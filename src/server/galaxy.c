@@ -126,6 +126,10 @@ void save_galaxy() {
     fwrite(bases, sizeof(NPCBase), MAX_BASES, f);
     fwrite(players, sizeof(ConnectedPlayer), MAX_CLIENTS, f);
     fclose(f);
+    time_t now = time(NULL);
+    char *ts = ctime(&now);
+    ts[strlen(ts)-1] = '\0'; /* Remove newline */
+    printf("--- [%s] GALAXY SAVED TO galaxy.dat SUCCESSFULLY ---\n", ts);
 }
 
 int load_galaxy() {
