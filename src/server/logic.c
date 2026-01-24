@@ -274,29 +274,21 @@ void update_game_logic() {
             }
         }
 
-        /* Galactic Barrier Enforcement */
-        bool clamped = false;
-        if (players[i].gx < 0.05) { players[i].gx = 0.05; clamped = true; }
-        if (players[i].gx > 99.95) { players[i].gx = 99.95; clamped = true; }
-        if (players[i].gy < 0.05) { players[i].gy = 0.05; clamped = true; }
-        if (players[i].gy > 99.95) { players[i].gy = 99.95; clamped = true; }
-        if (players[i].gz < 0.05) { players[i].gz = 0.05; clamped = true; }
-        if (players[i].gz > 99.95) { players[i].gz = 99.95; clamped = true; }
+        /* Galactic Barrier Enforcement: Standardized for all axes and corners */
+        bool hit_barrier = false;
+        if (players[i].gx < 0.05) { players[i].gx = 0.05; hit_barrier = true; }
+        else if (players[i].gx > 99.95) { players[i].gx = 99.95; hit_barrier = true; }
+        
+        if (players[i].gy < 0.05) { players[i].gy = 0.05; hit_barrier = true; }
+        else if (players[i].gy > 99.95) { players[i].gy = 99.95; hit_barrier = true; }
+        
+        if (players[i].gz < 0.05) { players[i].gz = 0.05; hit_barrier = true; }
+        else if (players[i].gz > 99.95) { players[i].gz = 99.95; hit_barrier = true; }
 
-        if (players[i].nav_state == NAV_STATE_CHASE) {
-            /* If in chase mode, we slide along the barrier instead of stopping */
-            if (players[i].gx < 0.05) players[i].gx = 0.05;
-            if (players[i].gx > 99.95) players[i].gx = 99.95;
-            if (players[i].gy < 0.05) players[i].gy = 0.05;
-            if (players[i].gy > 99.95) players[i].gy = 99.95;
-            if (players[i].gz < 0.05) players[i].gz = 0.05;
-            if (players[i].gz > 99.95) players[i].gz = 99.95;
-        } else {
-            if (clamped && players[i].nav_state != NAV_STATE_IDLE) {
-                players[i].nav_state = NAV_STATE_IDLE;
-                players[i].warp_speed = 0;
-                send_server_msg(i, "HELMSMAN", "Warning: We have hit the Galactic Barrier. Engines disengaged.");
-            }
+        if (hit_barrier && players[i].nav_state != NAV_STATE_CHASE && players[i].nav_state != NAV_STATE_IDLE) {
+            players[i].nav_state = NAV_STATE_IDLE;
+            players[i].warp_speed = 0;
+            send_server_msg(i, "HELMSMAN", "Warning: We have hit the Galactic Barrier. Engines disengaged.");
         }
 
         /* Update Sector Coordinates and Quadrant */

@@ -443,10 +443,26 @@ void handle_dam(int i, const char *params) {
 }
 
 void handle_cal(int i, const char *params) {
-    int qx,qy,qz; if(sscanf(params,"%d %d %d",&qx,&qy,&qz)==3) {
-        double dx=(qx-players[i].state.q1)*10.0, dy=(qy-players[i].state.q2)*10.0, dz=(qz-players[i].state.q3)*10.0;
-        double h=atan2(dx,-dy)*180.0/M_PI; if(h<0)h+=360.0; double d=sqrt(dx*dx+dy*dy+dz*dz); double m=asin(dz/d)*180.0/M_PI;
-        char buf[128]; sprintf(buf,"Course to Q[%d,%d,%d]: H:%.1f M:%.1f W:%.2f", qx,qy,qz,h,m,d/10.0); send_server_msg(i,"COMPUTER",buf);
+    int qx,qy,qz; 
+    if(sscanf(params,"%d %d %d",&qx,&qy,&qz)==3) {
+        double dx=(qx-players[i].state.q1)*10.0;
+        double dy=(qy-players[i].state.q2)*10.0;
+        double dz=(qz-players[i].state.q3)*10.0;
+        double d=sqrt(dx*dx+dy*dy+dz*dz);
+        
+        double h=0, m=0;
+        if (d > 0.001) {
+            h=atan2(dx,-dy)*180.0/M_PI; if(h<0)h+=360.0;
+            m=asin(dz/d)*180.0/M_PI;
+        }
+        
+        char buf[128]; 
+        if (d < 0.001) {
+            sprintf(buf, "Navigation: Ship is already at Q[%d,%d,%d].", qx, qy, qz);
+        } else {
+            sprintf(buf,"Course to Q[%d,%d,%d]: H:%.1f M:%.1f W:%.2f", qx,qy,qz,h,m,d/10.0);
+        }
+        send_server_msg(i,"COMPUTER",buf);
     }
 }
 
