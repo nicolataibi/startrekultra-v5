@@ -992,21 +992,22 @@ void drawGalaxyMap() {
                 if (is_my_q) {
                     /* Highlight current quadrant: Pulsing White + Label */
                     float s_glow = 0.4f + sin(pulse*6.0f)*0.15f;
-                    glDisable(GL_LIGHTING);
                     glColor4f(1, 1, 1, 0.8);
                     glutWireCube(s_glow);
                     glColor3f(1, 1, 1);
                     drawText3D(-0.3f, 0.4f, 0, "YOU");
-                    glEnable(GL_LIGHTING);
                 }
 
-                if (bh > 0) glColor3f(0.8, 0, 1); /* Purple */
-                else if (en > 0) glColor3f(1, 0, 0); /* Red */
-                else if (bs > 0) glColor3f(0, 1, 0); /* Green */
-                else if (pl > 0) glColor3f(0, 0.8, 1); /* Cyan */
-                else if (st > 0) glColor3f(1, 1, 0); /* Yellow */
-                
-                glutSolidCube(0.15);
+                if (val > 0) {
+                    if (bh > 0) glColor3f(0.8, 0, 1); /* Purple - High Priority */
+                    else if (en > 0) glColor3f(1, 0, 0); /* Red */
+                    else if (bs > 0) glColor3f(0, 1, 0); /* Green */
+                    else if (pl > 0) glColor3f(0, 0.8, 1); /* Cyan */
+                    else if (st > 0) glColor3f(1, 1, 0); /* Yellow - Low Priority */
+                    else glColor3f(0.4, 0.4, 0.4); /* Dark gray fallback */
+                    
+                    glutSolidCube(0.15);
+                }
                 glPopMatrix();
             }
         }
@@ -1168,7 +1169,7 @@ void display() {
             glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1000, 0, 1000); glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
             glDisable(GL_LIGHTING); glColor3f(1, 1, 0);
             drawText3D(20, 960, 0, "--- STELLAR CARTOGRAPHY: FULL GALAXY VIEW ---");
-            drawText3D(20, 935, 0, "RED: Hostiles | GREEN: Bases | CYAN: Planets | PURPLE: Black Holes");
+            drawText3D(20, 935, 0, "RED: Hostiles | GREEN: Bases | CYAN: Planets | PURPLE: Black Holes | YELLOW: Stars");
             glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
         }
     }

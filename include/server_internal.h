@@ -70,11 +70,11 @@ typedef struct {
 typedef struct { int id, q1, q2, q3; double x, y, z; int resource_type, amount, active; } NPCPlanet;
 typedef struct { int id, faction, q1, q2, q3; double x, y, z; int health, active; } NPCBase;
 
-#define MAX_NPC 600
-#define MAX_PLANETS 400
-#define MAX_BASES 100
-#define MAX_STARS 1200
-#define MAX_BH 100
+#define MAX_NPC 1000
+#define MAX_PLANETS 1000
+#define MAX_BASES 200
+#define MAX_STARS 3000
+#define MAX_BH 200
 
 /* Local Quadrant Limits for Spatial Index (Optimization) */
 #define MAX_Q_NPC 32
@@ -97,7 +97,7 @@ extern int g_debug;
 
 #define LOG_DEBUG(...) do { if (g_debug) { printf("DEBUG: " __VA_ARGS__); fflush(stdout); } } while (0)
 
-#define GALAXY_VERSION 20260125
+#define GALAXY_VERSION 20260126
 
 /* Spatial Partitioning Index */
 typedef struct {

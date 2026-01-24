@@ -206,7 +206,14 @@ void generate_galaxy() {
                     black_holes[bh_count] = (NPCBlackHole){.id=bh_count, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .active=1}; bh_count++; actual_bh++;
                 }
 
-                galaxy_master.g[i][j][l] = actual_bh * 10000 + actual_p * 1000 + actual_k * 100 + actual_b * 10 + actual_s;
+                /* Cap values to 9 for BPNBS encoding */
+                int c_bh = actual_bh > 9 ? 9 : actual_bh;
+                int c_p = actual_p > 9 ? 9 : actual_p;
+                int c_k = actual_k > 9 ? 9 : actual_k;
+                int c_b = actual_b > 9 ? 9 : actual_b;
+                int c_s = actual_s > 9 ? 9 : actual_s;
+
+                galaxy_master.g[i][j][l] = c_bh * 10000 + c_p * 1000 + c_k * 100 + c_b * 10 + c_s;
                 galaxy_master.k9 += actual_k;
                 galaxy_master.b9 += actual_b;
             }
