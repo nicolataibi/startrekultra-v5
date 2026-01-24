@@ -1,0 +1,88 @@
+/* 
+ * STARTREK ULTRA - 3D LOGIC ENGINE 
+ * Authors: Nicola Taibi, Supported by Google Gemini
+ * Copyright (C) 2026 Nicola Taibi
+ * License: GNU General Public License v3.0
+ */
+
+#ifndef SHARED_STATE_H
+#define SHARED_STATE_H
+
+#include <pthread.h>
+#include <semaphore.h>
+
+#define MAX_OBJECTS 200
+#define MAX_BEAMS 10
+#define SHM_NAME "/startrek_ultra_shm"
+
+/* 
+ * Shared State Structure
+ * Replaces the textual format of /tmp/ultra_map.dat
+ */
+
+typedef struct {
+    float shm_x, shm_y, shm_z;
+    float h, m;
+    int type; /* 1=Player, 3=Base, 4=Star, 5=Planet, 6=BH, 10+=Enemies */
+    int ship_class;
+    int active;
+    int health_pct;
+    int id;
+    char shm_name[64];
+} SharedObject;
+
+typedef struct {
+    float shm_tx, shm_ty, shm_tz;
+    int active;
+} SharedBeam;
+
+typedef struct {
+    float shm_x, shm_y, shm_z;
+    int active;
+} SharedPoint;
+
+typedef struct {
+    float shm_x, shm_y, shm_z;
+    int species;
+    int active;
+} SharedDismantle;
+
+typedef struct {
+    pthread_mutex_t mutex;
+    sem_t data_ready;
+    
+    /* UI Info */
+    int shm_energy;
+    int shm_crew;
+    int shm_shields[6];
+    int shm_cargo_energy;
+    int shm_cargo_torpedoes;
+    int inventory[7];
+    int klingons;
+    char quadrant[128];
+    int shm_show_axes;
+    int shm_show_grid;
+    int shm_show_map;
+    int is_cloaked;
+    int shm_q[3]; /* Current Quadrant [x,y,z] */
+
+    /* Full Galaxy Data for Map Mode */
+    int shm_galaxy[11][11][11];
+
+    /* Object List */
+    int object_count;
+    SharedObject objects[MAX_OBJECTS];
+
+    /* FX */
+    int beam_count;
+    SharedBeam beams[MAX_BEAMS];
+    
+    SharedPoint torp;
+    SharedPoint boom;
+    SharedDismantle dismantle;
+    
+    /* Synchronization counter */
+    long long frame_id;
+} GameState;
+
+#endif
