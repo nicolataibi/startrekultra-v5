@@ -1,6 +1,8 @@
 # Star Trek Ultra: 3D Multi-User Client-Server Edition
 **Persistent Galaxy Tactical Navigation & Combat Simulator**
 
+![USS Enterprise](Enterprise.jpg)
+
 Star Trek Ultra è un simulatore spaziale avanzato che unisce la profondità strategica dei classici giochi testuali "Trek" anni '70 con un'architettura moderna Client-Server e una visualizzazione 3D accelerata hardware.
 
 ---
