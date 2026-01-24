@@ -1181,6 +1181,12 @@ void display() {
 
     char buf[256]; 
     if (!g_show_map) {
+        /* Captain and Ship Info Header */
+        glColor3f(1.0f, 1.0f, 0.0f); /* Yellow */
+        sprintf(buf, "%s - CMDR: %s", getClassName(objects[0].ship_class), objects[0].name);
+        drawText3D(20, 955, 0, buf);
+
+        glColor3f(0.0f, 1.0f, 1.0f); /* Cyan */
         float disp_s1 = enterpriseX + 5.5f;
         float disp_s2 = 5.5f - enterpriseZ;
         float disp_s3 = enterpriseY + 5.5f;
