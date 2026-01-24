@@ -97,7 +97,7 @@ extern int g_debug;
 
 #define LOG_DEBUG(...) do { if (g_debug) { printf("DEBUG: " __VA_ARGS__); fflush(stdout); } } while (0)
 
-#define GALAXY_VERSION 20260124
+#define GALAXY_VERSION 20260125
 
 /* Spatial Partitioning Index */
 typedef struct {

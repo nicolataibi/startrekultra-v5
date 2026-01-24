@@ -150,7 +150,9 @@ int main(int argc, char *argv[]) {
                                                             players[slot].state.q1 = rand()%10 + 1; players[slot].state.q2 = rand()%10 + 1; players[slot].state.q3 = rand()%10 + 1;                                    players[slot].state.s1 = 5.0; players[slot].state.s2 = 5.0; players[slot].state.s3 = 5.0;
                                     for(int s=0; s<8; s++) players[slot].state.system_health[s] = 100.0f;
                                 }
+                                LOG_DEBUG("Synchronizing Galaxy Master (%zu bytes) to FD %d\n", sizeof(StarTrekGame), fd);
                                 if (write_all(fd, &galaxy_master, sizeof(StarTrekGame)) == sizeof(StarTrekGame)) {
+                                    LOG_DEBUG("Galaxy Master sent successfully to FD %d\n", fd);
                                     /* Emergency Rescue Check: If ship is inside a celestial body or has no energy/crew, relocate */
                                     bool needs_rescue = false;
                                     if (players[slot].state.energy <= 0 || players[slot].state.crew_count <= 0) needs_rescue = true;

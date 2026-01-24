@@ -75,10 +75,23 @@ void initShaders() {
 
     const char* bhFrag = "#version 120\n"
         "uniform float time;\n"
-        "void main() { vec2 uv = gl_FragCoord.xy / vec2(1024.0, 768.0);\n"
-        "float d = distance(uv, vec2(0.5, 0.5));\n"
-        "gl_FragColor = vec4(0.1, 0.0, 0.2, 0.8 * sin(time + d*10.0)); }";
-    bhShaderProgram = linkProgram(sv, compileShader(bhFrag, GL_FRAGMENT_SHADER));
+        "varying vec3 pos;\n"
+        "void main() {\n"
+        "  float d = length(pos);\n"
+        "  float ripple = sin(d * 20.0 - time * 10.0) * 0.5 + 0.5;\n"
+        "  vec3 col = vec3(0.4, 0.0, 0.8) * (1.0 - d) + vec3(0.1, 0.0, 0.2);\n"
+        "  gl_FragColor = vec4(col * ripple, 0.7);\n"
+        "}";
+    
+    const char* bhVert = "#version 120\n"
+        "varying vec3 pos;\n"
+        "void main() {\n"
+        "  pos = gl_Vertex.xyz;\n"
+        "  gl_Position = ftransform();\n"
+        "}";
+    bhShaderProgram = linkProgram(compileShader(bhVert, GL_VERTEX_SHADER), compileShader(bhFrag, GL_FRAGMENT_SHADER));
+
+    /* Advanced Ship Shader */
 }
 
 int shm_fd = -1;
@@ -900,19 +913,25 @@ void drawBlackHole(float x, float y, float z) {
     /* Event Horizon - Solid Black */
     glDisable(GL_LIGHTING);
     glColor3f(0.0f, 0.0f, 0.0f);
-    glutSolidSphere(0.4, 32, 32);
+    glutSolidSphere(0.2, 32, 32); 
     
-    /* Accretion Disk - Rotating Rings */
-    glRotatef(pulse*20, 1, 1, 0);
-    for(int i=0; i<5; i++) {
-        float r = 0.5f + i*0.15f + sin(pulse*2)*0.05f;
-        glColor4f(0.6f - i*0.1f, 0.0f, 0.8f, 0.5f - i*0.1f);
-        glutWireTorus(0.02, r, 10, 40);
+    /* Photon Ring - Bright white/violet edge */
+    float p_ring = 0.21f + sin(pulse*5.0f)*0.005f;
+    glColor4f(0.9f, 0.7f, 1.0f, 0.8f);
+    glutWireSphere(p_ring, 32, 32);
+
+    /* Accretion Disk - Rotating vibrant rings */
+    glRotatef(pulse*30, 1, 1, 0);
+    for(int i=0; i<6; i++) {
+        float r = 0.25f + i*0.08f + sin(pulse*2.5f + i)*0.02f;
+        glColor4f(0.9f - i*0.1f, 0.3f, 1.0f, 0.8f - i*0.1f);
+        glutWireTorus(0.015, r, 12, 50);
     }
     
-    /* Gravitational Lensing / Glow */
-    glColor4f(0.3f, 0.0f, 0.5f, 0.2f);
-    glutSolidSphere(1.2, 20, 20);
+    /* Gravitational Lensing / Volumetric Glow */
+    glRotatef(-pulse*10, 0, 1, 1);
+    glColor4f(0.5f, 0.1f, 0.8f, 0.25f);
+    glutSolidSphere(0.9, 20, 20);
     
     glEnable(GL_LIGHTING);
     glPopMatrix();
@@ -942,7 +961,7 @@ void drawGalaxyMap() {
                 int cx = v_coords[vx], cy = v_coords[vy], cz = v_coords[vz];
                 float px = offset + cx * gap;
                 float py = offset + cz * gap;
-                float pz = offset + cy * gap;
+                float pz = offset + (11 - cy) * gap; /* Inverted Y for map display consistency */
                 sprintf(vbuf, "[%d,%d,%d]", cx, cy, cz);
                 drawText3D(px, py + 0.3f, pz, vbuf);
             }
@@ -953,11 +972,12 @@ void drawGalaxyMap() {
         for(int y=1; y<=10; y++) {
             for(int x=1; x<=10; x++) {
                 int val = g_galaxy[x][y][z];
-                if (val == 0) continue;
+                bool is_my_q = (x == g_my_q[0] && y == g_my_q[1] && z == g_my_q[2]);
+                if (val == 0 && !is_my_q) continue;
 
                 float px = offset + x * gap;
-                float py = offset + z * gap; /* Z is vertical in my map view */
-                float pz = offset + y * gap;
+                float py = offset + z * gap;
+                float pz = offset + (11 - y) * gap;
 
                 /* Color coding based on BPNBS (Blackhole, Planet, Enemy, Base, Star) */
                 int bh = (val / 10000) % 10;
@@ -969,11 +989,15 @@ void drawGalaxyMap() {
                 glPushMatrix();
                 glTranslatef(px, py, pz);
                 
-                if (x == g_my_q[0] && y == g_my_q[1] && z == g_my_q[2]) {
-                    /* Highlight current quadrant */
+                if (is_my_q) {
+                    /* Highlight current quadrant: Pulsing White + Label */
+                    float s_glow = 0.4f + sin(pulse*6.0f)*0.15f;
+                    glDisable(GL_LIGHTING);
+                    glColor4f(1, 1, 1, 0.8);
+                    glutWireCube(s_glow);
                     glColor3f(1, 1, 1);
-                    float s = 0.3f + sin(pulse*5)*0.1f;
-                    glutWireCube(s);
+                    drawText3D(-0.3f, 0.4f, 0, "YOU");
+                    glEnable(GL_LIGHTING);
                 }
 
                 if (bh > 0) glColor3f(0.8, 0, 1); /* Purple */
@@ -1191,7 +1215,8 @@ void timer(int v) {
     }
 
     /* Update Objects with Interpolation */
-    for (int i = 0; i < objectCount; i++) {
+    for (int i = 0; i < 200; i++) {
+        if (objects[i].id == 0) continue;
         /* Interpolazione fluida per la posizione (LERP) */
         float interp_speed = 0.25f;
         objects[i].x += (objects[i].tx - objects[i].x) * interp_speed;

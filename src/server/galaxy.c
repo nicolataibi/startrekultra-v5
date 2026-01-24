@@ -173,7 +173,7 @@ void generate_galaxy() {
                 int base = (rand()%100 > 98) ? 1 : 0;
                 int planets_cnt = (rand()%100 > 90) ? (rand()%2 + 1) : 0;
                 int star = (rand()%100 < 40) ? (rand()%3 + 1) : 0;
-                int bh = (rand()%100 < 5) ? 1 : 0;
+                int bh = (rand()%100 < 10) ? 1 : 0;
                 
                 int actual_k = 0, actual_b = 0, actual_p = 0, actual_s = 0, actual_bh = 0;
                 

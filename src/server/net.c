@@ -32,7 +32,6 @@ int write_all(int fd, const void *buf, size_t len) {
         ssize_t n = send(fd, p + total, len - total, 0);
         if (n <= 0) return (int)n;
         total += n;
-        if (g_debug && len > 100) LOG_DEBUG("write_all progress: %zu/%zu bytes\n", total, len);
     }
     return (int)total;
 }

@@ -143,9 +143,6 @@ int read_all(int fd, void *buf, size_t len) {
             return -1;
         }
         total += n;
-        if (len > 100) {
-            LOG_DEBUG("read_all progress: %zu/%zu bytes\n", total, len);
-        }
     }
     return (int)total;
 }
@@ -398,6 +395,7 @@ int main(int argc, char *argv[]) {
 
     /* Ricezione Galassia Master (Sincronizzazione iniziale) */
     StarTrekGame master_sync;
+    printf("Synchronizing with Galaxy Server...\n");
     LOG_DEBUG("Waiting for Galaxy Master (%zu bytes)...\n", sizeof(StarTrekGame));
     if (read_all(sock, &master_sync, sizeof(StarTrekGame)) == sizeof(StarTrekGame)) {
         printf(B_GREEN "Galaxy Map synchronized.\n" RESET);
