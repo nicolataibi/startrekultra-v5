@@ -213,7 +213,11 @@ void handle_pha(int i, const char *params) {
                     int dmg_rem = hit;
                     for (int s=0; s<6; s++) { if (dmg_rem <= 0) break; int abs = (players[tid-1].state.shields[s] >= dmg_rem/6) ? dmg_rem/6 : players[tid-1].state.shields[s]; players[tid-1].state.shields[s] -= abs; dmg_rem -= abs; }
                     players[tid-1].state.energy -= dmg_rem;
-                    if (players[tid-1].state.energy <= 0) { players[tid-1].active = 0; players[tid-1].state.boom = (NetPoint){(float)players[tid-1].state.s1, (float)players[tid-1].state.s2, (float)players[tid-1].state.s3, 1}; }
+                    if (players[tid-1].state.energy <= 0) { 
+                        players[tid-1].state.energy = 0; players[tid-1].state.crew_count = 0;
+                        players[tid-1].nav_state = NAV_STATE_IDLE; players[tid-1].warp_speed = 0;
+                        players[tid-1].state.boom = (NetPoint){(float)players[tid-1].state.s1, (float)players[tid-1].state.s2, (float)players[tid-1].state.s3, 1}; 
+                    }
                 } else if (tid >= 100 && tid < 500) {
                     npcs[tid-100].energy -= hit; float engine_dmg = (hit / 1000.0f) * 10.0f; npcs[tid-100].engine_health -= engine_dmg; if (npcs[tid-100].engine_health < 0) npcs[tid-100].engine_health = 0;
                     if (npcs[tid-100].energy <= 0) { npcs[tid-100].active = 0; players[i].state.boom = (NetPoint){(float)npcs[tid-100].x, (float)npcs[tid-100].y, (float)npcs[tid-100].z, 1}; }
@@ -389,9 +393,9 @@ void handle_psy(int i, const char *params) {
 
 void handle_xxx(int i, const char *params) {
     send_server_msg(i, "CRITICAL", "SELF-DESTRUCT INITIATED. GODSPEED, CAPTAIN.");
-    players[i].active = 0;
+    players[i].state.energy = 0; players[i].state.crew_count = 0;
+    players[i].nav_state = NAV_STATE_IDLE; players[i].warp_speed = 0;
     players[i].state.boom = (NetPoint){(float)players[i].state.s1, (float)players[i].state.s2, (float)players[i].state.s3, 1};
-    /* Radial damage logic could be added here in logic.c */
 }
 
 void handle_rep(int i, const char *params) {
@@ -485,7 +489,10 @@ void handle_aux(int i, const char *params) {
         char buf[512]; sprintf(buf, "\n--- STRATEGIC ANALYSIS ---\nHostiles: %d\nBases: %d\nStability: %.1f%%", galaxy_master.k9, galaxy_master.b9, (1.0-(float)galaxy_master.k9/200.0)*100.0);
         send_server_msg(i, "COMPUTER", buf);
     } else if (strncmp(params, "jettison", 8) == 0) {
-        send_server_msg(i, "ENGINEERING", "CORE JETTISONED!"); players[i].state.boom=(NetPoint){(float)players[i].state.s1,(float)players[i].state.s2,(float)players[i].state.s3,1}; players[i].active=0;
+        send_server_msg(i, "ENGINEERING", "CORE JETTISONED!"); 
+        players[i].state.energy = 0; players[i].state.crew_count = 0;
+        players[i].nav_state = NAV_STATE_IDLE; players[i].warp_speed = 0;
+        players[i].state.boom = (NetPoint){(float)players[i].state.s1,(float)players[i].state.s2,(float)players[i].state.s3,1};
     }
 }
 
@@ -518,6 +525,7 @@ static const CommandDef command_registry[] = {
     {"cal ", handle_cal, "Navigation Calculator"},
     {"who",  handle_who, "Active Captains List"},
     {"aux ", handle_aux, "Auxiliary Systems"},
+    {"xxx",  handle_xxx, "Self-Destruct"},
     {NULL, NULL, NULL}
 };
 

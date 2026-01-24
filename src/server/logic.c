@@ -301,13 +301,45 @@ void update_game_logic() {
 
         /* Collision Detection: Celestial Bodies */
         QuadrantIndex *current_q = &spatial_index[players[i].state.q1][players[i].state.q2][players[i].state.q3];
-        for (int s = 0; s < current_q->star_count; s++) {
-            double d = sqrt(pow(players[i].state.s1 - current_q->stars[s]->x, 2) + pow(players[i].state.s2 - current_q->stars[s]->y, 2) + pow(players[i].state.s3 - current_q->stars[s]->z, 2));
-            if (d < 0.8) { send_server_msg(i, "CRITICAL", "Impact with star corona! Hull melting..."); players[i].active = 0; players[i].state.boom = (NetPoint){(float)players[i].state.s1, (float)players[i].state.s2, (float)players[i].state.s3, 1}; break; }
+        for (int h = 0; h < current_q->bh_count; h++) {
+            double d = sqrt(pow(players[i].state.s1 - current_q->black_holes[h]->x, 2) + pow(players[i].state.s2 - current_q->black_holes[h]->y, 2) + pow(players[i].state.s3 - current_q->black_holes[h]->z, 2));
+            if (d < 2.5) {
+                /* Gravity Well Effect: Drain Shields and Energy */
+                int drain = (int)((2.5 - d) * 1000.0);
+                for(int s=0; s<6; s++) { if(players[i].state.shields[s] > 0) players[i].state.shields[s] -= (drain/10); if(players[i].state.shields[s] < 0) players[i].state.shields[s] = 0; }
+                players[i].state.energy -= drain;
+                if (global_tick % 20 == 0) send_server_msg(i, "WARNING", "Extreme gravitational shear detected! Hull integrity at risk.");
+            }
+            if (d < 0.6) { 
+                send_server_msg(i, "CRITICAL", "Event Horizon crossed! Spaghettification in progress..."); 
+                players[i].state.energy = 0; players[i].state.crew_count = 0;
+                players[i].nav_state = NAV_STATE_IDLE; players[i].warp_speed = 0;
+                players[i].dx = 0; players[i].dy = 0; players[i].dz = 0;
+                players[i].state.boom = (NetPoint){(float)players[i].state.s1, (float)players[i].state.s2, (float)players[i].state.s3, 1}; 
+                break; 
+            }
         }
-        if (players[i].active) for (int p = 0; p < current_q->planet_count; p++) {
+        if (players[i].active && players[i].state.energy > 0) for (int s = 0; s < current_q->star_count; s++) {
+            double d = sqrt(pow(players[i].state.s1 - current_q->stars[s]->x, 2) + pow(players[i].state.s2 - current_q->stars[s]->y, 2) + pow(players[i].state.s3 - current_q->stars[s]->z, 2));
+            if (d < 0.8) { 
+                send_server_msg(i, "CRITICAL", "Impact with star corona! Hull melting..."); 
+                players[i].state.energy = 0; players[i].state.crew_count = 0;
+                players[i].nav_state = NAV_STATE_IDLE; players[i].warp_speed = 0;
+                players[i].dx = 0; players[i].dy = 0; players[i].dz = 0;
+                players[i].state.boom = (NetPoint){(float)players[i].state.s1, (float)players[i].state.s2, (float)players[i].state.s3, 1}; 
+                break; 
+            }
+        }
+        if (players[i].active && players[i].state.energy > 0) for (int p = 0; p < current_q->planet_count; p++) {
             double d = sqrt(pow(players[i].state.s1 - current_q->planets[p]->x, 2) + pow(players[i].state.s2 - current_q->planets[p]->y, 2) + pow(players[i].state.s3 - current_q->planets[p]->z, 2));
-            if (d < 0.8) { send_server_msg(i, "CRITICAL", "Planetary collision! Structural failure."); players[i].active = 0; players[i].state.boom = (NetPoint){(float)players[i].state.s1, (float)players[i].state.s2, (float)players[i].state.s3, 1}; break; }
+            if (d < 0.8) { 
+                send_server_msg(i, "CRITICAL", "Planetary collision! Structural failure."); 
+                players[i].state.energy = 0; players[i].state.crew_count = 0;
+                players[i].nav_state = NAV_STATE_IDLE; players[i].warp_speed = 0;
+                players[i].dx = 0; players[i].dy = 0; players[i].dz = 0;
+                players[i].state.boom = (NetPoint){(float)players[i].state.s1, (float)players[i].state.s2, (float)players[i].state.s3, 1}; 
+                break; 
+            }
         }
 
         /* Target Lock Validation (Inter-Quadrant aware) */
@@ -375,7 +407,11 @@ void update_game_logic() {
                     int dmg = 75000;
                     for(int s=0;s<6;s++) { int abs=(p->state.shields[s]>=dmg/6)?dmg/6:p->state.shields[s]; p->state.shields[s]-=abs; dmg-=abs; }
                     p->state.energy -= dmg; send_server_msg((int)(p-players), "WARNING", "HIT BY PHOTON TORPEDO!");
-                    if(p->state.energy <= 0) { p->active = 0; p->state.boom = (NetPoint){(float)p->state.s1, (float)p->state.s2, (float)p->state.s3, 1}; }
+                    if(p->state.energy <= 0) { 
+                        p->state.energy = 0; p->state.crew_count = 0;
+                        p->nav_state = NAV_STATE_IDLE; p->warp_speed = 0;
+                        p->state.boom = (NetPoint){(float)p->state.s1, (float)p->state.s2, (float)p->state.s3, 1}; 
+                    }
                     hit = true; break;
                 }
             }
@@ -397,7 +433,7 @@ void update_game_logic() {
 
     /* Phase 3: Network Updates */
     for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (!players[i].active || players[i].socket == 0) continue;
+        if (players[i].socket == 0) continue;
         pthread_mutex_lock(&game_mutex);
         PacketUpdate upd; memset(&upd, 0, sizeof(PacketUpdate)); upd.type = PKT_UPDATE;
         upd.q1 = players[i].state.q1; upd.q2 = players[i].state.q2; upd.q3 = players[i].state.q3;

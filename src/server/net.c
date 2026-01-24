@@ -37,21 +37,33 @@ int write_all(int fd, const void *buf, size_t len) {
 }
 
 void broadcast_message(PacketMessage *msg) {
+    int sockets[MAX_CLIENTS];
+    int factions[MAX_CLIENTS];
+    int count = 0;
+
     pthread_mutex_lock(&game_mutex);
     msg->length = strlen(msg->text);
     size_t pkt_size = offsetof(PacketMessage, text) + msg->length + 1;
     if (pkt_size > sizeof(PacketMessage)) pkt_size = sizeof(PacketMessage);
 
-    for (int i = 0; i < MAX_CLIENTS; i++) if (players[i].active && players[i].socket != 0) {
-        if (msg->scope == SCOPE_FACTION && players[i].faction != msg->faction) continue;
-        if (msg->scope == SCOPE_PRIVATE) {
-            bool is_target = ((i + 1) == msg->target_id);
-            bool is_sender = (strcmp(players[i].name, msg->from) == 0);
-            if (!is_target && !is_sender) continue;
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (players[i].active && players[i].socket != 0) {
+            if (msg->scope == SCOPE_FACTION && players[i].faction != msg->faction) continue;
+            if (msg->scope == SCOPE_PRIVATE) {
+                bool is_target = ((i + 1) == msg->target_id);
+                bool is_sender = (strcmp(players[i].name, msg->from) == 0);
+                if (!is_target && !is_sender) continue;
+            }
+            sockets[count] = players[i].socket;
+            factions[count] = players[i].faction;
+            count++;
         }
-        write_all(players[i].socket, msg, pkt_size);
     }
     pthread_mutex_unlock(&game_mutex);
+
+    for (int i = 0; i < count; i++) {
+        write_all(sockets[i], msg, pkt_size);
+    }
 }
 
 void send_server_msg(int p_idx, const char *from, const char *text) {

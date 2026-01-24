@@ -73,7 +73,7 @@ void enable_raw_mode() {
 }
 
 void reprint_prompt() {
-    printf("\r\033[KCommand? %s", g_input_buf);
+    printf("\r\033[K" B_WHITE "%s" RESET "> Command? %s", captain_name, g_input_buf);
     fflush(stdout);
 }
 

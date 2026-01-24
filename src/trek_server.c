@@ -110,50 +110,50 @@ int main(int argc, char *argv[]) {
                 if (type == PKT_QUERY || type == PKT_LOGIN) {
                     PacketLogin pkt;
                     if (read_all(fd, ((char*)&pkt) + sizeof(int), sizeof(PacketLogin) - sizeof(int)) > 0) {
-                        pthread_mutex_lock(&game_mutex);
                         if (type == PKT_QUERY) {
+                            pthread_mutex_lock(&game_mutex);
                             int found = 0;
                             for(int j=0; j<MAX_CLIENTS; j++) { if (players[j].name[0] != '\0' && strcmp(players[j].name, pkt.name) == 0) { found = 1; break; } }
+                            pthread_mutex_unlock(&game_mutex);
                             write_all(fd, &found, sizeof(int));
                         } else {
+                            pthread_mutex_lock(&game_mutex);
                             int slot = -1;
                             for(int j=0; j<MAX_CLIENTS; j++) { if (players[j].name[0] != '\0' && strcmp(players[j].name, pkt.name) == 0) { slot = j; break; } }
                             if (slot == -1) { for(int j=0; j<MAX_CLIENTS; j++) if (players[j].name[0] == '\0') { slot = j; break; } }
                             
                             if (slot != -1) {
-                                /* If re-logging, the previous socket is already handled by DEL above if it was closed, 
-                                   but here we might be replacing an active one? The previous select logic had close(players[slot].socket). */
                                 if (players[slot].socket != 0 && players[slot].socket != fd) {
                                     epoll_ctl(epoll_fd, EPOLL_CTL_DEL, players[slot].socket, NULL);
                                     close(players[slot].socket);
                                 }
                                 players[slot].socket = fd;
                                 int is_new = (players[slot].name[0] == '\0');
-                                                        if (is_new) {
-                                                            strcpy(players[slot].name, pkt.name); players[slot].faction = pkt.faction; players[slot].ship_class = pkt.ship_class;
-                                                            players[slot].state.energy = 100000; players[slot].state.torpedoes = 100;
-                                                            
-                                                            /* Initial Crew Based on Class */
-                                                            int crew = 400;
-                                                            switch(pkt.ship_class) {
-                                                                case SHIP_CLASS_GALAXY:    crew = 1012; break;
-                                                                case SHIP_CLASS_SOVEREIGN: crew = 850; break;
-                                                                case SHIP_CLASS_CONSTITUTION: crew = 430; break;
-                                                                case SHIP_CLASS_EXCELSIOR: crew = 750; break;
-                                                                case SHIP_CLASS_DEFIANT:   crew = 50; break;
-                                                                case SHIP_CLASS_INTREPID:  crew = 150; break;
-                                                                case SHIP_CLASS_OBERTH:    crew = 80; break;
-                                                                default: crew = 200; break;
-                                                            }
-                                                            players[slot].state.crew_count = crew;
-                                
-                                                            players[slot].state.q1 = rand()%10 + 1; players[slot].state.q2 = rand()%10 + 1; players[slot].state.q3 = rand()%10 + 1;                                    players[slot].state.s1 = 5.0; players[slot].state.s2 = 5.0; players[slot].state.s3 = 5.0;
+                                if (is_new) {
+                                    strcpy(players[slot].name, pkt.name); players[slot].faction = pkt.faction; players[slot].ship_class = pkt.ship_class;
+                                    players[slot].state.energy = 100000; players[slot].state.torpedoes = 100;
+                                    int crew = 400;
+                                    switch(pkt.ship_class) {
+                                        case SHIP_CLASS_GALAXY:    crew = 1012; break;
+                                        case SHIP_CLASS_SOVEREIGN: crew = 850; break;
+                                        case SHIP_CLASS_CONSTITUTION: crew = 430; break;
+                                        case SHIP_CLASS_EXCELSIOR: crew = 750; break;
+                                        case SHIP_CLASS_DEFIANT:   crew = 50; break;
+                                        case SHIP_CLASS_INTREPID:  crew = 150; break;
+                                        case SHIP_CLASS_OBERTH:    crew = 80; break;
+                                        default: crew = 200; break;
+                                    }
+                                    players[slot].state.crew_count = crew;
+                                    players[slot].state.q1 = rand()%10 + 1; players[slot].state.q2 = rand()%10 + 1; players[slot].state.q3 = rand()%10 + 1;
+                                    players[slot].state.s1 = 5.0; players[slot].state.s2 = 5.0; players[slot].state.s3 = 5.0;
                                     for(int s=0; s<8; s++) players[slot].state.system_health[s] = 100.0f;
                                 }
+                                pthread_mutex_unlock(&game_mutex);
+
                                 LOG_DEBUG("Synchronizing Galaxy Master (%zu bytes) to FD %d\n", sizeof(StarTrekGame), fd);
                                 if (write_all(fd, &galaxy_master, sizeof(StarTrekGame)) == sizeof(StarTrekGame)) {
+                                    pthread_mutex_lock(&game_mutex);
                                     LOG_DEBUG("Galaxy Master sent successfully to FD %d\n", fd);
-                                    /* Emergency Rescue Check: If ship is inside a celestial body or has no energy/crew, relocate */
                                     bool needs_rescue = false;
                                     if (players[slot].state.energy <= 0 || players[slot].state.crew_count <= 0) needs_rescue = true;
                                     
@@ -173,28 +173,27 @@ int main(int argc, char *argv[]) {
                                     if (needs_rescue) {
                                         players[slot].state.q1 = rand()%10 + 1; players[slot].state.q2 = rand()%10 + 1; players[slot].state.q3 = rand()%10 + 1;
                                         players[slot].state.s1 = 5.0; players[slot].state.s2 = 5.0; players[slot].state.s3 = 5.0;
-                                        players[slot].state.energy = 50000; /* Partial recharge */
+                                        players[slot].state.energy = 50000;
                                         if (players[slot].state.crew_count <= 0) players[slot].state.crew_count = 100;
-                                        for(int s=0; s<8; s++) players[slot].state.system_health[s] = 80.0f; /* Emergency repairs */
+                                        for(int s=0; s<8; s++) players[slot].state.system_health[s] = 80.0f;
                                         players[slot].gx = (players[slot].state.q1-1)*10.0 + 5.0;
                                         players[slot].gy = (players[slot].state.q2-1)*10.0 + 5.0;
                                         players[slot].gz = (players[slot].state.q3-1)*10.0 + 5.0;
-                                        
-                                        /* Reset movement to zero */
-                                        players[slot].nav_state = NAV_STATE_IDLE;
-                                        players[slot].warp_speed = 0;
+                                        players[slot].nav_state = NAV_STATE_IDLE; players[slot].warp_speed = 0;
                                         players[slot].dx = 0; players[slot].dy = 0; players[slot].dz = 0;
-                                        
                                         players[slot].active = 1;
+                                        pthread_mutex_unlock(&game_mutex);
                                         send_server_msg(slot, "STARFLEET", "EMERGENCY RESCUE: Your ship was recovered from a collision zone and towed to a safe sector.");
                                     } else {
                                         players[slot].active = 1;
+                                        pthread_mutex_unlock(&game_mutex);
                                         send_server_msg(slot, "SERVER", is_new ? "Welcome aboard, new Captain." : "Commander, welcome back.");
                                     }
                                 }
+                            } else {
+                                pthread_mutex_unlock(&game_mutex);
                             }
                         }
-                        pthread_mutex_unlock(&game_mutex);
                     }
                 } else if (p_idx != -1) {
                     if (type == PKT_COMMAND) {

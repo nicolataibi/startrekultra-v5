@@ -1299,110 +1299,47 @@ int main(int argc, char** argv) {
 
     for(int i=0; i<200; i++) { objects[i].x = objects[i].y = objects[i].z = -100.0f; }
 
-    
-
     printf("[3D VIEW] Starting...\n");
-
-
 
     char *shm_name = SHM_NAME; if (argc > 1) shm_name = argv[1];
 
     printf("[3D VIEW] Connecting to SHM: %s\n", shm_name);
-
     
 
     int retries = 0; 
 
     while(shm_fd == -1 && retries < 10) { 
-
         shm_fd = shm_open(shm_name, O_RDWR, 0666); 
-
         if (shm_fd == -1) { 
-
             printf("[3D VIEW] SHM not ready, retry %d/10...\n", retries+1);
-
             usleep(100000); retries++; 
-
         } 
-
     }
 
     
-
     if (shm_fd == -1) {
-
         fprintf(stderr, "[3D VIEW] FATAL: Could not access shared memory %s after retries.\n", shm_name);
-
         exit(1);
-
     }
 
-    
+    g_shared_state = mmap(NULL, sizeof(GameState), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 
-        g_shared_state = mmap(NULL, sizeof(GameState), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-
-    
-
-        if (g_shared_state == MAP_FAILED) {
-
-    
-
-            perror("[3D VIEW] mmap failed");
-
-    
-
-            exit(1);
-
-    
-
-        }
-
-    
-
-        printf("[3D VIEW] Shared memory mapped successfully.\n");
-
-    
-
+    if (g_shared_state == MAP_FAILED) {
+        perror("[3D VIEW] mmap failed");
+        exit(1);
+    }
         
-
+    printf("[3D VIEW] Shared memory mapped successfully.\n");
+    pthread_t stid;
     
+    if (pthread_create(&stid, NULL, shm_listener_thread, NULL) != 0) {
+        perror("[3D VIEW] Failed to create listener thread");
+        exit(1);
+    }
 
-        pthread_t stid;
-
-    
-
-        if (pthread_create(&stid, NULL, shm_listener_thread, NULL) != 0) {
-
-    
-
-            perror("[3D VIEW] Failed to create listener thread");
-
-    
-
-            exit(1);
-
-    
-
-        }
-
-    
-
-        
-
-    
-
-        printf("[3D VIEW] Initializing GLUT (check DISPLAY: %s)...\n", getenv("DISPLAY"));
-
-    
-
-        glutInit(&argc, argv); 
-
-    
-
-     
-
-
-     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH); glutInitWindowSize(1024, 768); glutCreateWindow("Trek 3DView - Multiuser");
+    printf("[3D VIEW] Initializing GLUT (check DISPLAY: %s)...\n", getenv("DISPLAY"));
+    glutInit(&argc, argv); 
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH); glutInitWindowSize(1024, 768); glutCreateWindow("Trek 3DView - Multiuser");
     
     /* Initialize Shader Engine */
     initShaders();
@@ -1416,5 +1353,5 @@ int main(int argc, char** argv) {
         kill(getppid(), SIGUSR2); 
         glutMainLoop(); 
         return 0;
-    }
+}
     
