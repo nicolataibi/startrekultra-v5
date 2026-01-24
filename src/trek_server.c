@@ -144,9 +144,15 @@ int main(int argc, char *argv[]) {
                                         default: crew = 200; break;
                                     }
                                     players[slot].state.crew_count = crew;
-                                    players[slot].state.q1 = rand()%10 + 1; players[slot].state.q2 = rand()%10 + 1; players[slot].state.q3 = rand()%10 + 1;
-                                    players[slot].state.s1 = 5.0; players[slot].state.s2 = 5.0; players[slot].state.s3 = 5.0;
-                                    for(int s=0; s<8; s++) players[slot].state.system_health[s] = 100.0f;
+                                                                        players[slot].state.q1 = rand()%10 + 1; players[slot].state.q2 = rand()%10 + 1; players[slot].state.q3 = rand()%10 + 1;
+                                                                        players[slot].state.s1 = 5.0; players[slot].state.s2 = 5.0; players[slot].state.s3 = 5.0;
+                                                                        
+                                                                        /* Initialize Absolute Galactic Coordinates */
+                                                                        players[slot].gx = (players[slot].state.q1 - 1) * 10.0 + players[slot].state.s1;
+                                                                        players[slot].gy = (players[slot].state.q2 - 1) * 10.0 + players[slot].state.s2;
+                                                                        players[slot].gz = (players[slot].state.q3 - 1) * 10.0 + players[slot].state.s3;
+                                                                        
+                                                                        for(int s=0; s<8; s++) players[slot].state.system_health[s] = 100.0f;
                                 }
                                 pthread_mutex_unlock(&game_mutex);
 

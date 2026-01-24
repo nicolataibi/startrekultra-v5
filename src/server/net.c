@@ -38,7 +38,6 @@ int write_all(int fd, const void *buf, size_t len) {
 
 void broadcast_message(PacketMessage *msg) {
     int sockets[MAX_CLIENTS];
-    int factions[MAX_CLIENTS];
     int count = 0;
 
     pthread_mutex_lock(&game_mutex);
@@ -55,7 +54,6 @@ void broadcast_message(PacketMessage *msg) {
                 if (!is_target && !is_sender) continue;
             }
             sockets[count] = players[i].socket;
-            factions[count] = players[i].faction;
             count++;
         }
     }

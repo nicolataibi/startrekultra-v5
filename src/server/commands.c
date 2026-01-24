@@ -43,7 +43,14 @@ void handle_nav(int i, const char *params) {
         players[i].target_gx = (players[i].state.q1-1)*10.0+players[i].state.s1+players[i].dx*w*10.0;
         players[i].target_gy = (players[i].state.q2-1)*10.0+players[i].state.s2+players[i].dy*w*10.0;
         players[i].target_gz = (players[i].state.q3-1)*10.0+players[i].state.s3+players[i].dz*w*10.0;
-        players[i].nav_state = NAV_STATE_ALIGN; players[i].nav_timer = 60;
+        players[i].nav_state = NAV_STATE_ALIGN; 
+        
+        /* Fast align if already close */
+        double diff_h = fabs(players[i].target_h - players[i].state.ent_h);
+        if (diff_h > 180) diff_h = 360 - diff_h;
+        if (diff_h < 1.0 && fabs(players[i].target_m - players[i].state.ent_m) < 1.0) players[i].nav_timer = 2;
+        else players[i].nav_timer = 60;
+        
         send_server_msg(i, "HELMSMAN", "Course plotted. Aligning ship.");
     } else {
         send_server_msg(i, "COMPUTER", "Usage: nav <H> <M> <W>");
@@ -72,7 +79,13 @@ void handle_imp(int i, const char *params) {
             players[i].dx = cos(rad_m) * sin(rad_h); players[i].dy = cos(rad_m) * -cos(rad_h); players[i].dz = sin(rad_m);
             players[i].warp_speed = s * 0.5; 
             players[i].nav_state = NAV_STATE_ALIGN_IMPULSE;
-            players[i].nav_timer = 60;
+            
+            /* Fast align if already close */
+            double diff_h = fabs(players[i].target_h - players[i].state.ent_h);
+            if (diff_h > 180) diff_h = 360 - diff_h;
+            if (diff_h < 1.0 && fabs(players[i].target_m - players[i].state.ent_m) < 1.0) players[i].nav_timer = 2;
+            else players[i].nav_timer = 60;
+
             send_server_msg(i, "HELMSMAN", "Course plotted. Aligning ship.");
         }
     } else {

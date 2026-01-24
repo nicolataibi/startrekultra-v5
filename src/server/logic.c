@@ -158,27 +158,34 @@ void update_game_logic() {
             players[i].gz = (players[i].state.q3-1)*10.0 + players[i].state.s3;
         }
 
-        if (players[i].nav_state == NAV_STATE_ALIGN) {
+        if (players[i].nav_state == NAV_STATE_ALIGN || players[i].nav_state == NAV_STATE_ALIGN_IMPULSE) {
             players[i].nav_timer--;
+            
+            double diff_h = players[i].target_h - players[i].start_h;
+            while (diff_h > 180.0) diff_h -= 360.0;
+            while (diff_h < -180.0) diff_h += 360.0;
+            
+            double diff_m = players[i].target_m - players[i].start_m;
+            
             double t = 1.0 - (double)players[i].nav_timer / 60.0;
-            players[i].state.ent_h = players[i].start_h + (players[i].target_h - players[i].start_h) * t;
-            players[i].state.ent_m = players[i].start_m + (players[i].target_m - players[i].start_m) * t;
+            players[i].state.ent_h = players[i].start_h + diff_h * t;
+            players[i].state.ent_m = players[i].start_m + diff_m * t;
+            
+            /* Normalize heading */
+            while (players[i].state.ent_h >= 360.0) players[i].state.ent_h -= 360.0;
+            while (players[i].state.ent_h < 0.0) players[i].state.ent_h += 360.0;
+
             if (players[i].nav_timer <= 0) {
-                players[i].nav_state = NAV_STATE_WARP;
-                double dist = sqrt(pow(players[i].target_gx - players[i].gx, 2) + pow(players[i].target_gy - players[i].gy, 2) + pow(players[i].target_gz - players[i].gz, 2));
-                players[i].nav_timer = (int)(dist / 10.0 * 90.0); if (players[i].nav_timer < 30) players[i].nav_timer = 30;
-                players[i].warp_speed = dist / players[i].nav_timer;
-            }
-        }
-        else if (players[i].nav_state == NAV_STATE_ALIGN_IMPULSE) {
-            players[i].nav_timer--;
-            double t = 1.0 - (double)players[i].nav_timer / 60.0;
-            players[i].state.ent_h = players[i].start_h + (players[i].target_h - players[i].start_h) * t;
-            players[i].state.ent_m = players[i].start_m + (players[i].target_m - players[i].start_m) * t;
-            if (players[i].nav_timer <= 0) {
-                players[i].nav_state = NAV_STATE_IMPULSE;
-                char msg[64]; sprintf(msg, "Impulse engaged at %.0f%%.", players[i].warp_speed * 200.0);
-                send_server_msg(i, "HELMSMAN", msg);
+                if (players[i].nav_state == NAV_STATE_ALIGN) {
+                    players[i].nav_state = NAV_STATE_WARP;
+                    double dist = sqrt(pow(players[i].target_gx - players[i].gx, 2) + pow(players[i].target_gy - players[i].gy, 2) + pow(players[i].target_gz - players[i].gz, 2));
+                    players[i].nav_timer = (int)(dist / 10.0 * 90.0); if (players[i].nav_timer < 30) players[i].nav_timer = 30;
+                    players[i].warp_speed = dist / players[i].nav_timer;
+                } else {
+                    players[i].nav_state = NAV_STATE_IMPULSE;
+                    char msg[64]; sprintf(msg, "Impulse engaged at %.0f%%.", players[i].warp_speed * 200.0);
+                    send_server_msg(i, "HELMSMAN", msg);
+                }
             }
         }
         else if (players[i].nav_state == NAV_STATE_WARP) {
