@@ -66,29 +66,50 @@ void init_static_spatial_index() {
 void rebuild_spatial_index() {
     if (!spatial_index) { init_static_spatial_index(); }
     
-    /* Optimization: Reset only dynamic object counts instead of full memset */
+    /* Optimization: Reset dynamic counts and refresh BPNBS index */
     for(int i=1; i<=10; i++)
         for(int j=1; j<=10; j++)
             for(int l=1; l<=10; l++) {
                 QuadrantIndex *q = &spatial_index[i][j][l];
                 q->npc_count = 0;
                 q->player_count = 0;
-                /* Static objects are preserved, their counts are already set to static_*_count */
+                /* Static objects are preserved */
                 q->planet_count = q->static_planet_count;
                 q->base_count = q->static_base_count;
                 q->star_count = q->static_star_count;
                 q->bh_count = q->static_bh_count;
+
+                /* Re-initialize BPNBS based on static objects */
+                int c_bh = q->bh_count > 9 ? 9 : q->bh_count;
+                int c_p = q->planet_count > 9 ? 9 : q->planet_count;
+                int c_b = q->base_count > 9 ? 9 : q->base_count;
+                int c_s = q->star_count > 9 ? 9 : q->star_count;
+                galaxy_master.g[i][j][l] = c_bh * 10000 + c_p * 1000 + c_b * 10 + c_s;
             }
 
     for(int n=0; n<MAX_NPC; n++) if(npcs[n].active) {
         if (!IS_Q_VALID(npcs[n].q1, npcs[n].q2, npcs[n].q3)) continue;
         QuadrantIndex *q = &spatial_index[npcs[n].q1][npcs[n].q2][npcs[n].q3];
-        if (q->npc_count < MAX_Q_NPC) { q->npcs[q->npc_count++] = &npcs[n]; }
+        if (q->npc_count < MAX_Q_NPC) { 
+            q->npcs[q->npc_count++] = &npcs[n]; 
+            /* Update BPNBS with current NPC count (Klingon/Enemy slot) */
+            int k_count = (q->npc_count > 9) ? 9 : q->npc_count;
+            int v = galaxy_master.g[npcs[n].q1][npcs[n].q2][npcs[n].q3];
+            /* Replace the 100s digit (K count) */
+            galaxy_master.g[npcs[n].q1][npcs[n].q2][npcs[n].q3] = (v / 1000 * 1000) + (k_count * 100) + (v % 100);
+        }
     }
     for(int u=0; u<MAX_CLIENTS; u++) if(players[u].active && players[u].name[0] != '\0') {
         if (!IS_Q_VALID(players[u].state.q1, players[u].state.q2, players[u].state.q3)) continue;
         QuadrantIndex *q = &spatial_index[players[u].state.q1][players[u].state.q2][players[u].state.q3];
-        if (q->player_count < MAX_Q_PLAYERS) { q->players[q->player_count++] = &players[u]; }
+        if (q->player_count < MAX_Q_PLAYERS) { 
+            q->players[q->player_count++] = &players[u]; 
+            /* Players also count as 'objects' in the K/NPC slot for simple LRS/BPNBS */
+            int total_k = (q->npc_count + q->player_count);
+            if (total_k > 9) total_k = 9;
+            int v = galaxy_master.g[players[u].state.q1][players[u].state.q2][players[u].state.q3];
+            galaxy_master.g[players[u].state.q1][players[u].state.q2][players[u].state.q3] = (v / 1000 * 1000) + (total_k * 100) + (v % 100);
+        }
     }
 }
 

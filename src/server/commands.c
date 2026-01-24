@@ -175,6 +175,14 @@ void handle_srs(int i, const char *params) {
         if (bid == locked_id) { strcat(status, RED "[LOCKED]" RESET); if(chasing) strcat(status, B_RED "[CHASE]" RESET); }
         char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Black Hole %s\n", "B-Hole", bid, bh->x, bh->y, bh->z, d, hh, m, status); strncat(b, line, sizeof(b)-strlen(b)-1);
     }
+    for(int b_idx=0; b_idx<local_q->base_count; b_idx++) {
+        NPCBase *ba = local_q->bases[b_idx];
+        double dx=ba->x-s1, dy=ba->y-s2, dz=ba->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
+        int baid = ba->id+500;
+        char status[64] = "";
+        if (baid == locked_id) { strcat(status, RED "[LOCKED]" RESET); if(chasing) strcat(status, B_RED "[CHASE]" RESET); }
+        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Federation Starbase %s\n", "Starbase", baid, ba->x, ba->y, ba->z, d, h, m, status); strncat(b, line, sizeof(b)-strlen(b)-1);
+    }
     send_server_msg(i, "COMPUTER", b);
 }
 
@@ -424,7 +432,7 @@ void handle_sta(int i, const char *params) {
     char b[4096]; const char* f_name = get_species_name(players[i].faction);
     const char* c_names[] = {"Constitution", "Miranda", "Excelsior", "Constellation", "Defiant", "Galaxy", "Sovereign", "Intrepid", "Akira", "Nebula", "Ambassador", "Oberth", "Steamrunner", "Vessel"};
     const char* class_name = (players[i].ship_class >= 0 && players[i].ship_class <= 13) ? c_names[players[i].ship_class] : "Unknown";
-    snprintf(b, sizeof(b), CYAN "\n.--- LCARS MAIN COMPUTER: SHIP DIAGNOSTICS -----------------------.\n" RESET WHITE " COMMANDER: %-18s CLASS: %-15s\n FACTION:   %-18s STATUS: %s\n" RESET, players[i].name, class_name, f_name, players[i].state.is_cloaked ? MAGENTA "[ CLOAKED ]" RESET : GREEN "[ ACTIVE ]" RESET);
+    snprintf(b, sizeof(b), CYAN "\n.--- LCARS MAIN COMPUTER: SHIP DIAGNOSTICS -----------------------.\n" RESET WHITE " COMMANDER: %-18s CLASS: %-15s\n FACTION:   %-18s STATUS: %s\n CREW COMPLEMENT: %d\n" RESET, players[i].name, class_name, f_name, players[i].state.is_cloaked ? MAGENTA "[ CLOAKED ]" RESET : GREEN "[ ACTIVE ]" RESET, players[i].state.crew_count);
     strcat(b, BLUE "\n[ POSITION AND TELEMETRY ]\n" RESET);
     snprintf(b+strlen(b), sizeof(b)-strlen(b), " QUADRANT: [%d,%d,%d]  SECTOR: [%.2f, %.2f, %.2f]\n", players[i].state.q1, players[i].state.q2, players[i].state.q3, players[i].state.s1, players[i].state.s2, players[i].state.s3);
     snprintf(b+strlen(b), sizeof(b)-strlen(b), " HEADING:  %03.0f\302\260        MARK:   %+03.0f\302\260\n", players[i].state.ent_h, players[i].state.ent_m);
