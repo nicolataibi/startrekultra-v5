@@ -209,19 +209,25 @@ void update_game_logic() {
         else if (players[i].nav_state == NAV_STATE_CHASE) {
             int tid = players[i].state.lock_target;
             double tx, ty, tz, tvx=0, tvy=0, tvz=0; bool found = false;
+            int tq1=0, tq2=0, tq3=0;
+
             if (tid >= 1 && tid <= 32 && players[tid-1].active) {
                 tx = players[tid-1].gx; ty = players[tid-1].gy; tz = players[tid-1].gz;
                 tvx = players[tid-1].dx * players[tid-1].warp_speed; tvy = players[tid-1].dy * players[tid-1].warp_speed; tvz = players[tid-1].dz * players[tid-1].warp_speed;
+                tq1 = players[tid-1].state.q1; tq2 = players[tid-1].state.q2; tq3 = players[tid-1].state.q3;
                 found = true;
             } else if (tid >= 100 && tid < 100+MAX_NPC && npcs[tid-100].active) {
                 tx = npcs[tid-100].gx; ty = npcs[tid-100].gy; tz = npcs[tid-100].gz;
                 tvx = npcs[tid-100].dx * 0.03; tvy = npcs[tid-100].dy * 0.03; tvz = npcs[tid-100].dz * 0.03;
+                tq1 = npcs[tid-100].q1; tq2 = npcs[tid-100].q2; tq3 = npcs[tid-100].q3;
                 found = true;
             }
 
             if (found && players[i].state.energy > 5000) {
                 double dx = tx - players[i].gx, dy = ty - players[i].gy, dz = tz - players[i].gz;
                 double dist = sqrt(dx*dx + dy*dy + dz*dz);
+                
+                /* Subspace Tracking: Calculate vectors using galactic coordinates */
                 if (dist > 0.05) {
                     double des_h = atan2(dx, -dy) * 180.0 / M_PI; if(des_h<0) des_h+=360;
                     double des_m = asin(dz/dist) * 180.0 / M_PI;
@@ -233,17 +239,35 @@ void update_game_logic() {
                     if (players[i].state.ent_h >= 360) { players[i].state.ent_h -= 360; }
                     if (players[i].state.ent_h < 0) { players[i].state.ent_h += 360; }
                 }
+                
                 double rad_h = players[i].state.ent_h * M_PI / 180.0;
                 double rad_m = players[i].state.ent_m * M_PI / 180.0;
                 players[i].dx = cos(rad_m) * sin(rad_h); players[i].dy = cos(rad_m) * -cos(rad_h); players[i].dz = sin(rad_m);
-                double ideal_speed = (dist - 2.0) * 0.4 + sqrt(tvx*tvx + tvy*tvy + tvz*tvz);
+                
+                /* Auto-Warp: Increase speed if target is in another quadrant (dist > 10) */
+                double target_dist = (players[i].approach_dist > 0.05) ? players[i].approach_dist : 2.0;
+                double base_speed = (dist > 10.0) ? 0.8 : 0.4;
+                double ideal_speed = (dist - target_dist) * base_speed + sqrt(tvx*tvx + tvy*tvy + tvz*tvz);
+                
                 if (ideal_speed > 0.8) { ideal_speed = 0.8; }
                 if (ideal_speed < -0.1) { ideal_speed = -0.1; }
+                
                 players[i].warp_speed = (players[i].warp_speed * 0.7) + (ideal_speed * 0.3);
                 players[i].gx += players[i].dx * players[i].warp_speed;
                 players[i].gy += players[i].dy * players[i].warp_speed;
                 players[i].gz += players[i].dz * players[i].warp_speed;
-                players[i].state.energy -= (int)(1 + fabs(players[i].warp_speed)*5.0);
+                
+                int drain = 10 + (int)(fabs(players[i].warp_speed)*20.0);
+                players[i].state.energy -= drain;
+                
+                /* Quadrant Transition Check */
+                if (players[i].state.q1 != tq1 || players[i].state.q2 != tq2 || players[i].state.q3 != tq3) {
+                    static int last_warn = 0;
+                    if (global_tick - last_warn > 300) {
+                        send_server_msg(i, "HELMSMAN", "Target has left the quadrant. Engaging inter-sector subspace tracking.");
+                        last_warn = global_tick;
+                    }
+                }
             } else {
                 players[i].nav_state = NAV_STATE_IDLE;
                 if (!found) send_server_msg(i, "COMPUTER", "Chase target lost.");
@@ -284,17 +308,19 @@ void update_game_logic() {
             if (d < 0.8) { send_server_msg(i, "CRITICAL", "Planetary collision! Structural failure."); players[i].active = 0; players[i].state.boom = (NetPoint){(float)players[i].state.s1, (float)players[i].state.s2, (float)players[i].state.s3, 1}; break; }
         }
 
-        /* Target Lock Validation */
+        /* Target Lock Validation (Inter-Quadrant aware) */
         if (players[i].state.lock_target > 0) {
             int tid = players[i].state.lock_target;
             bool valid = false;
             int pq1 = players[i].state.q1, pq2 = players[i].state.q2, pq3 = players[i].state.q3;
             
             if (tid >= 1 && tid <= 32) {
-                if (players[tid-1].active && players[tid-1].state.q1 == pq1 && players[tid-1].state.q2 == pq2 && players[tid-1].state.q3 == pq3) valid = true;
+                /* Players can be locked as long as they are active anywhere */
+                if (players[tid-1].active) valid = true;
             } else if (tid >= 100 && tid < 100+MAX_NPC) {
-                if (npcs[tid-100].active && npcs[tid-100].q1 == pq1 && npcs[tid-100].q2 == pq2 && npcs[tid-100].q3 == pq3) valid = true;
+                if (npcs[tid-100].active) valid = true;
             } else if (tid >= 500 && tid < 500+MAX_BASES) {
+                /* Static objects remain local-only for locking sanity */
                 if (bases[tid-500].active && bases[tid-500].q1 == pq1 && bases[tid-500].q2 == pq2 && bases[tid-500].q3 == pq3) valid = true;
             } else if (tid >= 1000 && tid < 1000+MAX_PLANETS) {
                 if (planets[tid-1000].active && planets[tid-1000].q1 == pq1 && planets[tid-1000].q2 == pq2 && planets[tid-1000].q3 == pq3) valid = true;

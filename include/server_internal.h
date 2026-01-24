@@ -38,6 +38,7 @@ typedef struct {
     double target_gx, target_gy, target_gz;
     double dx, dy, dz;
     double warp_speed;
+    double approach_dist;
 
     /* Combat State */
     bool torp_active;
