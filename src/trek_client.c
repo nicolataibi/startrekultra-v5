@@ -495,6 +495,7 @@ int main(int argc, char *argv[]) {
                         printf("who         : List active captains in galaxy\n");
                         printf("cal QX QY QZ: Navigation Calculator\n");
                         printf("apr ID DIST : Approach target autopilot\n");
+                        printf("cha         : Chase locked target (Inter-sector aware)\n");
                         printf("sco         : Solar scooping for energy\n");
                         printf("har         : Antimatter harvest from Black Hole\n");
                         printf("sta         : Mission Status Report\n");
