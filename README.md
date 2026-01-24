@@ -434,9 +434,15 @@ Per compilare il progetto, è necessario un ambiente di sviluppo Unix-like (pref
     *   `freeglut3` e `libglu1-mesa` (per il visualizzatore).
     *   `librt` e `libpthread` (per SHM e multithreading).
 
+#### Ubuntu / Debian
 ```bash
-# Comando di installazione rapida (Ubuntu/Debian)
 sudo apt-get install build-essential freeglut3-dev libglu1-mesa-dev libglew-dev
+```
+
+#### Fedora / Red Hat / AlmaLinux / CentOS
+```bash
+sudo dnf groupinstall "Development Tools"
+sudo dnf install freeglut-devel mesa-libGLU-devel glew-devel
 ```
 
 ---
