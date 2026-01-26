@@ -1,4 +1,5 @@
 # Star Trek Ultra: 3D Multi-User Client-Server Edition
+## Star Trek Day, 8 settembre 2026, 60 anni dalla prima messa in onda della serie originale nel 1966.
 **Persistent Galaxy Tactical Navigation & Combat Simulator**
 
 <table>
