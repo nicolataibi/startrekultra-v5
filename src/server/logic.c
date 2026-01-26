@@ -248,6 +248,16 @@ void update_game_logic() {
                 
                 players[i].nav_state = NAV_STATE_IDLE;
                 players[i].state.wormhole.active = 0; /* Turn off visual */
+                
+                /* Trigger Sparkle Arrival Effect (Calculate local sector coords for destination) */
+                int tq1 = get_q_from_g(players[i].gx);
+                int tq2 = get_q_from_g(players[i].gy);
+                int tq3 = get_q_from_g(players[i].gz);
+                float ts1 = (float)(players[i].gx - (tq1 - 1) * 10.0);
+                float ts2 = (float)(players[i].gy - (tq2 - 1) * 10.0);
+                float ts3 = (float)(players[i].gz - (tq3 - 1) * 10.0);
+                players[i].state.jump_arrival = (NetPoint){ts1, ts2, ts3, 1};
+                
                 send_server_msg(i, "HELMSMAN", "Wormhole traversal successful. Welcome to destination.");
             }
         }
@@ -513,7 +523,9 @@ void update_game_logic() {
         upd.beam_count = players[i].state.beam_count; for(int b=0; b<upd.beam_count && b<MAX_NET_BEAMS; b++) upd.beams[b] = players[i].state.beams[b];
         upd.torp = players[i].state.torp; upd.boom = players[i].state.boom; upd.dismantle = players[i].state.dismantle; 
         upd.wormhole = players[i].state.wormhole;
+        upd.jump_arrival = players[i].state.jump_arrival;
         players[i].state.beam_count = 0; players[i].state.boom.active = 0; players[i].state.dismantle.active = 0; players[i].state.wormhole.active = 0;
+        players[i].state.jump_arrival.active = 0;
         int current_sock = players[i].socket;
         pthread_mutex_unlock(&game_mutex);
         if (current_sock != 0) { size_t p_size = sizeof(PacketUpdate) - sizeof(NetObject) * (MAX_NET_OBJECTS - upd.object_count); if (p_size < offsetof(PacketUpdate, objects)) p_size = offsetof(PacketUpdate, objects); write_all(current_sock, &upd, p_size); }

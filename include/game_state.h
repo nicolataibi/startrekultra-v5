@@ -97,6 +97,7 @@ typedef struct {
     NetPoint torp;
     NetPoint boom;
     NetPoint wormhole;
+    NetPoint jump_arrival;
     NetDismantle dismantle;
 } StarTrekGame;
 

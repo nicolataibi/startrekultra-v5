@@ -96,6 +96,7 @@ typedef struct {
     NetPoint torp;
     NetPoint boom;
     NetPoint wormhole;
+    NetPoint jump_arrival;
     NetDismantle dismantle;
     int beam_count;
     NetBeam beams[MAX_NET_BEAMS];

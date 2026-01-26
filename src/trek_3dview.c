@@ -169,9 +169,16 @@ typedef struct {
     Particle particles[100];
 } Dismantle;
 
+typedef struct {
+    float x, y, z;
+    int timer;
+    Particle particles[150];
+} ArrivalEffect;
+
 GameObject objects[200];
 int objectCount = 0;
 Dismantle g_dismantle = {-100, -100, -100, 0, 0};
+ArrivalEffect g_arrival_fx = {0, 0, 0, 0};
 
 /* Rimosse variabili globali scia singola per scia universale */
 typedef struct { float x, y, z, alpha; } PhaserBeam;
@@ -182,6 +189,7 @@ typedef struct { float x, y, z; int active; int timer; } ViewPoint;
 ViewPoint g_torp = {0,0,0,0,0};
 ViewPoint g_boom = {0,0,0,0,0};
 ViewPoint g_wormhole = {0,0,0,0,0};
+ViewPoint g_jump_arrival = {0,0,0,0,0};
 
 float enterpriseX = -100, enterpriseY = -100, enterpriseZ = -100;
 
@@ -405,6 +413,42 @@ void loadGameState() {
         g_wormhole.active = 1;
     } else {
         g_wormhole.active = 0;
+    }
+
+    if (g_shared_state->jump_arrival.active) {
+        g_jump_arrival.x = g_shared_state->jump_arrival.shm_x - 5.5f;
+        g_jump_arrival.y = g_shared_state->jump_arrival.shm_z - 5.5f;
+        g_jump_arrival.z = 5.5f - g_shared_state->jump_arrival.shm_y;
+        g_jump_arrival.active = 1;
+        g_jump_arrival.timer = 120; /* 2 seconds @ 60fps */
+        
+        g_arrival_fx.x = g_jump_arrival.x;
+        g_arrival_fx.y = g_jump_arrival.y;
+        g_arrival_fx.z = g_jump_arrival.z;
+        g_arrival_fx.timer = 120;
+        
+        for(int i=0; i<150; i++) {
+            /* Random point on a sphere of radius 4.0 */
+            float theta = (rand() % 360) * M_PI / 180.0f;
+            float phi = (rand() % 180 - 90) * M_PI / 180.0f;
+            float dist = 3.0f + (rand() % 200) / 100.0f;
+            
+            g_arrival_fx.particles[i].x = g_arrival_fx.x + dist * cos(phi) * cos(theta);
+            g_arrival_fx.particles[i].y = g_arrival_fx.y + dist * sin(phi);
+            g_arrival_fx.particles[i].z = g_arrival_fx.z + dist * cos(phi) * sin(theta);
+            
+            /* Velocity to reach center in ~100 ticks */
+            g_arrival_fx.particles[i].vx = (g_arrival_fx.x - g_arrival_fx.particles[i].x) / 100.0f;
+            g_arrival_fx.particles[i].vy = (g_arrival_fx.y - g_arrival_fx.particles[i].y) / 100.0f;
+            g_arrival_fx.particles[i].vz = (g_arrival_fx.z - g_arrival_fx.particles[i].z) / 100.0f;
+            
+            g_arrival_fx.particles[i].r = (rand() % 100) / 100.0f;
+            g_arrival_fx.particles[i].g = (rand() % 100) / 100.0f;
+            g_arrival_fx.particles[i].b = (rand() % 100) / 100.0f;
+            g_arrival_fx.particles[i].active = 1;
+        }
+
+        g_shared_state->jump_arrival.active = 0;
     }
 
     /* Dismantle */
@@ -1152,6 +1196,63 @@ void drawExplosion() {
     glPopMatrix(); glEnable(GL_LIGHTING);
 }
 
+void drawJumpArrival() {
+    if (g_jump_arrival.timer <= 0) return;
+    glDisable(GL_LIGHTING);
+    
+    /* 1. Converging Particles (Pixels) */
+    glPointSize(2.0f);
+    glBegin(GL_POINTS);
+    for (int i = 0; i < 150; i++) {
+        if (g_arrival_fx.particles[i].active) {
+            float p_alpha = (g_jump_arrival.timer > 20) ? 1.0f : (g_jump_arrival.timer / 20.0f);
+            glColor4f(g_arrival_fx.particles[i].r, g_arrival_fx.particles[i].g, g_arrival_fx.particles[i].b, p_alpha);
+            glVertex3f(g_arrival_fx.particles[i].x, g_arrival_fx.particles[i].y, g_arrival_fx.particles[i].z);
+        }
+    }
+    glEnd();
+
+    glPushMatrix(); glTranslatef(g_jump_arrival.x, g_jump_arrival.y, g_jump_arrival.z);
+    
+    float total_duration = 120.0f;
+    float t = (total_duration - g_jump_arrival.timer) / total_duration;
+    float alpha = (g_jump_arrival.timer / total_duration);
+    
+    /* Central expanding glow */
+    drawGlow(0.2f + t * 1.2f, 1.0f, 1.0f, 1.0f, alpha * 0.7f);
+    
+    /* Sparkling multicolored points */
+    glPointSize(5.0f);
+    glBegin(GL_POINTS);
+    for (int i = 0; i < 50; i++) {
+        float angle = (float)i * (2.0f * M_PI / 50.0f) + pulse * 2.0f;
+        float r_dist = (0.2f + t * 2.0f) * (0.8f + 0.2f * sin(pulse * 12.0f + i));
+        
+        float r = 0.5f + 0.5f * sin(pulse * 6.0f + i);
+        float g = 0.5f + 0.5f * sin(pulse * 6.0f + i + 2.0f);
+        float b = 0.5f + 0.5f * sin(pulse * 6.0f + i + 4.0f);
+        
+        glColor4f(r, g, b, alpha);
+        glVertex3f(cos(angle) * r_dist, (sin(pulse * 4.0f + i) * 0.6f), sin(angle) * r_dist);
+    }
+    glEnd();
+    
+    /* Expanding rings */
+    for (int j = 0; j < 4; j++) {
+        float r_ring = (t * 3.5f) - (float)j * 0.4f;
+        if (r_ring < 0) continue;
+        glColor4f(0.6f, 0.9f, 1.0f, alpha * (0.5f - j * 0.1f));
+        glBegin(GL_LINE_LOOP);
+        for (int k = 0; k < 40; k++) {
+            float th = (float)k * (2.0f * M_PI / 40.0f);
+            glVertex3f(cos(th) * r_ring, sin(pulse + j) * 0.2f, sin(th) * r_ring);
+        }
+        glEnd();
+    }
+    
+    glPopMatrix(); glEnable(GL_LIGHTING);
+}
+
 void drawTorpedo() {
     if (!g_torp.active) return;
     glDisable(GL_LIGHTING);
@@ -1196,13 +1297,23 @@ void display() {
         /* Tactical Mode Camera */
         glTranslatef(0, 0, zoom); glRotatef(angleX, 1, 0, 0); glRotatef(angleY, 0, 1, 0);
         glDisable(GL_LIGHTING);
-        if (vbo_stars != 0) { glColor3f(0.7,0.7,0.7); glEnableClientState(GL_VERTEX_ARRAY); glBindBuffer(GL_ARRAY_BUFFER, vbo_stars); glVertexPointer(3, GL_FLOAT, 0, 0); glDrawArrays(GL_POINTS, 0, 1000); glBindBuffer(GL_ARRAY_BUFFER, 0); glDisableClientState(GL_VERTEX_ARRAY); }
+        if (vbo_stars != 0) { 
+            glPointSize(1.0f);
+            glColor3f(0.7,0.7,0.7); 
+            glEnableClientState(GL_VERTEX_ARRAY); 
+            glBindBuffer(GL_ARRAY_BUFFER, vbo_stars); 
+            glVertexPointer(3, GL_FLOAT, 0, 0); 
+            glDrawArrays(GL_POINTS, 0, 1000); 
+            glBindBuffer(GL_ARRAY_BUFFER, 0); 
+            glDisableClientState(GL_VERTEX_ARRAY); 
+        }
         glColor3f(0.2, 0.2, 0.5); glutWireCube(11.0);
         if (g_show_axes) drawCompass();
         if (g_show_grid) drawGrid();
         
         drawPhaserBeams();
         drawExplosion();
+        drawJumpArrival();
         drawTorpedo();
         if (g_wormhole.active) drawWormhole(g_wormhole.x, g_wormhole.y, g_wormhole.z);
         drawDismantle();
@@ -1297,6 +1408,21 @@ void timer(int v) {
 
     /* Update Boom Timer */
     if (g_boom.timer > 0) g_boom.timer--;
+    
+    /* Update Jump Arrival Timer */
+    if (g_jump_arrival.timer > 0) {
+        g_jump_arrival.timer--;
+        for(int i=0; i<150; i++) {
+            if (g_arrival_fx.particles[i].active) {
+                g_arrival_fx.particles[i].x += g_arrival_fx.particles[i].vx;
+                g_arrival_fx.particles[i].y += g_arrival_fx.particles[i].vy;
+                g_arrival_fx.particles[i].z += g_arrival_fx.particles[i].vz;
+                
+                /* Slowly fade or change behavior if they reach center? 
+                   For now just simple convergence */
+            }
+        }
+    }
 
     /* Update Dismantle */
     if (g_dismantle.timer > 0) {

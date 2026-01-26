@@ -292,6 +292,14 @@ void *network_listener(void *arg) {
                 g_shared_state->wormhole.shm_y = upd.wormhole.net_y;
                 g_shared_state->wormhole.shm_z = upd.wormhole.net_z;
                 g_shared_state->wormhole.active = upd.wormhole.active;
+
+                /* Jump Arrival Event */
+                if (upd.jump_arrival.active) {
+                    g_shared_state->jump_arrival.shm_x = upd.jump_arrival.net_x;
+                    g_shared_state->jump_arrival.shm_y = upd.jump_arrival.net_y;
+                    g_shared_state->jump_arrival.shm_z = upd.jump_arrival.net_z;
+                    g_shared_state->jump_arrival.active = 1;
+                }
                 
                 g_shared_state->frame_id++; 
                 pthread_mutex_unlock(&g_shared_state->mutex);
