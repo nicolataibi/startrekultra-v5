@@ -517,11 +517,56 @@ void handle_aux(int i, const char *params) {
     }
 }
 
+void handle_jum(int i, const char *params) {
+    int qx, qy, qz;
+    if (sscanf(params, "%d %d %d", &qx, &qy, &qz) == 3) {
+        if (!IS_Q_VALID(qx, qy, qz)) {
+            send_server_msg(i, "COMPUTER", "Invalid quadrant coordinates.");
+            return;
+        }
+        
+        /* Cost calculation: 5000 Energy + 1 Dilithium crystal */
+        if (players[i].state.energy < 5000 || players[i].state.inventory[1] < 1) {
+             send_server_msg(i, "ENGINEERING", "Insufficient resources for Wormhole generation (Req: 5000 Energy, 1 Dilithium).");
+             return;
+        }
+
+        players[i].state.energy -= 5000;
+        players[i].state.inventory[1] -= 1;
+
+        /* Calculate Wormhole Entrance Position (3 units in front of ship) */
+        double rad_h = players[i].state.ent_h * M_PI / 180.0;
+        double rad_m = players[i].state.ent_m * M_PI / 180.0;
+        
+        /* Local sector coordinates for the effect */
+        double wx = players[i].state.s1 + cos(rad_m) * sin(rad_h) * 3.0;
+        double wy = players[i].state.s2 + cos(rad_m) * -cos(rad_h) * 3.0;
+        double wz = players[i].state.s3 + sin(rad_m) * 3.0;
+        
+        players[i].wx = wx; players[i].wy = wy; players[i].wz = wz;
+
+        /* Set Destination */
+        players[i].target_gx = (qx - 1) * 10.0 + 5.5; /* Center of target quadrant */
+        players[i].target_gy = (qy - 1) * 10.0 + 5.5;
+        players[i].target_gz = (qz - 1) * 10.0 + 5.5;
+        
+        /* Engage */
+        players[i].nav_state = NAV_STATE_WORMHOLE;
+        players[i].nav_timer = 200; /* Animation duration (approx 3.3 seconds at 60fps logic tick) */
+        players[i].warp_speed = 0; /* Stop ship */
+        
+        send_server_msg(i, "HELMSMAN", "Initiating trans-quadrant jump. Calculating Schwarzschild coordinates...");
+    } else {
+        send_server_msg(i, "COMPUTER", "Usage: jum <Q1> <Q2> <Q3>");
+    }
+}
+
 /* --- Command Registry Table --- */
 
 static const CommandDef command_registry[] = {
     {"nav ", handle_nav, "Warp Navigation"},
     {"imp ", handle_imp, "Impulse Drive"},
+    {"jum ", handle_jum, "Wormhole Jump"},
     {"apr ", handle_apr, "Approach target"},
     {"cha",  handle_cha, "Chase locked target"},
     {"srs",  handle_srs, "Short Range Sensors"},

@@ -152,8 +152,16 @@ int main(int argc, char *argv[]) {
                                                                         players[slot].gy = (players[slot].state.q2 - 1) * 10.0 + players[slot].state.s2;
                                                                         players[slot].gz = (players[slot].state.q3 - 1) * 10.0 + players[slot].state.s3;
                                                                         
+                                                                        players[slot].state.inventory[1] = 10; /* Initial Dilithium for jumps */
+
                                                                         for(int s=0; s<8; s++) players[slot].state.system_health[s] = 100.0f;
                                 }
+                                
+                                /* WELCOME PACKAGE: Ensure all captains (new or returning) have at least 10 Dilithium for Jumps */
+                                if (players[slot].state.inventory[1] < 10) {
+                                    players[slot].state.inventory[1] = 10;
+                                }
+
                                 pthread_mutex_unlock(&game_mutex);
 
                                 LOG_DEBUG("Synchronizing Galaxy Master (%zu bytes) to FD %d\n", sizeof(StarTrekGame), fd);

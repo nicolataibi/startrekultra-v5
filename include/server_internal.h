@@ -19,7 +19,8 @@ typedef enum {
     NAV_STATE_REALIGN, 
     NAV_STATE_IMPULSE, 
     NAV_STATE_CHASE,
-    NAV_STATE_ALIGN_IMPULSE
+    NAV_STATE_ALIGN_IMPULSE,
+    NAV_STATE_WORMHOLE
 } NavState;
 
 typedef struct {
@@ -37,6 +38,7 @@ typedef struct {
     double target_h, target_m;
     double target_gx, target_gy, target_gz;
     double dx, dy, dz;
+    double wx, wy, wz; /* Wormhole Entrance Coordinates */
     double warp_speed;
     double approach_dist;
 

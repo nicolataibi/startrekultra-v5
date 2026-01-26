@@ -1,7 +1,12 @@
 # Star Trek Ultra: 3D Multi-User Client-Server Edition
 **Persistent Galaxy Tactical Navigation & Combat Simulator**
 
-![USS Enterprise](Enterprise.jpg)
+<table>
+  <tr>
+    <td><img src="Enterprise.jpg" alt="USS Enterprise" width="400"/></td>
+    <td><img src="einstein-rosen-schwarzschild.jpg" alt="Einstein-Rosen Schwarzschild Wormhole" width="400"/></td>
+  </tr>
+</table>
 
 Star Trek Ultra è un simulatore spaziale avanzato che unisce la profondità strategica dei classici giochi testuali "Trek" anni '70 con un'architettura moderna Client-Server e una visualizzazione 3D accelerata hardware.
 
@@ -152,6 +157,9 @@ Di seguito la lista completa dei comandi disponibili, raggruppati per funzione.
     *   `S`: Speed (0.0 - 1.0).
     *   `imp 0 0 0`: Arresto motori (All Stop).
 *   `cal <QX> <QY> <QZ>`: **Navigation Calculator**. Calcola H, M, W per raggiungere un quadrante.
+*   `jum <QX> <QY> <QZ>`: **Wormhole Jump (Einstein-Rosen Bridge)**. Genera un wormhole per un salto istantaneo verso il quadrante di destinazione.
+    *   **Requisiti**: 5000 unità di Energia e 1 Cristallo di Dilithio.
+    *   **Procedura**: Richiede una sequenza di stabilizzazione della singolarità di circa 3 secondi.
 *   `apr <ID> <DIST>`: **Approach Autopilot**. Avvicinamento automatico al bersaglio ID fino a distanza DIST.
 *   `doc`: **Docking**. Attracco a una Base Stellare (richiede distanza ravvicinata).
 *   `map`: **Stellar Cartography**. Attiva la visualizzazione 3D globale 10x10x10 dell'intera galassia.

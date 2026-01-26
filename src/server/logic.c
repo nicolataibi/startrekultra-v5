@@ -213,6 +213,44 @@ void update_game_logic() {
                 players[i].gz += players[i].dz * players[i].warp_speed;
             }
         }
+        else if (players[i].nav_state == NAV_STATE_WORMHOLE) {
+            players[i].nav_timer--;
+            
+            /* Sci-Fi Message Sequence */
+            if (players[i].nav_timer == 180) 
+                send_server_msg(i, "ENGINEERING", "Injecting exotic matter into local Schwarzschild metric...");
+            else if (players[i].nav_timer == 130)
+                send_server_msg(i, "SCIENCE", "Einstein-Rosen Bridge detected. Stabilizing singularity...");
+            else if (players[i].nav_timer == 80)
+                send_server_msg(i, "HELMSMAN", "Wormhole mouth stable. Entering event horizon.");
+
+            /* Update Wormhole visual position in packet */
+            players[i].state.wormhole = (NetPoint){(float)players[i].wx, (float)players[i].wy, (float)players[i].wz, 1};
+
+            /* Move ship INTO the wormhole during the last phase */
+            if (players[i].nav_timer < 60) {
+                 /* Interpolate from current Pos to Wormhole Pos */
+                 double cur_s1 = players[i].gx - (players[i].state.q1 - 1) * 10.0;
+                 double cur_s2 = players[i].gy - (players[i].state.q2 - 1) * 10.0;
+                 double cur_s3 = players[i].gz - (players[i].state.q3 - 1) * 10.0;
+                 
+                 /* Simple approach effect */
+                 players[i].gx += (players[i].wx - cur_s1) * 0.05;
+                 players[i].gy += (players[i].wy - cur_s2) * 0.05;
+                 players[i].gz += (players[i].wz - cur_s3) * 0.05;
+            }
+
+            if (players[i].nav_timer <= 0) {
+                /* JUMP! */
+                players[i].gx = players[i].target_gx;
+                players[i].gy = players[i].target_gy;
+                players[i].gz = players[i].target_gz;
+                
+                players[i].nav_state = NAV_STATE_IDLE;
+                players[i].state.wormhole.active = 0; /* Turn off visual */
+                send_server_msg(i, "HELMSMAN", "Wormhole traversal successful. Welcome to destination.");
+            }
+        }
         else if (players[i].nav_state == NAV_STATE_CHASE) {
             int tid = players[i].state.lock_target;
             double tx, ty, tz, tvx=0, tvy=0, tvz=0; bool found = false;
@@ -473,8 +511,9 @@ void update_game_logic() {
         }
         upd.object_count = o_idx;
         upd.beam_count = players[i].state.beam_count; for(int b=0; b<upd.beam_count && b<MAX_NET_BEAMS; b++) upd.beams[b] = players[i].state.beams[b];
-        upd.torp = players[i].state.torp; upd.boom = players[i].state.boom; upd.dismantle = players[i].state.dismantle;
-        players[i].state.beam_count = 0; players[i].state.boom.active = 0; players[i].state.dismantle.active = 0;
+        upd.torp = players[i].state.torp; upd.boom = players[i].state.boom; upd.dismantle = players[i].state.dismantle; 
+        upd.wormhole = players[i].state.wormhole;
+        players[i].state.beam_count = 0; players[i].state.boom.active = 0; players[i].state.dismantle.active = 0; players[i].state.wormhole.active = 0;
         int current_sock = players[i].socket;
         pthread_mutex_unlock(&game_mutex);
         if (current_sock != 0) { size_t p_size = sizeof(PacketUpdate) - sizeof(NetObject) * (MAX_NET_OBJECTS - upd.object_count); if (p_size < offsetof(PacketUpdate, objects)) p_size = offsetof(PacketUpdate, objects); write_all(current_sock, &upd, p_size); }

@@ -79,6 +79,7 @@ typedef struct {
     
     SharedPoint torp;
     SharedPoint boom;
+    SharedPoint wormhole;
     SharedDismantle dismantle;
     
     /* Synchronization counter */

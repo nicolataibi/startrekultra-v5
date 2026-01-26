@@ -287,6 +287,12 @@ void *network_listener(void *arg) {
                     g_shared_state->dismantle.active = 1;
                 }
                 
+                /* Wormhole Event */
+                g_shared_state->wormhole.shm_x = upd.wormhole.net_x;
+                g_shared_state->wormhole.shm_y = upd.wormhole.net_y;
+                g_shared_state->wormhole.shm_z = upd.wormhole.net_z;
+                g_shared_state->wormhole.active = upd.wormhole.active;
+                
                 g_shared_state->frame_id++; 
                 pthread_mutex_unlock(&g_shared_state->mutex);
                 sem_post(&g_shared_state->data_ready);
@@ -475,6 +481,7 @@ int main(int argc, char *argv[]) {
                         printf(B_WHITE "\n--- STAR TREK ULTRA: MULTIPLAYER COMMANDS ---" RESET "\n");
                         printf("nav H M W   : Warp Navigation (Heading 0-359, Mark -90/90, Warp 0-8)\n");
                         printf("imp H M S   : Impulse Drive (H, M, Speed 0.0-1.0). imp 0 0 0 to stop.\n");
+                        printf("jum Q1 Q2 Q3: Wormhole Jump (Instant travel, costs 5000 En + 1 Dilithium)\n");
                         printf("srs         : Short Range Sensors (Current Quadrant View)\n");
                         printf("lrs         : Long Range Sensors (3x3x3 Neighborhood Scan)\n");
                         printf("pha E       : Fire Phasers (Distance-based damage, uses Energy)\n");

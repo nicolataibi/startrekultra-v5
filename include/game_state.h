@@ -96,6 +96,7 @@ typedef struct {
     NetBeam beams[MAX_NET_BEAMS];
     NetPoint torp;
     NetPoint boom;
+    NetPoint wormhole;
     NetDismantle dismantle;
 } StarTrekGame;
 

@@ -95,6 +95,7 @@ typedef struct {
     uint8_t is_cloaked;
     NetPoint torp;
     NetPoint boom;
+    NetPoint wormhole;
     NetDismantle dismantle;
     int beam_count;
     NetBeam beams[MAX_NET_BEAMS];

@@ -31,6 +31,7 @@ int grid_vertex_count = 0;
 /* Shader Globals */
 GLuint starShaderProgram = 0;
 GLuint bhShaderProgram = 0;
+GLuint whShaderProgram = 0;
 
 GLuint compileShader(const char* source, GLenum type) {
     GLuint shader = glCreateShader(type);
@@ -91,6 +92,18 @@ void initShaders() {
         "}";
     bhShaderProgram = linkProgram(compileShader(bhVert, GL_VERTEX_SHADER), compileShader(bhFrag, GL_FRAGMENT_SHADER));
 
+    /* Wormhole Shader (Cyan/Blue Variant) */
+    const char* whFrag = "#version 120\n"
+        "uniform float time;\n"
+        "varying vec3 pos;\n"
+        "void main() {\n"
+        "  float d = length(pos);\n"
+        "  float ripple = sin(d * 30.0 - time * 20.0) * 0.5 + 0.5;\n"
+        "  vec3 col = vec3(0.0, 0.8, 1.0) * (1.0 - d) + vec3(0.0, 0.1, 0.3);\n"
+        "  gl_FragColor = vec4(col * ripple + vec3(0.8, 0.9, 1.0) * pow(ripple, 4.0), 0.8);\n"
+        "}";
+    whShaderProgram = linkProgram(compileShader(bhVert, GL_VERTEX_SHADER), compileShader(whFrag, GL_FRAGMENT_SHADER));
+    
     /* Advanced Ship Shader */
 }
 
@@ -168,6 +181,7 @@ int beamCount = 0;
 typedef struct { float x, y, z; int active; int timer; } ViewPoint;
 ViewPoint g_torp = {0,0,0,0,0};
 ViewPoint g_boom = {0,0,0,0,0};
+ViewPoint g_wormhole = {0,0,0,0,0};
 
 float enterpriseX = -100, enterpriseY = -100, enterpriseZ = -100;
 
@@ -383,6 +397,14 @@ void loadGameState() {
         g_boom.timer = 40; /* 1.3 seconds approx */
         /* Consume event */
         g_shared_state->boom.active = 0;
+    }
+    if (g_shared_state->wormhole.active) {
+        g_wormhole.x = g_shared_state->wormhole.shm_x - 5.5f;
+        g_wormhole.y = g_shared_state->wormhole.shm_z - 5.5f;
+        g_wormhole.z = 5.5f - g_shared_state->wormhole.shm_y;
+        g_wormhole.active = 1;
+    } else {
+        g_wormhole.active = 0;
     }
 
     /* Dismantle */
@@ -902,6 +924,72 @@ void drawPlanet(float x, float y, float z) {
     glDisable(GL_LIGHTING); glColor4f(0.4f, 0.8f, 1.0f, 0.3f); glutSolidSphere(0.65, 24, 24); glEnable(GL_LIGHTING);
 }
 
+void drawWormhole(float x, float y, float z) {
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
+    if (whShaderProgram) {
+        glUseProgram(whShaderProgram);
+        glUniform1f(glGetUniformLocation(whShaderProgram, "time"), pulse);
+    }
+    glPushMatrix();
+    glTranslatef(x, y, z);
+    glRotatef(pulse * 20.0f, 0, 0, 1);
+
+    glDisable(GL_LIGHTING);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDisable(GL_TEXTURE_2D);
+    glDisable(GL_DEPTH_TEST); /* Draw on top or semi-transparent */
+    
+    float rs = 0.2f;
+    float rmax = 1.2f;
+    int Nr = 20;
+    int Nt = 30;
+
+    float dr = (rmax - rs) / (float)Nr;
+    float dth = 2.0f * M_PI / (float)Nt;
+
+    for (int side = -1; side <= 1; side += 2) {
+        /* Circles */
+        for(int i=0; i<Nr; i++){
+            float r = rs + (float)i * dr;
+            float zz = 2.0f * sqrt(rs * (r - rs));
+            float color_fade = 1.0f - (float)i/(float)Nr;
+            
+            glColor4f(0.0f, 0.6f * color_fade, 1.0f * color_fade, 0.8f * color_fade);
+            glBegin(GL_LINE_LOOP);
+            for(int j=0; j<=Nt; j++){
+                float th = (float)j * dth;
+                glVertex3f(r * cos(th), r * sin(th), (float)side * zz);
+            }
+            glEnd();
+        }
+
+        /* Meridians */
+        for(int j=0; j<Nt; j++){
+            float th = (float)j * dth;
+            glBegin(GL_LINE_STRIP);
+            for(int i=0; i<Nr; i++){
+                float r = rs + (float)i * dr;
+                float zz = 2.0f * sqrt(rs * (r - rs));
+                float color_fade = 1.0f - (float)i/(float)Nr;
+                glColor4f(0.0f, 0.4f * color_fade, 0.8f * color_fade, 0.6f * color_fade);
+                glVertex3f(r * cos(th), r * sin(th), (float)side * zz);
+            }
+            glEnd();
+        }
+    }
+
+    /* Central Event Horizon Core */
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    glColor3f(0.0f, 0.0f, 0.1f);
+    glutSolidSphere(rs, 16, 16);
+
+    glPopMatrix();
+    if (whShaderProgram) glUseProgram(0);
+    glPopAttrib();
+}
+
 void drawBlackHole(float x, float y, float z) {
     if (bhShaderProgram) {
         glUseProgram(bhShaderProgram);
@@ -1116,6 +1204,7 @@ void display() {
         drawPhaserBeams();
         drawExplosion();
         drawTorpedo();
+        if (g_wormhole.active) drawWormhole(g_wormhole.x, g_wormhole.y, g_wormhole.z);
         drawDismantle();
 
         /* Render Trails */
