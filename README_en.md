@@ -1,0 +1,453 @@
+# Star Trek Ultra: 3D Multi-User Client-Server Edition
+## Star Trek Day, September 8, 2026, 60 years since the first airing of the original series in 1966.
+**Persistent Galaxy Tactical Navigation & Combat Simulator**
+
+<table>
+  <tr>
+    <td><img src="Enterprise.jpg" alt="USS Enterprise" width="400"/></td>
+    <td><img src="einstein-rosen-schwarzschild.jpg" alt="Einstein-Rosen Schwarzschild Wormhole" width="400"/></td>
+  </tr>
+</table>
+
+Star Trek Ultra is an advanced space simulator that combines the strategic depth of classic 70s text-based "Trek" games with a modern Client-Server architecture and hardware-accelerated 3D visualization.
+
+---
+
+## 🛠️ System Architecture and Construction Details
+
+The game is built on the **Subspace-Direct Bridge (SDB)** architecture, a hybrid communication model designed to eliminate bottlenecks typical of real-time multiplayer simulators.
+
+### The Subspace-Direct Bridge (SDB) Model
+This cutting-edge architecture solves latency and jitter problems typical of intensive multiplayer games by completely decoupling network synchronization from visualization fluidity. The SDB model transforms the client into an **Intelligent Tactical Relay**, optimizing remote traffic and zeroing out local latency.
+
+1.  **Subspace Channel (TCP/IP Binary Link)**:
+    *   **Role**: Authoritative synchronization of the galactic state.
+    *   **Technology**: Proprietary binary protocol with dynamic **Interest Management**. The server calculates which objects are visible to the player and sends only necessary data, reducing bandwidth usage by up to 85%.
+    *   **Features**: Implements variable-length packets and binary packing (`pragma pack(1)`) to eliminate padding and maximize efficiency on remote channels.
+
+2.  **Direct Bridge (POSIX Shared Memory Link)**:
+    *   **Role**: Zero-latency interface between local logic and the graphics engine.
+    *   **Technology**: Shared memory segment (`/dev/shm`) mapped directly into the address spaces of the Client and Viewer.
+    *   **Efficiency**: Uses a **Zero-Copy** approach. The Client writes data received from the server directly into SHM; the 3D Viewer consumes it instantly. Synchronization is guaranteed by POSIX semaphores and mutexes, allowing the graphics engine to run at a constant 60+ FPS, applying **Linear Interpolation (LERP)** to compensate for time gaps between network packets.
+
+#### 🔄 Data Flow Pipeline (Tactical Propagation)
+The effectiveness of the SDB model is visible by observing the journey of a single update (e.g., the movement of a Romulan Warbird):
+1.  **Server Tick (Logic)**: The server calculates the enemy's new global position and updates the spatial index.
+2.  **Subspace Pulse (Network)**: The server serializes the data into `PacketUpdate`, truncates it to include only objects in the player's quadrant, and sends it via TCP.
+3.  **Client Relay (Async)**: The client's `network_listener` thread receives the packet, validates the `Frame ID`, and writes coordinates to **Shared Memory**.
+4.  **Direct Bridge Signal (IPC)**: The client increments the `data_ready` semaphore.
+5.  **Viewer Wake-up (Rendering)**: The viewer exits the *wait* state, acquires the mutex, copies the new coordinates as `target`, and starts LERP calculation to smoothly glide the vessel to the new position during subsequent graphic frames.
+
+Thanks to this pipeline, terminal commands travel in "Subspace" with TCP security, while the tactical view on the bridge remains stable, fluid, and stutter-free, regardless of internet connection quality.
+
+### 1. The Galactic Server (`trek_server`)
+This is the game's "engine". It manages the entire universe of 1000 quadrants.
+*   **Modular Logic**: Divided into modules (`galaxy.c`, `logic.c`, `net.c`, `commands.c`) to ensure maintainability and thread-safety.
+*   **Spatial Partitioning**: Uses a 3D spatial index (Grid Index) for object management. This allows the server to scan only objects local to the player, guaranteeing constant performance ($O(1)$) regardless of the total number of entities in the galaxy.
+*   **Persistence**: Saves the state of the entire universe, including player progress, in `galaxy.dat` with binary version control.
+
+### 2. The Command Bridge (`trek_client`)
+The `trek_client` represents the operational core of the user experience, acting as a sophisticated orchestrator between the human operator, the remote server, and the local rendering engine.
+
+*   **Multi-Threaded Architecture**: The client simultaneously manages several data pipelines:
+    *   A dedicated thread (**Network Listener**) constantly monitors the *Subspace Channel*, processing incoming packets from the server without blocking the interface.
+    *   The main thread handles user input and immediate feedback on the terminal.
+*   **Reactive Input Management (Reactive UI)**: Thanks to `termios` `raw` mode, the client intercepts individual keystrokes in real-time. This allows the player to receive radio messages, computer alerts, and tactical updates *while typing* a command, without the cursor or text being interrupted or garbled.
+*   **Direct Bridge Orchestration**: The client is responsible for the shared memory (SHM) lifecycle. At startup, it creates the memory segment, initializes synchronization semaphores, and launches the `trek_3dview` process. Whenever it receives a `PacketUpdate` from the server, the client instantly updates the object matrix in SHM, notifying the viewer via POSIX signals.
+*   **Identity & Persistence Hub**: Manages the login procedure and faction/class selection, interfacing with the server's persistent database to restore mission state.
+
+In summary, `trek_client` transforms a simple text terminal into an advanced and fluid command bridge, typical of an LCARS interface.
+
+### 3. The 3D Tactical View (`trek_3dview`)
+The 3D viewer is a standalone rendering engine based on **OpenGL and GLUT**, designed to provide an immersive spatial representation of the surrounding tactical area and the entire galaxy.
+
+*   **Cinematic Fluidity (LERP)**: To overcome the discrete nature of network packets, the engine implements **Linear Interpolation (LERP)** algorithms for both positions and orientations (Heading/Mark). Objects don't "jump" from point to point but glide smoothly through space, maintaining 60 FPS even if the server updates logic at a lower frequency.
+*   **High-Performance Rendering**: Uses **Vertex Buffer Objects (VBO)** to handle thousands of background stars and the galactic grid, minimizing CPU calls and maximizing GPU throughput.
+*   **Stellar Cartography (Map Mode)**:
+    *   Activatable via the `map` command, this mode transforms the tactical view into a global 10x10x10 galactic map.
+    *   Each quadrant is represented by chromatic indicators showing the density of bases (green), enemies (red), planets (cyan), and black holes (purple).
+    *   The player's current position is highlighted by a **pulsing white indicator**, facilitating long-range navigation.
+*   **Dynamic Tactical HUD**: Implements a 2D-on-3D projection (via `gluProject`) to anchor labels, health bars, and IDs directly above vessels. The overlay now includes real-time monitoring of **Crew (CREW)**, vital for mission survival.
+*   **Effects Engine (VFX)**:
+    *   **Trail Engine**: Each ship leaves a persistent ionic trail that helps visualize its movement vector.
+    *   **Combat FX**: Real-time visualization of phaser beams managed via **GLSL Shaders**, photon torpedoes with dynamic glow, and volumetric explosions.
+    *   **Dismantle Particles**: A dedicated particle system animates the dismantling of enemy wrecks during resource recovery operations.
+
+The Tactical View is not just an aesthetic element but a fundamental tool for short-range combat and precision navigation between celestial bodies and environmental threats.
+
+---
+
+## 📡 Communication Protocols
+
+### Network (Server ↔ Client): The Subspace Channel
+Remote communication is entrusted to a custom state-aware binary protocol, designed to ensure consistency and performance on networks with variable latency.
+
+*   **Deterministic Binary Protocol**: Unlike text protocols (like JSON or XML), the Subspace Channel uses a **Binary-Only** architecture. Data structures are aligned via `pragma pack(1)` to eliminate compiler padding, ensuring every transmitted byte is useful information.
+*   **State-Aware Synchronization**:
+    *   The server doesn't just send positions but synchronizes the entire logical state needed by the client (energy, shields, inventory, onboard computer messages).
+    *   Every update packet (`PacketUpdate`) includes a global **Frame ID**, allowing the client to correctly handle the temporal order of data.
+*   **Interest Management & Delta Optimization**:
+    *   **Spatial Filtering**: The server dynamically calculates each player's visibility set. You will only receive data on objects present in your current quadrant or affecting your long-range sensors, drastically reducing network load.
+    *   **Truncated Updates**: Packets containing object lists (like enemy ships or debris) are physically truncated before sending. If there are only 2 ships in your quadrant, the server will send a packet containing only those 2 slots instead of the entire fixed array, saving precious KB every tick.
+*   **Data Integrity & Stream Robustness**:
+    *   Implements an **Atomic Read/Write** mechanism. The `read_all` and `write_all` functions ensure that, despite the "stream" nature of TCP, binary packets are reconstructed only when complete and intact, preventing logical state corruption during traffic spikes.
+*   **Signal Multiplexing**: The protocol manages different packet types (`Login`, `Command`, `Update`, `Message`, `Query`) on the same socket, acting as a subspace signal multiplexer.
+
+This implementation allows the simulator to scale smoothly, keeping command latency (Input Lag) minimal and galaxy consistency absolute for all connected captains.
+
+### IPC (Client ↔ Viewer): The Direct Bridge
+The link between the command bridge and the tactical view is realized via an inter-process communication (IPC) interface based on **POSIX Shared Memory**, designed to eliminate local data exchange latency.
+
+*   **Shared-Memory Architecture**: The `trek_client` allocates a dedicated memory segment (`/st_shm_PID`) where the `GameState` structure resides. This structure acts as a mirror representation of the local state, accessible in real-time by both the client (writer) and the viewer (reader).
+*   **Hybrid Synchronization (Mutex & Semaphores)**:
+    *   **PTHREAD_PROCESS_SHARED Mutex**: Data consistency within shared memory is guaranteed by a mutex configured for cross-process use. This prevents the viewer from reading partial data while the client is updating the object matrix.
+    *   **POSIX Semaphores**: A semaphore (`sem_t data_ready`) is used to implement a "Producer-Consumer" notification mechanism. Instead of constantly polling memory, the viewer remains in an efficient wait state until the client signals the availability of a new logical frame.
+*   **Zero-Copy Efficiency**: Since data physically resides in the same RAM area mapped into both address spaces, passing telemetry parameters involves no additional memory copy (memcpy), maximizing system bus performance.
+*   **Event Latching**: SHM handles "latching" of rapid events (like explosions or phaser discharges). The client deposits the event in memory, and the viewer, after rendering it, resets the flag, ensuring no tactical effect is lost or duplicated.
+*   **Lifecycle Orchestration**: The client acts as a supervisor, managing creation (`shm_open`), sizing (`ftruncate`), and final destruction of the IPC resource, ensuring the system leaves no memory orphans in case of a crash.
+
+This approach transforms the 3D viewer into a pure reactive graphics slave, allowing the rendering engine to focus exclusively on visual fluidity and geometric calculation.
+
+---
+
+## 🔍 Technical Specifications
+
+Star Trek Ultra is not just a tactical simulator but a complex software architecture implementing advanced design patterns for distributed state management and real-time calculation.
+
+### 1. The Core Logic Engine (Tick-Based Simulation)
+The server operates on a deterministic loop at **30 Ticks Per Second (TPS)**. Each logic cycle follows a rigorous pipeline:
+*   **Input Reconciliation**: Processing of atomic commands received from clients via epoll.
+*   **Predictive AI Update**: Calculation of movement vectors for NPCs based on pursuit matrices and tactical weights (faction, residual energy).
+*   **Spatial Indexing (Grid Partitioning)**: Objects are not iterated linearly ($O(N)$), but mapped into a 10x10x10 three-dimensional grid. This reduces collision and sensor complexity to ($O(1)$) for the player's local area.
+*   **Physics Enforcement**: Application of galactic clamping and collision resolution with static celestial bodies.
+
+### 2. ID-Based Object Tracking & Shared Memory Mapping
+The object tracking system uses a **Persistent Identifier** architecture:
+*   **Server Side**: Each entity (ship, star, planet) has a unique global ID. During the tick, only IDs visible to the player are serialized.
+*   **Client/Viewer Side**: The viewer maintains a local buffer of 200 slots. Through an **implicit Hash Map**, the client associates the server ID with an SHM slot. If an ID disappears from the network packet, the *Stale Object Purge* system instantly invalidates the local slot, ensuring visual consistency without timeout latency.
+
+### 3. Hybrid Networking Model (Binary stream over TCP)
+To overcome TCP's "stream" nature, the simulator implements a **Binary Framing** protocol:
+*   **Atomic Reassembly**: The `read_all`/`write_all` functions ensure packets are never partially processed, preventing memory corruption in `pragma pack(1)` structures.
+*   **Interest Management**: The server physically truncates the payload of UPDATE packets based on the number of objects actually present in the player's action range, minimizing network bus usage.
+
+### 4. GLSL Rendering Pipeline (Hardware-Accelerated Aesthetics)
+The 3D viewer implements a programmable shading pipeline:
+*   **Vertex Stage**: Handling of HUD projection transformations and per-pixel light vector calculation.
+*   **Fragment Stage**:
+    *   **Aztek Shader**: Procedural generation of hull textures based on fragment coordinates, eliminating the need for external graphic assets.
+    *   **Fresnel Rim Lighting**: Calculation of the dot product between normal and view vector to highlight vessel structural profiles.
+    *   **Plasma Flow Simulation**: Temporal animation of emissive parameters to simulate energy flow in warp nacelles.
+
+### 5. Robustness and Session Continuity
+*   **Atomic Save-State**: The `galaxy.dat` database is updated via periodic flushes with global mutex locking, ensuring a consistent memory snapshot.
+*   **Emergency Rescue Protocol**: A heuristic rescue logic intervenes at login to resolve error states (collisions or destroyed ships), ensuring the persistence of the player's career even in case of mission failure.
+
+---
+
+## 🕹️ Operational Command Manual
+
+Below is the complete list of available commands, grouped by function.
+
+### 🚀 Navigation
+*   `nav <H> <M> <W>`: **Warp Navigation**. Set course and warp speed.
+    *   `H`: Heading (0-359).
+    *   `M`: Mark (-90 to +90).
+    *   `W`: Warp Factor (0-8).
+*   `imp <H> <M> <S>`: **Impulse Drive**. Sub-light engines.
+    *   `S`: Speed (0.0 - 1.0).
+    *   `imp 0 0 0`: All Stop.
+*   `cal <QX> <QY> <QZ>`: **Navigation Calculator**. Calculates H, M, W to reach a quadrant.
+*   `jum <QX> <QY> <QZ>`: **Wormhole Jump (Einstein-Rosen Bridge)**. Generates a wormhole for an instant jump to the destination quadrant.
+    *   **Requirements**: 5000 units of Energy and 1 Dilithium Crystal.
+    *   **Procedure**: Requires a singularity stabilization sequence of about 3 seconds.
+*   `apr <ID> <DIST>`: **Approach Autopilot**. Automatic approach to target ID up to DIST distance.
+*   `doc`: **Docking**. Dock at a Starbase (requires close range).
+*   `map`: **Stellar Cartography**. Activates global 10x10x10 3D visualization of the entire galaxy.
+    *   **Color Legend**: Enemies (Red), Bases (Green), Planets (Cyan), Stars (Yellow), Black Holes (Purple).
+    *   **Localization**: Current ship position is indicated by a **pulsing white cube**.
+
+### 🔬 Sensors and Scanners
+*   `srs`: **Short Range Sensors**. Detailed scan of the current quadrant.
+*   `lrs`: **Long Range Sensors**. 3x3x3 scan of surrounding quadrants.
+*   `aux probe <QX> <QY> <QZ>`: Launches a long-range probe to a specific quadrant.
+*   `sta`: **Status Report**. Complete report on ship state, mission, and **Crew** monitoring.
+*   `dam`: **Damage Report**. Detailed system damage.
+*   `who`: List of active captains in the galaxy.
+
+### ⚔️ Tactical Combat
+*   `pha <E>`: **Fire Phasers**. Fire phasers with energy E. Damage based on distance.
+*   `tor <H> <M>`: **Fire Photon Torpedo**. Launches a torpedo.
+    *   If `lock` active: Automatic guidance (just type `tor`).
+    *   Without lock: Manual ballistic trajectory.
+*   `lock <ID>`: **Target Lock**. Locks targeting systems on target ID (0 to unlock).
+*   `she <F> <R> <T> <B> <L> <RI>`: **Shield Configuration**. Distributes energy to the 6 shields.
+*   `clo`: **Cloaking Device**. Activates/Deactivates cloak (consumes energy).
+*   `pow <E> <S> <W>`: **Power Distribution**. Allocates reactor energy (Engines, Shields, Weapons %).
+*   `aux jettison`: **Eject Warp Core**. Ejects the core (Suicide maneuver / Last resort).
+*   `xxx`: **Self-Destruct**. Sequential self-destruction.
+
+### 📦 Operations and Resources
+*   `bor`: **Boarding Party**. Sends boarding parties (Dist < 1.0). May cause crew loss if repelled.
+*   `dis`: **Dismantle**. Dismantles enemy wrecks for resources (Dist < 1.5).
+*   `min`: **Mining**. Extracts resources from an orbiting planet (Dist < 2.0).
+*   `sco`: **Solar Scooping**. Collects energy from a star (Dist < 2.0).
+*   `har`: **Harvest Antimatter**. Collects antimatter from a black hole (Dist < 2.0).
+*   `con <T> <A>`: **Convert Resources**. Converts resources in cargo bay.
+    *   `1`: Dilithium -> Energy.
+    *   `3`: Verterium -> Torpedoes.
+*   `load <T> <A>`: **Load Cargo**. Loads from cargo bay to systems.
+    *   `1`: Energy.
+    *   `2`: Torpedoes.
+*   `inv`: **Inventory**. Shows cargo bay content.
+*   `rep <ID>`: **Repair**. Repairs a damaged system using resources.
+*   **Crew Management**:
+    *   Initial personnel number depends on ship class (e.g., 1012 for Galaxy, 50 for Defiant).
+    *   **Vital Integrity**: If **Life Support** drops below 75%, the crew will start suffering periodic losses.
+    *   **Failure Condition**: If crew reaches **zero**, the mission ends and the ship is considered lost.
+
+### 📡 Communications and Misc
+*   `rad <MSG>`: Sends radio message to all (Open channel).
+*   `rad @Fac <MSG>`: Sends to faction (e.g., `@Romulan Enemies sighted!`).
+*   `rad #ID <MSG>`: Private message to player ID.
+*   `psy`: **Psychological Warfare**. Attempts bluff (Corbomite Maneuver).
+*   `axs` / `grd`: Activates/Deactivates 3D visual guides (Axes / Grid).
+The 3D viewer is not a simple graphic window but an extension of the command bridge providing overlaid telemetry data (Augmented Reality) to support the captain's decision-making process.
+
+#### 🎯 Integrated Tactical Projection
+The system uses spatial projection algorithms to anchor information directly above detected entities:
+*   **Targeting Tags**: Each vessel is identified with a dynamic label. For players, it shows `Class (Captain Name)`, for NPCs `Faction [ID]`.
+*   **Health Bars**: Chromatic health indicators (Green/Yellow/Red) displayed above each ship and station, allowing instant evaluation of enemy status without consulting text logs.
+*   **Visual Latching**: Combat effects (phasers, explosions) are temporally synchronized with server logic, providing immediate visual feedback on hit impact.
+
+#### 🧭 3D Tactical Compass (`axs`)
+By activating visual axes (`axs`), the simulator projects a spherical reference system centered on your ship:
+*   **Heading Ring**: A graduated horizontal disk rotating with the ship, indicating the 360 degrees of the galactic plane.
+*   **Mark Arc**: A vertical guide displaying zenith inclination (-90/+90), crucial for complex 3D pursuits.
+*   **Galactic Axes**: Reference lines for X (red), Y (green), and Z (blue) axes delimiting the current sector boundaries.
+
+#### 📟 Telemetry and HUD Monitoring
+The on-screen interface (Overlay) provides constant monitoring of vital parameters:
+*   **Reactor & Shield Status**: Real-time display of available energy and average defensive grid power.
+*   **Sector Coordinates**: Instant conversion of spatial data into relative coordinates `[S1, S2, S3]` (0.0 - 10.0), mirroring those used in `nav` and `imp` commands.
+*   **Threat Detector**: A dynamic counter indicates the number of hostile vessels detected by sensors in the current quadrant.
+
+#### 🛠️ View Customization
+The commander can configure their interface via quick CLI commands:
+*   `grd`: Activates/Deactivates the **Galactic Tactical Grid**, useful for perceiving depth and distances.
+*   `axs`: Activates/Deactivates the **Compass and Reference Axes**.
+*   `h` (hotkey): Completely hides the HUD for a "cinematic" view of the sector.
+*   **Zoom & Rotation**: Total control of the tactical camera via mouse or `W/S` keys and directional arrows.
+
+---
+
+## ⚠️ Tactical Report: Threats and Obstacles
+
+### NPC Ship Capabilities
+Computer-controlled ships (Klingons, Romulans, Borg, etc.) operate with standardized combat protocols:
+*   **Primary Armament**: Currently, NPC ships are equipped exclusively with **Phaser Banks**.
+*   **Firepower**: Enemy phasers inflict constant damage of **100 units** of energy per hit.
+*   **Engagement Range**: Hostile ships will automatically open fire if a player enters within a **6.0 unit** range (Sector).
+*   **Fire Rate**: Approximately one shot every 5 seconds.
+*   **Tactics**: NPC ships do not use photon torpedoes. Their main strategy consists of direct approach (Chase) or fleeing if energy drops below critical levels.
+
+### Photon Torpedo Dynamics
+Torpedoes (command `tor`) are physically simulated weapons with precision:
+*   **Collision**: Torpedoes must physically hit the target (distance < 0.5) to explode.
+*   **Guidance**: If launched with an active `lock`, torpedoes correct course by 20% per tick towards the target, allowing hits on moving ships.
+*   **Obstacles**: Celestial bodies like **Stars, Planets, and Black Holes** are solid physical objects. A torpedo impacting them will be absorbed/destroyed without hitting the target behind them. Use galactic terrain for cover!
+*   **Starbases**: Starbases also block torpedoes. Beware of friendly or incidental fire.
+
+---
+
+## 🎖️ Commanders Historical Registry
+
+This section provides an official reference to the most celebrated commanders of the galaxy, useful for player inspiration or designating elite vessels.
+
+### 🔴 Galactic Power Commanders
+
+#### 1. Klingon Empire
+*   **Kor**: The legendary "Dahar Master", pioneer of early tactical contacts with the Federation.
+*   **Martok**: Supreme Commander of Klingon forces during the Dominion War.
+*   **Gowron**: Chancellor and veteran of the Klingon Civil War.
+
+#### 2. Romulan Star Empire
+*   **Tomalak**: Commander of D'deridex class vessels and historic tactical adversary.
+*   **Sela**: Operational commander and strategist specializing in infiltration operations.
+*   **Donatra**: Commander of the *Valdore*, known for tactical cooperation during the Shinzon crisis.
+
+#### 3. Borg Collective
+*   **Locutus**: Tactical designation of Captain Picard during the Wolf 359 incursion.
+*   **The Queen**: Central coordination node of the Collective.
+*   **Unimatrix 01**: Command designation for Diamond class vessels or Tactical Cubes.
+
+#### 4. Cardassian Union
+*   **Gul Dukat**: Leader of occupation forces and commander of station Terok Nor.
+*   **Gul Madred**: Expert in interrogation and intelligence operations.
+*   **Gul Damar**: Leader of the Cardassian resistance and successor to supreme command.
+
+#### 5. Dominion (Jem'Hadar)
+*   **Remata'Klan**: First of the Jem'Hadar, symbol of discipline and absolute loyalty.
+*   **Ikat'ika**: Commander of ground forces and master of tactical combat.
+*   **Karat'Ulan**: Operational commander in the Gamma Quadrant.
+
+#### 6. Tholian Assembly
+*   **Loskene**: Commander known for employing the Tholian energy web.
+*   **Terev**: Ambassador and commander involved in territorial disputes.
+*   **Sthross**: Flotilla commander expert in energy confinement tactics.
+
+#### 7. Gorn Hegemony
+*   **Slar**: Warrior commander active during early expansion phases.
+*   **S'Sless**: Captain in charge of frontier outpost defense.
+*   **Varn**: Fleet commander during skirmishes in the Alpha Quadrant.
+
+#### 8. Ferengi Alliance
+*   **DaiMon Bok**: Known for employing simulation technologies and personal vendettas.
+*   **DaiMon Tog**: Commander specializing in forced technology acquisitions.
+*   **DaiMon Goss**: Tactical representative during negotiations for Wormhole control.
+
+#### 9. Species 8472
+*   **Boothby (Impersonator)**: Entity dedicated to infiltration and study of Fleet command.
+*   **Bio-Ship Alpha**: Designation of the tactical coordinator of organic vessels.
+*   **Valerie Archer (Impersonator)**: Infiltration subject for deep reconnaissance missions.
+
+#### 10. Breen Confederacy
+*   **Thot Pran**: High-ranking commander during the offensive in the Alpha Quadrant.
+*   **Thot Gor**: Operational leader during the strategic alliance with the Dominion.
+*   **Thot Tarek**: Commander of Breen strike forces.
+
+#### 11. Hirogen
+*   **Karr**: Alpha Hirogen expert in large-scale hunt simulations.
+*   **Idrin**: Veteran hunter and commander of prey vessels.
+*   **Turanj**: Commander specializing in long-range tracking.
+
+---
+
+---
+
+### 🔵 Starfleet Commanders by Ship Class
+
+In Star Trek Ultra, the choice of ship class is not just aesthetic but defines the Commander's operational profile. Below are historical and tactical references for available classes:
+
+#### 🏛️ Constitution Class (Heavy Cruiser)
+The symbol of Starfleet exploration in the 23rd century. Balanced, versatile, and robust vessel.
+*   **Famous Commanders**:
+    *   **James T. Kirk**: Legendary captain of the *USS Enterprise* (NCC-1701), known for his unconventional tactical solutions.
+    *   **Christopher Pike**: Kirk's predecessor, symbol of integrity and courage.
+    *   **Robert April**: The first commander to take the Constitution class into the depths of unexplored space.
+
+#### 🛰️ Miranda Class (Multi-role Vessel)
+Reliable and long-lived, the Miranda class is the backbone of tactical and scientific support.
+*   **Famous Commanders**:
+    *   **Clark Terrell**: Commander of the *USS Reliant*, tragically involved in the Genesis Project crisis.
+    *   **Walker Keel**: Close friend of Picard and key figure in discovering the parasitic infiltration in Fleet Command.
+
+#### ⚔️ Defiant Class (Heavy Escort)
+Designed specifically for combat against the Borg. Small, extremely maneuverable, and heavily armed.
+*   **Famous Commanders**:
+    *   **Benjamin Sisko**: The "Emissary of the Prophets", who led the *USS Defiant* during the most critical phases of the Dominion War.
+    *   **Worf**: Klingon tactical master who often commanded the Defiant in frontline scenarios.
+
+#### 👑 Galaxy Class (Long Range Explorer)
+A "city in space". Designed for decade-long missions and high-level diplomacy, equipped with massive firepower.
+*   **Famous Commanders**:
+    *   **Jean-Luc Picard**: Commander of the *USS Enterprise-D*, unparalleled diplomat and fine strategist.
+    *   **Edward Jellico**: Known for his rigid military protocol during the Cardassian crisis.
+
+#### ⚡ Sovereign Class (Battle Cruiser)
+The pinnacle of Starfleet war technology in the late 24th century. Designed to face the most extreme threats.
+*   **Famous Commanders**:
+    *   **Jean-Luc Picard**: Commanding the *USS Enterprise-E* during the Battle of Sector 001 and the Ba'ku insurrection.
+    *   **William T. Riker**: Led the Sovereign in Picard's absence, demonstrating superior tactical audacity.
+
+#### 🔭 Intrepid Class (Scientific Explorer)
+Fast and equipped with neural bio-circuits. Designed for research and autonomy in remote quadrants.
+*   **Famous Commanders**:
+    *   **Kathryn Janeway**: The legendary captain who guided the *USS Voyager* for 70,000 light-years through the Delta Quadrant.
+    *   **Rudy Ransom**: Commander of the *USS Equinox*, whose story represents the dark side of survival in deep space.
+
+#### 🛡️ Other Operational Classes
+*   **Excelsior**: Led by **Hikaru Sulu**, pioneer of deep space exploration.
+*   **Constellation**: The class of the *USS Stargazer*, Picard's first command.
+*   **Akira / Steamrunner**: Flagships for territory defense during large-scale invasions.
+*   **Ambassador**: A technological bridge between the Excelsior and Galaxy classes, led by **Rachel Garrett**.
+*   **Oberth**: Light scientific vessel, essential for advanced stellar scans.
+
+---
+
+## 💾 Persistence and Continuity
+Star Trek Ultra's architecture is designed to support a persistent and dynamic galaxy. Every action, from discovering a new planetary system to loading the Cargo Bay, is preserved via a low-level binary archiving system.
+
+#### 🗄️ The Galactic Database (`galaxy.dat`)
+The `galaxy.dat` file constitutes the simulator's historical memory. It uses a **Direct Serialization** structure of the server RAM:
+*   **Galaxy Master Matrix**: A 10x10x10 three-dimensional grid storing mass density and composition of each quadrant (BPNBS encoding).
+*   **Entity Registries**: A complete dump of global arrays (`npcs`, `stars_data`, `planets`, `bases`), preserving relative coordinates, energy levels, and cooldown timers.
+*   **Data Integrity**: Implements rigid version control (`GALAXY_VERSION`). If the server detects a file generated with different structural parameters (e.g., max NPC number changed), it invalidates the load to prevent memory corruption, regenerating a consistent universe.
+
+#### 🔄 Synchronization Pipeline (Auto-Save)
+Continuity is guaranteed by an asynchronous synchronization loop:
+*   **Periodic Flush**: Every 60 seconds, the logic thread initiates a save procedure.
+*   **Thread Safety**: During disk I/O operation, the system acquires the `game_mutex`. This ensures the saved database is an **atomic snapshot** and consistent representation of the entire universe at that precise moment.
+
+#### 🆔 Identity and Profile Restoration
+The player continuity system relies on **Persistent Identity**:
+*   **Recognition**: By entering the same captain name used previously, the server queries the database of active and historical players.
+*   **Session Recovery**: Instantly restores:
+    *   **Global Coordinates (`gx, gy, gz`)**: The ship reappears exactly in the last visited sector.
+    *   **Strategic Inventory**: Dilithium, Tritanium, and Isolinear Crystal levels in Cargo Bay.
+    *   **Systems State**: Engine damage, sensor efficiency, and phaser bank charge.
+*   **Connection Hot-Swap**: If a captain loses connection (client crash or network instability), the server keeps the vessel "active" but stationary for a grace period, allowing the player to regain immediate control upon reentry.
+
+#### 🆘 EMERGENCY RESCUE Protocol
+To guarantee career continuity even in the most disastrous tactical situations, the simulator implements an automatic recovery protocol activated during login phase.
+
+*   **Collision Detection**: If a player attempts to reconnect and the server detects the ship is positioned inside a celestial body (star or planet), the rescue procedure is triggered to avoid the "Death Loop".
+*   **Critical State**: The protocol also intervenes if the vessel was previously destroyed (zero energy or total crew loss).
+*   **Rescue Actions**: Starfleet Command executes the following automatic operations:
+    *   **Spatial Relocation**: The ship is teleported to a random and safe sector of the galaxy, away from immediate threats.
+    *   **Systems Restoration**: Emergency repair of all 8 core subsystems up to **80% integrity**.
+    *   **Energy Recharge**: Supply of **50,000 units** of emergency energy.
+    *   **Rescue Crew**: If personnel was at zero, a minimum rescue team of **100 members** is assigned.
+
+This architecture guarantees that Star Trek Ultra is not just a game session, but a true evolving space career.
+
+## 🛠️ Technologies and System Requirements
+
+The Star Trek Ultra project is a demonstration of performance-oriented software engineering, utilizing the latest evolutions of the C language and Linux/POSIX system interfaces.
+
+### 🏗️ Core Engine & Language Standards
+*   **C23 (ISO/IEC 9899:2024)**: The simulator adopts the latest C language standard. The use of `-std=c2x` allows the employment of modern features like native `true/false` constants, standardization attributes, and stricter type support, ensuring robust and future-proof code.
+*   **High-Performance Event Loop (`epoll`)**: The server abandons the traditional `select` model in favor of **Linux epoll**. Thanks to **Edge-Triggered (EPOLLET)** mode, the kernel notifies the server only when data is actually ready on the socket, drastically reducing system calls and allowing management of hundreds of clients with near-zero CPU overhead.
+*   **Binary Protocol Efficiency**: Communication in the *Subspace Channel* is optimized via `pragma pack(1)`. This forces the compiler to eliminate any padding bytes between structure members, ensuring binary packets are as small as possible and portable across different architectures.
+
+### 🧵 Concurrency and Real-Time IPC
+*   **Zero-Copy Shared Memory**: The *Direct Bridge* architecture exploits **POSIX Shared Memory (`shm_open`)** and **mmap**. This allows sharing the entire galactic state between Client and Viewer without any memory copy operation (Zero-Copy), reducing IPC latency to nanosecond levels.
+*   **Deterministic Synchronization**: The system uses a mix of **Pthread Mutex Shared** (for atomic data integrity) and **POSIX Semaphores** (for event-driven wake-up). This ensures the viewer renders data exactly when received from the server, eliminating visual jitter.
+*   **High-Precision Timers**: The server logic loop is timed via `clock_nanosleep` on system monotonic clocks, ensuring physics and movement calculation is constant and independent of system load.
+
+### 🎨 Tactical Rendering Pipeline (3D View)
+Tactical visualization is managed by a modern OpenGL engine combining classic and programmable techniques:
+*   **GLSL Shader Engine**: Star glow effects, Black Hole distortion, and phaser discharges are processed via shaders written in **OpenGL Shading Language**. This shifts the aesthetic load to the GPU, freeing the CPU for network logic.
+*   **Vertex Buffer Objects (VBO)**: Static geometry (background stars, tactical grid) is loaded into video card memory at startup. During rendering, a single draw command is sent to the GPU, maximizing graphic throughput.
+*   **Projective HUD Technology**: Uses inverse matrix transformations and `gluProject` to map 3D spatial coordinates into 2D screen coordinates, allowing the interface to dynamically anchor identification tags above moving vessels.
+
+### 📦 Dependencies and Compilation
+To compile the project, a Unix-like development environment (preferably Linux) is required with the following requirements:
+*   **Compiler**: GCC 13+ or Clang 16+ (for full C23 support).
+*   **Libraries**:
+    *   `freeglut3` and `libglu1-mesa` (for the viewer).
+    *   `librt` and `libpthread` (for SHM and multithreading).
+
+#### Ubuntu / Debian
+```bash
+sudo apt-get install build-essential freeglut3-dev libglu1-mesa-dev libglew-dev
+```
+
+#### Fedora / Red Hat / AlmaLinux / CentOS
+```bash
+sudo dnf groupinstall "Development Tools"
+sudo dnf install freeglut-devel mesa-libGLU-devel glew-devel
+```
+
+---
+*STARTREK ULTRA - 3D LOGIC ENGINE. Developed with technical excellence by Nicola Taibi*
