@@ -7,6 +7,10 @@
     <td><img src="Enterprise.jpg" alt="USS Enterprise" width="400"/></td>
     <td><img src="einstein-rosen-schwarzschild.jpg" alt="Einstein-Rosen Schwarzschild Wormhole" width="400"/></td>
   </tr>
+  <tr>
+    <td><img src="pulsar.jpg" alt="Pulsar" width="400"/></td>
+    <td><img src="nebula.jpg" alt="Nebula" width="400"/></td>
+  </tr>
 </table>
 
 Star Trek Ultra è un simulatore spaziale avanzato che unisce la profondità strategica dei classici giochi testuali "Trek" anni '70 con un'architettura moderna Client-Server e una visualizzazione 3D accelerata hardware.
@@ -65,7 +69,8 @@ Il visualizzatore 3D è un motore di rendering standalone basato su **OpenGL e G
 *   **Rendering ad Alte Prestazioni**: Utilizza **Vertex Buffer Objects (VBO)** per gestire migliaia di stelle di sfondo e la griglia galattica, minimizzando le chiamate alla CPU e massimizzando il throughput della GPU.
 *   **Cartografia Stellare (Modalità Mappa)**:
     *   Attivabile tramite il comando `map`, questa modalità trasforma la vista tattica in una mappa galattica globale 10x10x10.
-    *   Ogni quadrante è rappresentato da indicatori cromatici che mostrano la densità di basi (verde), nemici (rosso), pianeti (ciano) e buchi neri (viola).
+    *   Ogni quadrante è rappresentato da indicatori cromatici che mostrano la densità di basi (verde), nemici (rosso), pianeti (ciano), buchi neri (viola), **nebulose (grigio)** e **pulsar (arancione)**.
+    *   Le **tempeste ioniche** attive sono visualizzate come gusci energetici bianchi che avvolgono il quadrante.
     *   La posizione attuale del giocatore è evidenziata da un **indicatore bianco pulsante**, facilitando la navigazione a lungo raggio.
 *   **HUD Tattico Dinamico**: Implementa una proiezione 2D-su-3D (via `gluProject`) per ancorare etichette, barre della salute e identificativi direttamente sopra i vascelli. L'overlay include ora il monitoraggio in tempo reale dell'**Equipaggio (CREW)**, vitale per la sopravvivenza della missione.
 *   **Engine degli Effetti (VFX)**:
@@ -164,10 +169,14 @@ Di seguito la lista completa dei comandi disponibili, raggruppati per funzione.
 *   `apr <ID> <DIST>`: **Approach Autopilot**. Avvicinamento automatico al bersaglio ID fino a distanza DIST.
 *   `doc`: **Docking**. Attracco a una Base Stellare (richiede distanza ravvicinata).
 *   `map`: **Stellar Cartography**. Attiva la visualizzazione 3D globale 10x10x10 dell'intera galassia.
-    *   **Legenda Colori**: Nemici (Rosso), Basi (Verde), Pianeti (Ciano), Stelle (Giallo), Buchi Neri (Viola).
+    *   **Legenda Colori**: Nemici (Rosso), Basi (Verde), Pianeti (Ciano), Stelle (Giallo), Buchi Neri (Viola), **Nebulose (Grigio)**, **Pulsar (Arancione Pulsante)**.
+    *   **Anomalie Dinamiche**: I quadranti interessati da **Tempeste Ioniche** sono avvolti da una gabbia bianca trasparente.
     *   **Localizzazione**: La posizione attuale della nave è indicata da un **cubo bianco pulsante**.
 
 ### 🔬 Sensori e Scanner
+*   `scan <ID>`: **Deep Scan Analysis**. Esegue una scansione profonda del bersaglio o dell'anomalia.
+    *   **Navi**: Rivela integrità scafo, livelli scudi per quadrante, energia residua, equipaggio e danni ai sottosistemi.
+    *   **Anomalie**: Fornisce dati scientifici su Nebulose e Pulsar.
 *   `srs`: **Short Range Sensors**. Scansione dettagliata del quadrante attuale.
 *   `lrs`: **Long Range Sensors**. Scansione 3x3x3 dei quadranti circostanti.
 *   `aux probe <QX> <QY> <QZ>`: Lancia una sonda a lungo raggio verso un quadrante specifico.
@@ -262,6 +271,35 @@ I siluri (comando `tor`) sono armi fisiche simulate con precisione:
 *   **Guida**: Se lanciati con un `lock` attivo, i siluri correggono la rotta del 20% per tick verso il bersaglio, permettendo di colpire navi in movimento.
 *   **Ostacoli**: Corpi celesti come **Stelle, Pianeti e Buchi Neri** sono oggetti fisici solidi. Un siluro che impatta contro di essi verrà assorbito/distrutto senza colpire il bersaglio dietro di essi. Sfruttate il terreno galattico per coprirvi!
 *   **Basi Stellari**: Anche le basi stellari bloccano i siluri. Attenzione al fuoco amico o incidentale.
+
+### 🌪️ Anomalie Spaziali e Pericoli Ambientali
+Il quadrante è disseminato di fenomeni naturali rilevabili sia dai sensori che dalla **visuale tattica 3D**:
+*   **Nebulose (Classe Mutara - ID 4xxx)**:
+    *   **Effetto**: Nubi di gas ionizzati che interferiscono con gli scudi deflettori.
+    *   **Visuale 3D**: Appaiono come volumi di gas grigio semitrasparente.
+    *   **Pericolo**: Stazionare all'interno (Distanza < 2.0) causa un costante drenaggio di energia.
+*   **Pulsar (ID 5xxx)**:
+    *   **Effetto**: Stelle di neutroni in rapida rotazione che emettono radiazioni letali.
+    *   **Visuale 3D**: Visibili come nuclei luminosi con fasci di radiazioni rotanti.
+    *   **Pericolo**: Avvicinarsi troppo (Distanza < 2.5) danneggia gravemente gli scudi e uccide rapidamente l'equipaggio per irraggiamento.
+*   **Tempeste Ioniche**:
+    *   **Effetto**: Eventi casuali globali sincronizzati in tempo reale sulla mappa.
+    *   **Frequenza**: Elevata (media statistica di un evento ogni 5-6 minuti).
+    *   **Dettagli Tecnici**: Controllo ogni 1000 tick (33s), probabilità evento 20%, di cui il 50% sono tempeste ioniche.
+    *   **Pericolo**: Possono accecare i sensori o spostare violentemente la nave fuori dalla rotta stabilita.
+
+## 📡 Dinamiche di Gioco ed Eventi
+L'universo di Star Trek Ultra è animato da una serie di eventi dinamici che richiedono decisioni rapide da parte del comando.
+
+#### ⚡ Eventi Casuali del Settore
+*   **Sbalzi del Sottospazio (Subspace Surges)**: Fluttuazioni improvvise che possono ricaricare parzialmente le riserve energetiche o causare un sovraccarico con conseguente perdita di energia.
+*   **Cesoie Spaziali (Spatial Shear)**: Violente correnti gravitazionali che colpiscono la nave durante la navigazione, spingendola fisicamente fuori rotta.
+*   **Emergenza Supporto Vitale**: Se il sistema `Life Support` è danneggiato, l'equipaggio inizierà a subire perdite. È una condizione critica che richiede riparazioni d'urgenza o l'attracco a una base stellare.
+
+#### 🚨 Protocolli Tattici e di Emergenza
+*   **Bluff Corbomite**: Il comando `psy` permette di trasmettere un segnale di minaccia nucleare fittizio. Se il bluff ha successo, i vascelli nemici entreranno in modalità di ritirata immediata.
+*   **Protocollo Soccorso (Emergency Rescue)**: In caso di distruzione del vascello o collisione fatale, al successivo rientro il Comando della Flotta attiverà una missione di soccorso automatica, riposizionando la nave in un settore sicuro e ripristinando i sistemi core all'80%.
+*   **Resistenza all'Abbordaggio**: Le operazioni di arrembaggio (`bor`) non sono prive di rischi; le squadre possono essere respinte, causando danni interni ai circuiti della propria nave.
 
 ---
 

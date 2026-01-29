@@ -221,7 +221,7 @@ void drawGalaxy();
 void drawSovereign();
 void drawIntrepid();
 void drawAkira();
-void drawNebula();
+void drawNebulaShip();
 void drawAmbassador();
 void drawOberth();
 void drawSteamrunner();
@@ -486,6 +486,7 @@ void drawText3D(float x, float y, float z, const char* text) {
 const char* getSpeciesName(int s) {
     switch(s) {
         case 1: return "Player"; case 3: return "Starbase"; case 4: return "Star"; case 5: return "Planet"; case 6: return "Black Hole";
+        case 7: return "Nebula"; case 8: return "Pulsar";
         case 10: return "Klingon"; case 11: return "Romulan"; case 12: return "Borg";
         case 13: return "Cardassian"; case 14: return "Jem'Hadar"; case 15: return "Tholian";
         case 16: return "Gorn"; case 17: return "Ferengi"; case 18: return "Species 8472";
@@ -811,7 +812,7 @@ void drawAkira() {
     }
 }
 
-void drawNebula() {
+void drawNebulaShip() {
     drawGalaxy();
     glPushMatrix(); glTranslatef(-0.6f, 0.4f, 0); glColor3f(0.7f, 0.7f, 0.75f);
     glPushMatrix(); glScalef(0.8f, 0.15f, 0.8f); glutSolidSphere(0.5, 24, 24); glPopMatrix();
@@ -858,7 +859,7 @@ void drawFederationShip(int class, float h, float m) {
         case SHIP_CLASS_SOVEREIGN:    drawSovereign(); break;
         case SHIP_CLASS_INTREPID:     drawIntrepid(); break;
         case SHIP_CLASS_AKIRA:        drawAkira(); break;
-        case SHIP_CLASS_NEBULA:       drawNebula(); break;
+        case SHIP_CLASS_NEBULA:       drawNebulaShip(); break;
         case SHIP_CLASS_AMBASSADOR:   drawAmbassador(); break;
         case SHIP_CLASS_OBERTH:       drawOberth(); break;
         case SHIP_CLASS_STEAMRUNNER:  drawSteamrunner(); break;
@@ -1035,6 +1036,7 @@ void drawWormhole(float x, float y, float z) {
 }
 
 void drawBlackHole(float x, float y, float z) {
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
     if (bhShaderProgram) {
         glUseProgram(bhShaderProgram);
         glUniform1f(glGetUniformLocation(bhShaderProgram, "time"), pulse);
@@ -1065,9 +1067,50 @@ void drawBlackHole(float x, float y, float z) {
     glColor4f(0.5f, 0.1f, 0.8f, 0.25f);
     glutSolidSphere(0.9, 20, 20);
     
-    glEnable(GL_LIGHTING);
     glPopMatrix();
     if (bhShaderProgram) glUseProgram(0);
+    glPopAttrib();
+}
+
+void drawStellarNebula(float x, float y, float z) {
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
+    glDisable(GL_LIGHTING);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glPushMatrix();
+    /* Draw several nested spheres with noise-like pulses */
+    for (int i = 0; i < 3; i++) {
+        float s = 1.2f + i * 0.4f + sin(pulse + i) * 0.1f;
+        float alpha = 0.2f - (i * 0.05f);
+        glColor4f(0.7f, 0.7f, 0.7f, alpha);
+        glutSolidSphere(s, 12, 12);
+    }
+    glPopMatrix();
+    glPopAttrib();
+}
+
+void drawPulsar(float x, float y, float z) {
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
+    glDisable(GL_LIGHTING);
+    glPushMatrix();
+    /* Core */
+    glColor3f(1.0f, 0.8f, 0.4f);
+    glutSolidSphere(0.3f, 16, 16);
+    
+    /* Radiation Beams */
+    glRotatef(pulse * 100.0f, 0, 1, 0);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBegin(GL_LINES);
+    for (int i = -1; i <= 1; i+=2) {
+        glColor4f(1.0f, 0.5f, 0.0f, 0.8f);
+        glVertex3f(0, 0, 0);
+        glColor4f(1.0f, 0.2f, 0.0f, 0.0f);
+        glVertex3f(0, 4.0f * i, 0);
+    }
+    glEnd();
+    glPopMatrix();
+    glPopAttrib();
 }
 
 void drawGalaxyMap() {
@@ -1111,12 +1154,15 @@ void drawGalaxyMap() {
                 float py = offset + z * gap;
                 float pz = offset + (11 - y) * gap;
 
-                /* Color coding based on BPNBS (Blackhole, Planet, Enemy, Base, Star) */
-                int bh = (val / 10000) % 10;
-                int pl = (val / 1000) % 10;
-                int en = (val / 100) % 10;
-                int bs = (val / 10) % 10;
-                int st = val % 10;
+                /* Color coding based on S|Pu|N|BH|P|K|B|S (8 digits) */
+                int storm = (val / 10000000) % 10;
+                int pul   = (val / 1000000) % 10;
+                int neb   = (val / 100000) % 10;
+                int bh    = (val / 10000) % 10;
+                int pl    = (val / 1000) % 10;
+                int en    = (val / 100) % 10;
+                int bs    = (val / 10) % 10;
+                int st    = val % 10;
 
                 glPushMatrix();
                 glTranslatef(px, py, pz);
@@ -1130,15 +1176,30 @@ void drawGalaxyMap() {
                     drawText3D(-0.3f, 0.4f, 0, "YOU");
                 }
 
+                if (storm > 0) {
+                    /* Ion Storm: Large Transparent White Wireframe Shell - Enhanced visibility */
+                    glEnable(GL_BLEND);
+                    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                    glLineWidth(2.0f);
+                    glColor4f(1.0f, 1.0f, 1.0f, 0.4f + sin(pulse*4.0f)*0.2f);
+                    glutWireCube(0.8f);
+                    glLineWidth(1.0f);
+                    glDisable(GL_BLEND);
+                }
+
                 if (val > 0) {
-                    if (bh > 0) glColor3f(0.8, 0, 1); /* Purple - High Priority */
-                    else if (en > 0) glColor3f(1, 0, 0); /* Red */
-                    else if (bs > 0) glColor3f(0, 1, 0); /* Green */
-                    else if (pl > 0) glColor3f(0, 0.8, 1); /* Cyan */
-                    else if (st > 0) glColor3f(1, 1, 0); /* Yellow - Low Priority */
+                    if (pul > 0) glColor3f(1.0, 0.5, 0); /* Orange - Pulsar */
+                    else if (neb > 0) glColor3f(0.7, 0.7, 0.7); /* Grey - Nebula */
+                    else if (bh > 0) glColor3f(0.6, 0, 1.0); /* Purple - Black Hole */
+                    else if (en > 0) glColor3f(1, 0, 0); /* Red - Hostile */
+                    else if (bs > 0) glColor3f(0, 1, 0); /* Green - Base */
+                    else if (pl > 0) glColor3f(0, 0.8, 1); /* Cyan - Planet */
+                    else if (st > 0) glColor3f(1, 1, 0); /* Yellow - Star */
                     else glColor3f(0.4, 0.4, 0.4); /* Dark gray fallback */
                     
-                    glutSolidCube(0.15);
+                    float base_s = 0.15f;
+                    if (pul > 0) base_s += sin(pulse*8.0f)*0.05f; /* Pulsar heartbeat */
+                    glutSolidCube(base_s);
                 }
                 glPopMatrix();
             }
@@ -1339,6 +1400,8 @@ void display() {
                     case 4: drawStar(0,0,0); break;
                     case 5: drawPlanet(0,0,0); break;
                     case 6: drawBlackHole(0,0,0); break;
+                    case 7: drawStellarNebula(0,0,0); break;
+                    case 8: drawPulsar(0,0,0); break;
                     case 10: drawKlingon(0,0,0); break;
                     case 11: drawRomulan(0,0,0); break;
                     case 12: drawBorg(0,0,0); break;
@@ -1370,6 +1433,7 @@ void display() {
             glDisable(GL_LIGHTING); glColor3f(1, 1, 0);
             drawText3D(20, 960, 0, "--- STELLAR CARTOGRAPHY: FULL GALAXY VIEW ---");
             drawText3D(20, 935, 0, "RED: Hostiles | GREEN: Bases | CYAN: Planets | PURPLE: Black Holes | YELLOW: Stars");
+            drawText3D(20, 910, 0, "GREY: Nebulas | ORANGE: Pulsars | WHITE SHELL: Ion Storms");
             glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
         }
     }

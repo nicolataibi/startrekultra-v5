@@ -7,6 +7,10 @@
     <td><img src="Enterprise.jpg" alt="USS Enterprise" width="400"/></td>
     <td><img src="einstein-rosen-schwarzschild.jpg" alt="Einstein-Rosen Schwarzschild Wormhole" width="400"/></td>
   </tr>
+  <tr>
+    <td><img src="pulsar.jpg" alt="Pulsar" width="400"/></td>
+    <td><img src="nebula.jpg" alt="Nebula" width="400"/></td>
+  </tr>
 </table>
 
 Star Trek Ultra is an advanced space simulator that combines the strategic depth of classic 70s text-based "Trek" games with a modern Client-Server architecture and hardware-accelerated 3D visualization.
@@ -65,7 +69,8 @@ The 3D viewer is a standalone rendering engine based on **OpenGL and GLUT**, des
 *   **High-Performance Rendering**: Uses **Vertex Buffer Objects (VBO)** to handle thousands of background stars and the galactic grid, minimizing CPU calls and maximizing GPU throughput.
 *   **Stellar Cartography (Map Mode)**:
     *   Activatable via the `map` command, this mode transforms the tactical view into a global 10x10x10 galactic map.
-    *   Each quadrant is represented by chromatic indicators showing the density of bases (green), enemies (red), planets (cyan), and black holes (purple).
+    *   Each quadrant is represented by chromatic indicators showing the density of bases (green), enemies (red), planets (cyan), black holes (purple), **nebulas (grey)**, and **pulsars (orange)**.
+    *   Active **ion storms** are visualized as white energy shells surrounding the quadrant.
     *   The player's current position is highlighted by a **pulsing white indicator**, facilitating long-range navigation.
 *   **Dynamic Tactical HUD**: Implements a 2D-on-3D projection (via `gluProject`) to anchor labels, health bars, and IDs directly above vessels. The overlay now includes real-time monitoring of **Crew (CREW)**, vital for mission survival.
 *   **Effects Engine (VFX)**:
@@ -164,10 +169,14 @@ Below is the complete list of available commands, grouped by function.
 *   `apr <ID> <DIST>`: **Approach Autopilot**. Automatic approach to target ID up to DIST distance.
 *   `doc`: **Docking**. Dock at a Starbase (requires close range).
 *   `map`: **Stellar Cartography**. Activates global 10x10x10 3D visualization of the entire galaxy.
-    *   **Color Legend**: Enemies (Red), Bases (Green), Planets (Cyan), Stars (Yellow), Black Holes (Purple).
+    *   **Color Legend**: Enemies (Red), Bases (Green), Planets (Cyan), Stars (Yellow), Black Holes (Purple), **Nebulas (Grey)**, **Pulsars (Pulsing Orange)**.
+    *   **Dynamic Anomalies**: Quadrants affected by **Ion Storms** are enclosed in a white transparent wireframe shell.
     *   **Localization**: Current ship position is indicated by a **pulsing white cube**.
 
 ### 🔬 Sensors and Scanners
+*   `scan <ID>`: **Deep Scan Analysis**. Performs a deep scan of the target or anomaly.
+    *   **Vessels**: Reveals hull integrity, shield levels per quadrant, residual energy, crew count, and subsystem damage.
+    *   **Anomalies**: Provides scientific data on Nebulas and Pulsars.
 *   `srs`: **Short Range Sensors**. Detailed scan of the current quadrant.
 *   `lrs`: **Long Range Sensors**. 3x3x3 scan of surrounding quadrants.
 *   `aux probe <QX> <QY> <QZ>`: Launches a long-range probe to a specific quadrant.
@@ -257,6 +266,35 @@ Torpedoes (command `tor`) are physically simulated weapons with precision:
 *   **Guidance**: If launched with an active `lock`, torpedoes correct course by 20% per tick towards the target, allowing hits on moving ships.
 *   **Obstacles**: Celestial bodies like **Stars, Planets, and Black Holes** are solid physical objects. A torpedo impacting them will be absorbed/destroyed without hitting the target behind them. Use galactic terrain for cover!
 *   **Starbases**: Starbases also block torpedoes. Beware of friendly or incidental fire.
+
+### 🌪️ Space Anomalies and Environmental Hazards
+The quadrant is scattered with natural phenomena detectable by both sensors and the **3D tactical view**:
+*   **Nebulas (Mutara Class - ID 4xxx)**:
+    *   **Effect**: Clouds of ionized gases interfering with deflector shields.
+    *   **3D View**: Rendered as semi-transparent grey gas volumes.
+    *   **Hazard**: Remaining inside (Distance < 2.0) causes constant energy drain.
+*   **Pulsars (ID 5xxx)**:
+    *   **Effect**: Rapidly rotating neutron stars emitting deadly radiation.
+    *   **3D View**: Visible as bright cores with rotating radiation beams.
+    *   **Hazard**: Approaching too close (Distance < 2.5) severely damages shields and rapidly kills crew via radiation poisoning.
+*   **Ion Storms**:
+    *   **Effect**: Random global events synchronized in real-time on the map.
+    *   **Frequency**: High (statistical average of one event every 5-6 minutes).
+    *   **Technical Details**: Checked every 1000 ticks (33s), 20% event probability, with a 50% specific weight for ion storms.
+    *   **Hazard**: Can blind sensors or violently push the ship off course.
+
+## 📡 Game Dynamics and Events
+The universe of Star Trek Ultra is brought to life by a series of dynamic events that require quick thinking from the command bridge.
+
+#### ⚡ Random Sector Events
+*   **Subspace Surges**: Sudden fluctuations that can partially recharge energy reserves or cause an overload resulting in energy loss.
+*   **Spatial Shear**: Violent gravitational currents that hit the ship during navigation, physically pushing it off course.
+*   **Life Support Emergency**: If the `Life Support` system is damaged, the crew will start suffering casualties. This is a critical condition requiring urgent repairs or docking at a starbase.
+
+#### 🚨 Tactical and Emergency Protocols
+*   **Corbomite Bluff**: The `psy` command allows you to transmit a fake nuclear threat signal. If successful, enemy vessels will immediately enter retreat mode.
+*   **Emergency Rescue Protocol**: In case of vessel destruction or fatal collision, upon re-entry Starfleet Command will initiate an automatic rescue mission, repositioning the ship in a safe sector and restoring core systems to 80% integrity.
+*   **Boarding Resistance**: Boarding operations (`bor`) are not without risks; teams can be repelled, causing internal damage to your ship's isolinear circuits.
 
 ---
 

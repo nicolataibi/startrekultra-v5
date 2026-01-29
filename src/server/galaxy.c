@@ -14,6 +14,8 @@
 
 NPCStar stars_data[MAX_STARS];
 NPCBlackHole black_holes[MAX_BH];
+NPCNebula nebulas[MAX_NEBULAS];
+NPCPulsar pulsars[MAX_PULSARS];
 NPCPlanet planets[MAX_PLANETS];
 NPCBase bases[MAX_BASES];
 NPCShip npcs[MAX_NPC];
@@ -61,6 +63,22 @@ void init_static_spatial_index() {
             q->static_bh_count = q->bh_count;
         }
     }
+    for(int n=0; n<MAX_NEBULAS; n++) if(nebulas[n].active) {
+        if (!IS_Q_VALID(nebulas[n].q1, nebulas[n].q2, nebulas[n].q3)) continue;
+        QuadrantIndex *q = &spatial_index[nebulas[n].q1][nebulas[n].q2][nebulas[n].q3];
+        if (q->nebula_count < MAX_Q_NEBULAS) { 
+            q->nebulas[q->nebula_count++] = &nebulas[n]; 
+            q->static_nebula_count = q->nebula_count;
+        }
+    }
+    for(int p=0; p<MAX_PULSARS; p++) if(pulsars[p].active) {
+        if (!IS_Q_VALID(pulsars[p].q1, pulsars[p].q2, pulsars[p].q3)) continue;
+        QuadrantIndex *q = &spatial_index[pulsars[p].q1][pulsars[p].q2][pulsars[p].q3];
+        if (q->pulsar_count < MAX_Q_PULSARS) { 
+            q->pulsars[q->pulsar_count++] = &pulsars[p]; 
+            q->static_pulsar_count = q->pulsar_count;
+        }
+    }
 }
 
 void rebuild_spatial_index() {
@@ -78,13 +96,17 @@ void rebuild_spatial_index() {
                 q->base_count = q->static_base_count;
                 q->star_count = q->static_star_count;
                 q->bh_count = q->static_bh_count;
+                q->nebula_count = q->static_nebula_count;
+                q->pulsar_count = q->static_pulsar_count;
 
                 /* Re-initialize BPNBS based on static objects */
                 int c_bh = q->bh_count > 9 ? 9 : q->bh_count;
                 int c_p = q->planet_count > 9 ? 9 : q->planet_count;
                 int c_b = q->base_count > 9 ? 9 : q->base_count;
                 int c_s = q->star_count > 9 ? 9 : q->star_count;
-                galaxy_master.g[i][j][l] = c_bh * 10000 + c_p * 1000 + c_b * 10 + c_s;
+                int c_neb = q->nebula_count > 9 ? 9 : q->nebula_count;
+                int c_pul = q->pulsar_count > 9 ? 9 : q->pulsar_count;
+                galaxy_master.g[i][j][l] = c_pul * 1000000 + c_neb * 100000 + c_bh * 10000 + c_p * 1000 + c_b * 10 + c_s;
             }
 
     for(int n=0; n<MAX_NPC; n++) if(npcs[n].active) {
@@ -124,6 +146,8 @@ void save_galaxy() {
     fwrite(black_holes, sizeof(NPCBlackHole), MAX_BH, f);
     fwrite(planets, sizeof(NPCPlanet), MAX_PLANETS, f);
     fwrite(bases, sizeof(NPCBase), MAX_BASES, f);
+    fwrite(nebulas, sizeof(NPCNebula), MAX_NEBULAS, f);
+    fwrite(pulsars, sizeof(NPCPulsar), MAX_PULSARS, f);
     fwrite(players, sizeof(ConnectedPlayer), MAX_CLIENTS, f);
     fclose(f);
     time_t now = time(NULL);
@@ -147,6 +171,8 @@ int load_galaxy() {
     fread(black_holes, sizeof(NPCBlackHole), MAX_BH, f);
     fread(planets, sizeof(NPCPlanet), MAX_PLANETS, f);
     fread(bases, sizeof(NPCBase), MAX_BASES, f);
+    fread(nebulas, sizeof(NPCNebula), MAX_NEBULAS, f);
+    fread(pulsars, sizeof(NPCPulsar), MAX_PULSARS, f);
     fread(players, sizeof(ConnectedPlayer), MAX_CLIENTS, f);
     fclose(f);
     
@@ -187,8 +213,10 @@ void generate_galaxy() {
     memset(planets, 0, sizeof(planets));
     memset(bases, 0, sizeof(bases));
     memset(black_holes, 0, sizeof(black_holes));
+    memset(nebulas, 0, sizeof(nebulas));
+    memset(pulsars, 0, sizeof(pulsars));
 
-    int n_count = 0, b_count = 0, p_count = 0, s_count = 0, bh_count = 0;
+    int n_count = 0, b_count = 0, p_count = 0, s_count = 0, bh_count = 0, neb_count = 0, pul_count = 0;
     
     for(int i=1; i<=10; i++)
         for(int j=1; j<=10; j++)
@@ -199,8 +227,10 @@ void generate_galaxy() {
                 int planets_cnt = (rand()%100 > 90) ? (rand()%2 + 1) : 0;
                 int star = (rand()%100 < 40) ? (rand()%3 + 1) : 0;
                 int bh = (rand()%100 < 10) ? 1 : 0;
+                int neb = (rand()%100 < 15) ? 1 : 0;
+                int pul = (rand()%100 < 5) ? 1 : 0;
                 
-                int actual_k = 0, actual_b = 0, actual_p = 0, actual_s = 0, actual_bh = 0;
+                int actual_k = 0, actual_b = 0, actual_p = 0, actual_s = 0, actual_bh = 0, actual_neb = 0, actual_pul = 0;
                 
                 for(int e=0; e<kling && n_count < MAX_NPC; e++) {
                     int faction = 10+(rand()%11);
@@ -230,17 +260,25 @@ void generate_galaxy() {
                 for(int h=0; h<bh && bh_count < MAX_BH; h++) {
                     black_holes[bh_count] = (NPCBlackHole){.id=bh_count, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .active=1}; bh_count++; actual_bh++;
                 }
+                for(int n=0; n<neb && neb_count < MAX_NEBULAS; n++) {
+                    nebulas[neb_count] = (NPCNebula){.id=neb_count, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .active=1}; neb_count++; actual_neb++;
+                }
+                for(int p=0; p<pul && pul_count < MAX_PULSARS; p++) {
+                    pulsars[pul_count] = (NPCPulsar){.id=pul_count, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .active=1}; pul_count++; actual_pul++;
+                }
 
-                /* Cap values to 9 for BPNBS encoding */
+                /* Cap values to 9 for BPNBS encoding (7-digit PuNBPNBS) */
+                int c_pul = actual_pul > 9 ? 9 : actual_pul;
+                int c_neb = actual_neb > 9 ? 9 : actual_neb;
                 int c_bh = actual_bh > 9 ? 9 : actual_bh;
                 int c_p = actual_p > 9 ? 9 : actual_p;
                 int c_k = actual_k > 9 ? 9 : actual_k;
                 int c_b = actual_b > 9 ? 9 : actual_b;
                 int c_s = actual_s > 9 ? 9 : actual_s;
 
-                galaxy_master.g[i][j][l] = c_bh * 10000 + c_p * 1000 + c_k * 100 + c_b * 10 + c_s;
+                galaxy_master.g[i][j][l] = c_pul * 1000000 + c_neb * 100000 + c_bh * 10000 + c_p * 1000 + c_k * 100 + c_b * 10 + c_s;
                 galaxy_master.k9 += actual_k;
                 galaxy_master.b9 += actual_b;
             }
-    printf("Galaxy generated: %d NPCs, %d Stars, %d Planets, %d Bases, %d Black Holes.\n", n_count, s_count, p_count, b_count, bh_count);
+    printf("Galaxy generated: %d NPCs, %d Stars, %d Planets, %d Bases, %d Black Holes, %d Nebulas, %d Pulsars.\n", n_count, s_count, p_count, b_count, bh_count, neb_count, pul_count);
 }

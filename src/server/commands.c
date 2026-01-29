@@ -183,7 +183,80 @@ void handle_srs(int i, const char *params) {
         if (baid == locked_id) { strcat(status, RED "[LOCKED]" RESET); if(chasing) strcat(status, B_RED "[CHASE]" RESET); }
         char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Federation Starbase %s\n", "Starbase", baid, ba->x, ba->y, ba->z, d, h, m, status); strncat(b, line, sizeof(b)-strlen(b)-1);
     }
+    for(int n_idx=0; n_idx<local_q->nebula_count; n_idx++) {
+        NPCNebula *nb = local_q->nebulas[n_idx];
+        double dx=nb->x-s1, dy=nb->y-s2, dz=nb->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
+        int nid = nb->id+4000;
+        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Mutara Nebula Class\n", "Nebula", nid, nb->x, nb->y, nb->z, d, h, m); strncat(b, line, sizeof(b)-strlen(b)-1);
+    }
+    for(int p_idx=0; p_idx<local_q->pulsar_count; p_idx++) {
+        NPCPulsar *pu = local_q->pulsars[p_idx];
+        double dx=pu->x-s1, dy=pu->y-s2, dz=pu->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
+        int pid = pu->id+5000;
+        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Pulsar (Radiation Hazard)\n", "Pulsar", pid, pu->x, pu->y, pu->z, d, h, m); strncat(b, line, sizeof(b)-strlen(b)-1);
+    }
     send_server_msg(i, "COMPUTER", b);
+}
+
+void handle_scan(int i, const char *params) {
+    int tid; 
+    if (sscanf(params, "%d", &tid) == 1) {
+        char rep[2048]; 
+        int pq1 = players[i].state.q1, pq2 = players[i].state.q2, pq3 = players[i].state.q3;
+        bool found = false;
+        
+        if (tid >= 1 && tid <= 32) {
+             if (players[tid-1].active && players[tid-1].state.q1==pq1 && players[tid-1].state.q2==pq2 && players[tid-1].state.q3==pq3) {
+                 found = true;
+                 ConnectedPlayer *t = &players[tid-1];
+                 const char* c_names[] = {"Constitution", "Miranda", "Excelsior", "Constellation", "Defiant", "Galaxy", "Sovereign", "Intrepid", "Akira", "Nebula", "Ambassador", "Oberth", "Steamrunner", "Vessel"};
+                 const char* class_name = (t->ship_class >= 0 && t->ship_class <= 13) ? c_names[t->ship_class] : "Unknown";
+                 
+                 snprintf(rep, sizeof(rep), CYAN "\n--- TACTICAL SCAN ANALYSIS: %s ---\n" RESET, t->name);
+                 snprintf(rep+strlen(rep), sizeof(rep)-strlen(rep), "CLASS: %s | FACTION: %s\n", class_name, get_species_name(t->faction));
+                 snprintf(rep+strlen(rep), sizeof(rep)-strlen(rep), "SHIELDS: [F:%d R:%d T:%d B:%d L:%d R:%d]\n", t->state.shields[0], t->state.shields[1], t->state.shields[2], t->state.shields[3], t->state.shields[4], t->state.shields[5]);
+                 snprintf(rep+strlen(rep), sizeof(rep)-strlen(rep), "ENERGY: %d | CREW: %d | TORPS: %d\n", t->state.energy, t->state.crew_count, t->state.torpedoes);
+                 
+                 if (t->state.is_cloaked) strcat(rep, MAGENTA "WARNING: CLOAKING SIGNATURE DETECTED\n" RESET);
+                 
+                 strcat(rep, YELLOW "SUBSYSTEM INTEGRITY:\n" RESET);
+                 const char* sys[] = {"Warp","Imp","Sens","Tran","Phas","Torp","Comp","Life"};
+                 for(int s=0; s<8; s++) { 
+                     char bar[11]; int fills = (int)(t->state.system_health[s]/10.0f); for(int k=0;k<10;k++) bar[k]=(k<fills)?'|':'.'; bar[10]=0;
+                     char line[64]; snprintf(line, sizeof(line), " %-8s [%s] %.1f%%\n", sys[s], bar, t->state.system_health[s]);
+                     strcat(rep, line);
+                 }
+             }
+        } else if (tid >= 100 && tid < 100+MAX_NPC) {
+            int idx = tid - 100;
+            if (npcs[idx].active && npcs[idx].q1==pq1 && npcs[idx].q2==pq2 && npcs[idx].q3==pq3) {
+                found = true;
+                NPCShip *n = &npcs[idx];
+                snprintf(rep, sizeof(rep), CYAN "\n--- TACTICAL SCAN ANALYSIS: TARGET ID %d ---\n" RESET, tid);
+                snprintf(rep+strlen(rep), sizeof(rep)-strlen(rep), "SPECIES: %s\n", get_species_name(n->faction));
+                snprintf(rep+strlen(rep), sizeof(rep)-strlen(rep), "ENERGY CORE: %d\n", n->energy);
+                snprintf(rep+strlen(rep), sizeof(rep)-strlen(rep), "PROPULSION: %.1f%%\n", n->engine_health);
+                snprintf(rep+strlen(rep), sizeof(rep)-strlen(rep), "BEHAVIOR: %s\n", (n->ai_state==AI_STATE_FLEE)?"RETREATING":(n->ai_state==AI_STATE_CHASE)?"AGGRESSIVE":"PATROLLING");
+            }
+        } else if (tid >= 4000 && tid < 4000+MAX_NEBULAS) {
+            int idx = tid - 4000;
+            if (nebulas[idx].active && nebulas[idx].q1==pq1 && nebulas[idx].q2==pq2 && nebulas[idx].q3==pq3) {
+                found = true;
+                snprintf(rep, sizeof(rep), BLUE "\n--- STELLAR PHENOMENON ANALYSIS ---\n" RESET "TYPE: Class-Mutara Nebula\nCOMPOSITION: Ionized Gases, Sensor-dampening particulates.\nEFFECT: Reduced sensor range, Shield regeneration inhibition.\n");
+            }
+        } else if (tid >= 5000 && tid < 5000+MAX_PULSARS) {
+            int idx = tid - 5000;
+            if (pulsars[idx].active && pulsars[idx].q1==pq1 && pulsars[idx].q2==pq2 && pulsars[idx].q3==pq3) {
+                found = true;
+                snprintf(rep, sizeof(rep), RED "\n--- WARNING: PULSAR DETECTED ---\n" RESET "TYPE: Rotating Neutron Star\nRADIATION: Extreme (Gamma/X-Ray)\nADVISORY: Maintain minimum safe distance 2.0. Shield failure imminent in proximity.\n");
+            }
+        }
+
+        if (found) send_server_msg(i, "SCIENCE", rep);
+        else send_server_msg(i, "COMPUTER", "Unable to lock sensors on specified ID.");
+    } else {
+        send_server_msg(i, "COMPUTER", "Usage: scan <ID>");
+    }
 }
 
 void handle_lrs(int i, const char *params) {
@@ -575,6 +648,7 @@ static const CommandDef command_registry[] = {
     {"tor",  handle_tor, "Fire Torpedo"},
     {"she ", handle_she, "Shield Configuration"},
     {"lock ",handle_lock, "Target Lock-on"},
+    {"scan ",handle_scan, "Detailed Scan"},
     {"clo",  handle_clo, "Cloaking Device"},
     {"bor",  handle_bor, "Boarding Party"},
     {"dis",  handle_dis, "Dismantle Wreck"},

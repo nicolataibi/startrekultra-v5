@@ -115,6 +115,13 @@ void update_game_logic() {
 
     pthread_mutex_lock(&game_mutex);
     
+    /* Phase 0: Map cleanup (Storms) */
+    if (global_tick % 500 == 0) {
+        for(int i=1; i<=10; i++) for(int j=1; j<=10; j++) for(int l=1; l<=10; l++) {
+            if (galaxy_master.g[i][j][l] >= 10000000) galaxy_master.g[i][j][l] -= 10000000;
+        }
+    }
+
     /* Phase 1: NPC Movement & AI */
     for (int n = 0; n < MAX_NPC; n++) update_npc_ai(n);
 
@@ -139,16 +146,69 @@ void update_game_logic() {
             }
         }
 
-        /* Random Environmental Events */
-        if (global_tick % 2000 == 0 && (rand() % 100 < 5)) {
-            int event_type = rand() % 2;
-            if (event_type == 0) {
+        /* Random Environmental Events - Increased frequency */
+        if (global_tick % 1000 == 0 && (rand() % 100 < 20)) {
+            int event_type = rand() % 4; /* 0,1 = Ion Storm, 2 = Shear, 3 = Power Surge */
+            if (event_type <= 1) {
                 send_server_msg(i, "SCIENCE", "Ion Storm detected! Sensors effectively blinded.");
                 players[i].state.system_health[2] *= 0.5f; /* Damage sensors */
+                /* Mark storm in galaxy grid for the map (8th digit) */
+                int q1=players[i].state.q1, q2=players[i].state.q2, q3=players[i].state.q3;
+                if (IS_Q_VALID(q1,q2,q3)) {
+                    if (galaxy_master.g[q1][q2][q3] < 10000000) galaxy_master.g[q1][q2][q3] += 10000000;
+                }
+            } else if (event_type == 1) {
+                send_server_msg(i, "HELMSMAN", "Spatial shear encountered! We are being pushed off course!");
+                players[i].gx += (rand()%100 - 50) / 50.0;
+                players[i].gy += (rand()%100 - 50) / 50.0;
+                players[i].gz += (rand()%100 - 50) / 50.0;
             } else {
                 send_server_msg(i, "ENGINEERING", "Subspace surge detected. Power levels fluctuating.");
                 players[i].state.energy += (rand() % 10000) - 5000;
                 if (players[i].state.energy < 0) players[i].state.energy = 0;
+            }
+        }
+
+        /* Anomaly Effects: Nebulas & Pulsars */
+        QuadrantIndex *anomaly_q = &spatial_index[players[i].state.q1][players[i].state.q2][players[i].state.q3];
+        
+        for (int n = 0; n < anomaly_q->nebula_count; n++) {
+            double d = sqrt(pow(players[i].state.s1 - anomaly_q->nebulas[n]->x, 2) + pow(players[i].state.s2 - anomaly_q->nebulas[n]->y, 2) + pow(players[i].state.s3 - anomaly_q->nebulas[n]->z, 2));
+            if (d < 2.0) {
+                 if (global_tick % 60 == 0) { /* Once per second */
+                     players[i].state.energy -= 50;
+                     if (players[i].state.energy < 0) players[i].state.energy = 0;
+                 }
+                 if (global_tick % 300 == 0) send_server_msg(i, "COMPUTER", "Alert: Nebular interference draining shields.");
+            }
+        }
+        for (int p = 0; p < anomaly_q->pulsar_count; p++) {
+            double d = sqrt(pow(players[i].state.s1 - anomaly_q->pulsars[p]->x, 2) + pow(players[i].state.s2 - anomaly_q->pulsars[p]->y, 2) + pow(players[i].state.s3 - anomaly_q->pulsars[p]->z, 2));
+            if (d < 2.5) {
+                if (global_tick % 60 == 0) {
+                    int dmg = (int)((2.5 - d) * 400.0);
+                    int shield_hit = 0;
+                    for(int s=0; s<6; s++) { 
+                        if(players[i].state.shields[s] > 0) {
+                            int abs = (players[i].state.shields[s] >= dmg/6) ? dmg/6 : players[i].state.shields[s];
+                            players[i].state.shields[s] -= abs;
+                            shield_hit += abs;
+                        }
+                    }
+                    if (shield_hit < dmg) {
+                        /* Radiation penetrates shields */
+                        players[i].state.crew_count -= (rand()%5 + 1);
+                        if (players[i].state.crew_count < 0) players[i].state.crew_count = 0;
+                    }
+                    char msg[64]; sprintf(msg, "Radiation Critical! Shield Integrity Failing. (Dmg: %d)", dmg);
+                    send_server_msg(i, "WARNING", msg);
+                    
+                    if (players[i].state.crew_count == 0) {
+                         send_server_msg(i, "CRITICAL", "ALL HANDS LOST TO RADIATION.");
+                         players[i].active = 0;
+                         players[i].state.boom = (NetPoint){(float)players[i].state.s1, (float)players[i].state.s2, (float)players[i].state.s3, 1};
+                    }
+                }
             }
         }
 
@@ -518,9 +578,18 @@ void update_game_logic() {
             for(int s=0; s<lq->star_count && o_idx < MAX_NET_OBJECTS; s++) upd.objects[o_idx++] = (NetObject){(float)lq->stars[s]->x,(float)lq->stars[s]->y,(float)lq->stars[s]->z,0,0,4,0,1,100,lq->stars[s]->id+2000,"Star"};
             for(int h=0; h<lq->bh_count && o_idx < MAX_NET_OBJECTS; h++) upd.objects[o_idx++] = (NetObject){(float)lq->black_holes[h]->x,(float)lq->black_holes[h]->y,(float)lq->black_holes[h]->z,0,0,6,0,1,100,lq->black_holes[h]->id+3000,"Black Hole"};
             for(int b=0; b<lq->base_count && o_idx < MAX_NET_OBJECTS; b++) upd.objects[o_idx++] = (NetObject){(float)lq->bases[b]->x,(float)lq->bases[b]->y,(float)lq->bases[b]->z,0,0,3,0,1,100,lq->bases[b]->id+500,"Starbase"};
+            for(int n=0; n<lq->nebula_count && o_idx < MAX_NET_OBJECTS; n++) upd.objects[o_idx++] = (NetObject){(float)lq->nebulas[n]->x,(float)lq->nebulas[n]->y,(float)lq->nebulas[n]->z,0,0,7,0,1,100,lq->nebulas[n]->id+4000,"Nebula"};
+            for(int p=0; p<lq->pulsar_count && o_idx < MAX_NET_OBJECTS; p++) upd.objects[o_idx++] = (NetObject){(float)lq->pulsars[p]->x,(float)lq->pulsars[p]->y,(float)lq->pulsars[p]->z,0,0,8,0,1,100,lq->pulsars[p]->id+5000,"Pulsar"};
         }
         upd.object_count = o_idx;
         upd.beam_count = players[i].state.beam_count; for(int b=0; b<upd.beam_count && b<MAX_NET_BEAMS; b++) upd.beams[b] = players[i].state.beams[b];
+        
+        /* Map Synchronizer: Send current quadrant data to keep map updated with dynamic storms */
+        upd.map_update_q[0] = upd.q1; upd.map_update_q[1] = upd.q2; upd.map_update_q[2] = upd.q3;
+        if (IS_Q_VALID(upd.q1, upd.q2, upd.q3)) {
+            upd.map_update_val = galaxy_master.g[upd.q1][upd.q2][upd.q3];
+        }
+
         upd.torp = players[i].state.torp; upd.boom = players[i].state.boom; upd.dismantle = players[i].state.dismantle; 
         upd.wormhole = players[i].state.wormhole;
         upd.jump_arrival = players[i].state.jump_arrival;

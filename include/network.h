@@ -100,6 +100,8 @@ typedef struct {
     NetDismantle dismantle;
     int beam_count;
     NetBeam beams[MAX_NET_BEAMS];
+    int map_update_val;
+    int map_update_q[3];
     int object_count;
     NetObject objects[MAX_NET_OBJECTS];
 } PacketUpdate;

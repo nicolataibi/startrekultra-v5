@@ -58,6 +58,8 @@ typedef enum {
 
 typedef struct { int id, faction, q1, q2, q3; double x, y, z; int active; } NPCStar;
 typedef struct { int id, q1, q2, q3; double x, y, z; int active; } NPCBlackHole;
+typedef struct { int id, q1, q2, q3; double x, y, z; int active; } NPCNebula;
+typedef struct { int id, q1, q2, q3; double x, y, z; int active; } NPCPulsar;
 typedef struct { 
     int id, faction, q1, q2, q3; 
     double x, y, z, h, m; 
@@ -78,6 +80,8 @@ typedef struct { int id, faction, q1, q2, q3; double x, y, z; int health, active
 #define MAX_BASES 200
 #define MAX_STARS 3000
 #define MAX_BH 200
+#define MAX_NEBULAS 500
+#define MAX_PULSARS 200
 
 /* Local Quadrant Limits for Spatial Index (Optimization) */
 #define MAX_Q_NPC 32
@@ -85,11 +89,15 @@ typedef struct { int id, faction, q1, q2, q3; double x, y, z; int health, active
 #define MAX_Q_BASES 8
 #define MAX_Q_STARS 32
 #define MAX_Q_BH 4
+#define MAX_Q_NEBULAS 8
+#define MAX_Q_PULSARS 4
 #define MAX_Q_PLAYERS 32
 
 /* Global Data accessed by modules */
 extern NPCStar stars_data[MAX_STARS];
 extern NPCBlackHole black_holes[MAX_BH];
+extern NPCNebula nebulas[MAX_NEBULAS];
+extern NPCPulsar pulsars[MAX_PULSARS];
 extern NPCPlanet planets[MAX_PLANETS];
 extern NPCBase bases[MAX_BASES];
 extern NPCShip npcs[MAX_NPC];
@@ -100,7 +108,7 @@ extern int g_debug;
 
 #define LOG_DEBUG(...) do { if (g_debug) { printf("DEBUG: " __VA_ARGS__); fflush(stdout); } } while (0)
 
-#define GALAXY_VERSION 20260126
+#define GALAXY_VERSION 20260129
 
 /* Spatial Partitioning Index */
 typedef struct {
@@ -118,6 +126,12 @@ typedef struct {
     NPCBlackHole *black_holes[MAX_Q_BH];
     int bh_count;
     int static_bh_count;     /* Marker for optimization */
+    NPCNebula *nebulas[MAX_Q_NEBULAS];
+    int nebula_count;
+    int static_nebula_count; /* Marker for optimization */
+    NPCPulsar *pulsars[MAX_Q_PULSARS];
+    int pulsar_count;
+    int static_pulsar_count; /* Marker for optimization */
     ConnectedPlayer *players[MAX_Q_PLAYERS];
     int player_count;
 } QuadrantIndex;

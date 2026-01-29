@@ -236,6 +236,14 @@ void *network_listener(void *arg) {
                 g_shared_state->shm_q[2] = upd.q3;
                 sprintf(g_shared_state->quadrant, "Q-%d-%d-%d", upd.q1, upd.q2, upd.q3);
 
+                /* Update dynamic galaxy data (e.g. Ion Storms) */
+                if (upd.map_update_val > 0) {
+                    int mq1 = upd.map_update_q[0], mq2 = upd.map_update_q[1], mq3 = upd.map_update_q[2];
+                    if (mq1 >= 1 && mq1 <= 10 && mq2 >= 1 && mq2 <= 10 && mq3 >= 1 && mq3 <= 10) {
+                        g_shared_state->shm_galaxy[mq1][mq2][mq3] = upd.map_update_val;
+                    }
+                }
+
                 g_shared_state->object_count = upd.object_count;
                 for (int o=0; o < upd.object_count; o++) {
                     g_shared_state->objects[o].shm_x = upd.objects[o].net_x;
