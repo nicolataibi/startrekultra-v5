@@ -504,6 +504,7 @@ int main(int argc, char *argv[]) {
                         printf("tor H M     : Launch Photon Torpedo (Ballistic projectile)\n");
                         printf("she F R T B L RI : Configure 6 Shield Quadrants\n");
                         printf("lock ID     : Lock-on Target (0:Self, 1+:Nearby vessels)\n");
+                        printf("scan ID     : Detailed analysis of vessel or anomaly\n");
                         printf("pow E S W   : Power Distribution (Engines, Shields, Weapons %%)\n");
                         printf("psy         : Psychological Warfare (Corbomite Bluff)\n");
                         printf("aux probe QX QY QZ: Launch long-range probe\n");

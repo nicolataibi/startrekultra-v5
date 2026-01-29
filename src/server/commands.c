@@ -16,6 +16,8 @@
 /* Type definition for command handlers */
 typedef void (*CommandHandler)(int p_idx, const char *params);
 
+void handle_help(int p_idx, const char *params);
+
 typedef struct {
     const char *name;
     CommandHandler handler;
@@ -664,10 +666,21 @@ static const CommandDef command_registry[] = {
     {"dam",  handle_dam, "Damage Report"},
     {"cal ", handle_cal, "Navigation Calculator"},
     {"who",  handle_who, "Active Captains List"},
+    {"help", handle_help,"Display this directory"},
     {"aux ", handle_aux, "Auxiliary Systems"},
     {"xxx",  handle_xxx, "Self-Destruct"},
     {NULL, NULL, NULL}
 };
+
+void handle_help(int i, const char *params) {
+    char b[4096] = CYAN "\n--- LCARS COMMAND DIRECTORY ---\n" RESET;
+    for (int c = 0; command_registry[c].name != NULL; c++) {
+        char line[128];
+        snprintf(line, sizeof(line), WHITE "%-8s" RESET " : %s\n", command_registry[c].name, command_registry[c].description);
+        strcat(b, line);
+    }
+    send_server_msg(i, "COMPUTER", b);
+}
 
 void process_command(int i, const char *cmd) {
     pthread_mutex_lock(&game_mutex);
