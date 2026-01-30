@@ -56,10 +56,21 @@ typedef enum {
     AI_STATE_FLEE
 } AIState;
 
+/* --- Celestial and Tactical Entities --- */
+
 typedef struct { int id, faction, q1, q2, q3; double x, y, z; int active; } NPCStar;
 typedef struct { int id, q1, q2, q3; double x, y, z; int active; } NPCBlackHole;
 typedef struct { int id, q1, q2, q3; double x, y, z; int active; } NPCNebula;
 typedef struct { int id, q1, q2, q3; double x, y, z; int active; } NPCPulsar;
+typedef struct { int id, q1, q2, q3; double x, y, z; double a, b, angle, speed, inc; double cx, cy, cz; int active; } NPCComet;
+typedef struct { int id, q1, q2, q3; double x, y, z; float size; int active; } NPCAsteroid;
+typedef struct { int id, q1, q2, q3; double x, y, z; int ship_class; int active; } NPCDerelict;
+typedef struct { int id, q1, q2, q3; double x, y, z; int faction; int active; } NPCMine;
+typedef struct { int id, q1, q2, q3; double x, y, z; int active; } NPCBuoy;
+typedef struct { int id, faction, q1, q2, q3; double x, y, z; int health, energy, active; int fire_cooldown; } NPCPlatform;
+typedef struct { int id, q1, q2, q3; double x, y, z; int active; } NPCRift;
+typedef struct { int id, type, q1, q2, q3; double x, y, z; int health, energy, active; int behavior_timer; } NPCMonster;
+
 typedef struct { 
     int id, faction, q1, q2, q3; 
     double x, y, z, h, m; 
@@ -72,8 +83,11 @@ typedef struct {
     int nav_timer; 
     double dx, dy, dz; 
 } NPCShip;
+
 typedef struct { int id, q1, q2, q3; double x, y, z; int resource_type, amount, active; } NPCPlanet;
 typedef struct { int id, faction, q1, q2, q3; double x, y, z; int health, active; } NPCBase;
+
+/* --- Limits --- */
 
 #define MAX_NPC 1000
 #define MAX_PLANETS 1000
@@ -82,6 +96,14 @@ typedef struct { int id, faction, q1, q2, q3; double x, y, z; int health, active
 #define MAX_BH 200
 #define MAX_NEBULAS 500
 #define MAX_PULSARS 200
+#define MAX_COMETS 300
+#define MAX_ASTEROIDS 2000
+#define MAX_DERELICTS 150
+#define MAX_MINES 1000
+#define MAX_BUOYS 100
+#define MAX_PLATFORMS 200
+#define MAX_RIFTS 50
+#define MAX_MONSTERS 30
 
 /* Local Quadrant Limits for Spatial Index (Optimization) */
 #define MAX_Q_NPC 32
@@ -91,6 +113,14 @@ typedef struct { int id, faction, q1, q2, q3; double x, y, z; int health, active
 #define MAX_Q_BH 4
 #define MAX_Q_NEBULAS 8
 #define MAX_Q_PULSARS 4
+#define MAX_Q_COMETS 4
+#define MAX_Q_ASTEROIDS 20
+#define MAX_Q_DERELICTS 2
+#define MAX_Q_MINES 16
+#define MAX_Q_BUOYS 2
+#define MAX_Q_PLATFORMS 4
+#define MAX_Q_RIFTS 1
+#define MAX_Q_MONSTERS 1
 #define MAX_Q_PLAYERS 32
 
 /* Global Data accessed by modules */
@@ -98,6 +128,14 @@ extern NPCStar stars_data[MAX_STARS];
 extern NPCBlackHole black_holes[MAX_BH];
 extern NPCNebula nebulas[MAX_NEBULAS];
 extern NPCPulsar pulsars[MAX_PULSARS];
+extern NPCComet comets[MAX_COMETS];
+extern NPCAsteroid asteroids[MAX_ASTEROIDS];
+extern NPCDerelict derelicts[MAX_DERELICTS];
+extern NPCMine mines[MAX_MINES];
+extern NPCBuoy buoys[MAX_BUOYS];
+extern NPCPlatform platforms[MAX_PLATFORMS];
+extern NPCRift rifts[MAX_RIFTS];
+extern NPCMonster monsters[MAX_MONSTERS];
 extern NPCPlanet planets[MAX_PLANETS];
 extern NPCBase bases[MAX_BASES];
 extern NPCShip npcs[MAX_NPC];
@@ -106,9 +144,16 @@ extern StarTrekGame galaxy_master;
 extern pthread_mutex_t game_mutex;
 extern int g_debug;
 
+typedef struct {
+    int supernova_q1, supernova_q2, supernova_q3;
+    double x, y, z; /* Epicenter of the explosion (The star) */
+    int supernova_timer; /* Ticks remaining, 0 = inactive */
+} SupernovaState;
+extern SupernovaState supernova_event;
+
 #define LOG_DEBUG(...) do { if (g_debug) { printf("DEBUG: " __VA_ARGS__); fflush(stdout); } } while (0)
 
-#define GALAXY_VERSION 20260129
+#define GALAXY_VERSION 20260208
 
 /* Spatial Partitioning Index */
 typedef struct {
@@ -116,22 +161,38 @@ typedef struct {
     int npc_count;
     NPCPlanet *planets[MAX_Q_PLANETS];
     int planet_count;
-    int static_planet_count; /* Marker for optimization */
+    int static_planet_count; 
     NPCBase *bases[MAX_Q_BASES];
     int base_count;
-    int static_base_count;   /* Marker for optimization */
+    int static_base_count;   
     NPCStar *stars[MAX_Q_STARS];
     int star_count;
-    int static_star_count;   /* Marker for optimization */
+    int static_star_count;   
     NPCBlackHole *black_holes[MAX_Q_BH];
     int bh_count;
-    int static_bh_count;     /* Marker for optimization */
+    int static_bh_count;     
     NPCNebula *nebulas[MAX_Q_NEBULAS];
     int nebula_count;
-    int static_nebula_count; /* Marker for optimization */
+    int static_nebula_count; 
     NPCPulsar *pulsars[MAX_Q_PULSARS];
     int pulsar_count;
-    int static_pulsar_count; /* Marker for optimization */
+    int static_pulsar_count; 
+    NPCComet *comets[MAX_Q_COMETS];
+    int comet_count;
+    NPCAsteroid *asteroids[MAX_Q_ASTEROIDS];
+    int asteroid_count;
+    NPCDerelict *derelicts[MAX_Q_DERELICTS];
+    int derelict_count;
+    NPCMine *mines[MAX_Q_MINES];
+    int mine_count;
+    NPCBuoy *buoys[MAX_Q_BUOYS];
+    int buoy_count;
+    NPCPlatform *platforms[MAX_Q_PLATFORMS];
+    int platform_count;
+    NPCRift *rifts[MAX_Q_RIFTS];
+    int rift_count;
+    NPCMonster *monsters[MAX_Q_MONSTERS];
+    int monster_count;
     ConnectedPlayer *players[MAX_Q_PLAYERS];
     int player_count;
 } QuadrantIndex;

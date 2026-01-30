@@ -16,11 +16,20 @@ NPCStar stars_data[MAX_STARS];
 NPCBlackHole black_holes[MAX_BH];
 NPCNebula nebulas[MAX_NEBULAS];
 NPCPulsar pulsars[MAX_PULSARS];
+NPCComet comets[MAX_COMETS];
+NPCAsteroid asteroids[MAX_ASTEROIDS];
+NPCDerelict derelicts[MAX_DERELICTS];
+NPCMine mines[MAX_MINES];
+NPCBuoy buoys[MAX_BUOYS];
+NPCPlatform platforms[MAX_PLATFORMS];
+NPCRift rifts[MAX_RIFTS];
+NPCMonster monsters[MAX_MONSTERS];
 NPCPlanet planets[MAX_PLANETS];
 NPCBase bases[MAX_BASES];
 NPCShip npcs[MAX_NPC];
 ConnectedPlayer players[MAX_CLIENTS];
 StarTrekGame galaxy_master;
+SupernovaState supernova_event = {0,0,0,0};
 
 QuadrantIndex (*spatial_index)[11][11] = NULL;
 
@@ -79,6 +88,55 @@ void init_static_spatial_index() {
             q->static_pulsar_count = q->pulsar_count;
         }
     }
+    for(int a=0; a<MAX_ASTEROIDS; a++) if(asteroids[a].active) {
+        if (!IS_Q_VALID(asteroids[a].q1, asteroids[a].q2, asteroids[a].q3)) continue;
+        QuadrantIndex *q = &spatial_index[asteroids[a].q1][asteroids[a].q2][asteroids[a].q3];
+        if (q->asteroid_count < MAX_Q_ASTEROIDS) { 
+            q->asteroids[q->asteroid_count++] = &asteroids[a]; 
+        }
+    }
+    for(int d=0; d<MAX_DERELICTS; d++) if(derelicts[d].active) {
+        if (!IS_Q_VALID(derelicts[d].q1, derelicts[d].q2, derelicts[d].q3)) continue;
+        QuadrantIndex *q = &spatial_index[derelicts[d].q1][derelicts[d].q2][derelicts[d].q3];
+        if (q->derelict_count < MAX_Q_DERELICTS) { 
+            q->derelicts[q->derelict_count++] = &derelicts[d]; 
+        }
+    }
+    for(int m=0; m<MAX_MINES; m++) if(mines[m].active) {
+        if (!IS_Q_VALID(mines[m].q1, mines[m].q2, mines[m].q3)) continue;
+        QuadrantIndex *q = &spatial_index[mines[m].q1][mines[m].q2][mines[m].q3];
+        if (q->mine_count < MAX_Q_MINES) { 
+            q->mines[q->mine_count++] = &mines[m]; 
+        }
+    }
+    for(int b=0; b<MAX_BUOYS; b++) if(buoys[b].active) {
+        if (!IS_Q_VALID(buoys[b].q1, buoys[b].q2, buoys[b].q3)) continue;
+        QuadrantIndex *q = &spatial_index[buoys[b].q1][buoys[b].q2][buoys[b].q3];
+        if (q->buoy_count < MAX_Q_BUOYS) { 
+            q->buoys[q->buoy_count++] = &buoys[b]; 
+        }
+    }
+    for(int pl=0; pl<MAX_PLATFORMS; pl++) if(platforms[pl].active) {
+        if (!IS_Q_VALID(platforms[pl].q1, platforms[pl].q2, platforms[pl].q3)) continue;
+        QuadrantIndex *q = &spatial_index[platforms[pl].q1][platforms[pl].q2][platforms[pl].q3];
+        if (q->platform_count < MAX_Q_PLATFORMS) { 
+            q->platforms[q->platform_count++] = &platforms[pl]; 
+        }
+    }
+    for(int r=0; r<MAX_RIFTS; r++) if(rifts[r].active) {
+        if (!IS_Q_VALID(rifts[r].q1, rifts[r].q2, rifts[r].q3)) continue;
+        QuadrantIndex *q = &spatial_index[rifts[r].q1][rifts[r].q2][rifts[r].q3];
+        if (q->rift_count < MAX_Q_RIFTS) { 
+            q->rifts[q->rift_count++] = &rifts[r]; 
+        }
+    }
+    for(int m=0; m<MAX_MONSTERS; m++) if(monsters[m].active) {
+        if (!IS_Q_VALID(monsters[m].q1, monsters[m].q2, monsters[m].q3)) continue;
+        QuadrantIndex *q = &spatial_index[monsters[m].q1][monsters[m].q2][monsters[m].q3];
+        if (q->monster_count < MAX_Q_MONSTERS) { 
+            q->monsters[q->monster_count++] = &monsters[m]; 
+        }
+    }
 }
 
 void rebuild_spatial_index() {
@@ -91,6 +149,7 @@ void rebuild_spatial_index() {
                 QuadrantIndex *q = &spatial_index[i][j][l];
                 q->npc_count = 0;
                 q->player_count = 0;
+                q->comet_count = 0;
                 /* Static objects are preserved */
                 q->planet_count = q->static_planet_count;
                 q->base_count = q->static_base_count;
@@ -98,15 +157,22 @@ void rebuild_spatial_index() {
                 q->bh_count = q->static_bh_count;
                 q->nebula_count = q->static_nebula_count;
                 q->pulsar_count = q->static_pulsar_count;
+                q->asteroid_count = 0;
+                q->derelict_count = 0;
+                q->mine_count = 0;
+                q->buoy_count = 0;
+                q->platform_count = 0;
+                q->rift_count = 0;
+                q->monster_count = 0;
 
-                /* Re-initialize BPNBS based on static objects */
+                /* Re-initialize BPNBS based on static objects (base 7-digit) */
                 int c_bh = q->bh_count > 9 ? 9 : q->bh_count;
                 int c_p = q->planet_count > 9 ? 9 : q->planet_count;
                 int c_b = q->base_count > 9 ? 9 : q->base_count;
                 int c_s = q->star_count > 9 ? 9 : q->star_count;
                 int c_neb = q->nebula_count > 9 ? 9 : q->nebula_count;
                 int c_pul = q->pulsar_count > 9 ? 9 : q->pulsar_count;
-                galaxy_master.g[i][j][l] = c_pul * 1000000 + c_neb * 100000 + c_bh * 10000 + c_p * 1000 + c_b * 10 + c_s;
+                galaxy_master.g[i][j][l] = (long long)c_pul * 1000000 + c_neb * 100000 + c_bh * 10000 + c_p * 1000 + c_b * 10 + c_s;
             }
 
     for(int n=0; n<MAX_NPC; n++) if(npcs[n].active) {
@@ -119,6 +185,79 @@ void rebuild_spatial_index() {
             int v = galaxy_master.g[npcs[n].q1][npcs[n].q2][npcs[n].q3];
             /* Replace the 100s digit (K count) */
             galaxy_master.g[npcs[n].q1][npcs[n].q2][npcs[n].q3] = (v / 1000 * 1000) + (k_count * 100) + (v % 100);
+        }
+    }
+    for(int c=0; c<MAX_COMETS; c++) if(comets[c].active) {
+        if (!IS_Q_VALID(comets[c].q1, comets[c].q2, comets[c].q3)) continue;
+        QuadrantIndex *q = &spatial_index[comets[c].q1][comets[c].q2][comets[c].q3];
+        if (q->comet_count < MAX_Q_COMETS) { 
+            q->comets[q->comet_count++] = &comets[c]; 
+            int v = galaxy_master.g[comets[c].q1][comets[c].q2][comets[c].q3];
+            galaxy_master.g[comets[c].q1][comets[c].q2][comets[c].q3] = 100000000 + v; /* 9th digit for comets */
+        }
+    }
+    for(int a=0; a<MAX_ASTEROIDS; a++) if(asteroids[a].active) {
+        if (!IS_Q_VALID(asteroids[a].q1, asteroids[a].q2, asteroids[a].q3)) continue;
+        QuadrantIndex *q = &spatial_index[asteroids[a].q1][asteroids[a].q2][asteroids[a].q3];
+        if (q->asteroid_count < MAX_Q_ASTEROIDS) { 
+            q->asteroids[q->asteroid_count++] = &asteroids[a]; 
+            long long v = galaxy_master.g[asteroids[a].q1][asteroids[a].q2][asteroids[a].q3];
+            if (v < 1000000000) galaxy_master.g[asteroids[a].q1][asteroids[a].q2][asteroids[a].q3] += 1000000000;
+        }
+    }
+    for(int d=0; d<MAX_DERELICTS; d++) if(derelicts[d].active) {
+        if (!IS_Q_VALID(derelicts[d].q1, derelicts[d].q2, derelicts[d].q3)) continue;
+        QuadrantIndex *q = &spatial_index[derelicts[d].q1][derelicts[d].q2][derelicts[d].q3];
+        if (q->derelict_count < MAX_Q_DERELICTS) { 
+            q->derelicts[q->derelict_count++] = &derelicts[d]; 
+            long long v = galaxy_master.g[derelicts[d].q1][derelicts[d].q2][derelicts[d].q3];
+            if (v < 10000000000LL) galaxy_master.g[derelicts[d].q1][derelicts[d].q2][derelicts[d].q3] += 10000000000LL;
+        }
+    }
+    for(int m=0; m<MAX_MINES; m++) if(mines[m].active) {
+        if (!IS_Q_VALID(mines[m].q1, mines[m].q2, mines[m].q3)) continue;
+        QuadrantIndex *q = &spatial_index[mines[m].q1][mines[m].q2][mines[m].q3];
+        if (q->mine_count < MAX_Q_MINES) { 
+            q->mines[q->mine_count++] = &mines[m]; 
+            long long v = galaxy_master.g[mines[m].q1][mines[m].q2][mines[m].q3];
+            if (v < 100000000000LL) galaxy_master.g[mines[m].q1][mines[m].q2][mines[m].q3] += 100000000000LL;
+        }
+    }
+    for(int b=0; b<MAX_BUOYS; b++) if(buoys[b].active) {
+        if (!IS_Q_VALID(buoys[b].q1, buoys[b].q2, buoys[b].q3)) continue;
+        QuadrantIndex *q = &spatial_index[buoys[b].q1][buoys[b].q2][buoys[b].q3];
+        if (q->buoy_count < MAX_Q_BUOYS) { 
+            q->buoys[q->buoy_count++] = &buoys[b]; 
+            long long v = galaxy_master.g[buoys[b].q1][buoys[b].q2][buoys[b].q3];
+            if (v < 1000000000000LL) galaxy_master.g[buoys[b].q1][buoys[b].q2][buoys[b].q3] += 1000000000000LL;
+        }
+    }
+    for(int pl=0; pl<MAX_PLATFORMS; pl++) if(platforms[pl].active) {
+        if (!IS_Q_VALID(platforms[pl].q1, platforms[pl].q2, platforms[pl].q3)) continue;
+        QuadrantIndex *q = &spatial_index[platforms[pl].q1][platforms[pl].q2][platforms[pl].q3];
+        if (q->platform_count < MAX_Q_PLATFORMS) { 
+            q->platforms[q->platform_count++] = &platforms[pl]; 
+            long long v = galaxy_master.g[platforms[pl].q1][platforms[pl].q2][platforms[pl].q3];
+            if (v < 10000000000000LL) galaxy_master.g[platforms[pl].q1][platforms[pl].q2][platforms[pl].q3] += 10000000000000LL;
+        }
+    }
+    for(int r=0; r<MAX_RIFTS; r++) if(rifts[r].active) {
+        if (!IS_Q_VALID(rifts[r].q1, rifts[r].q2, rifts[r].q3)) continue;
+        QuadrantIndex *q = &spatial_index[rifts[r].q1][rifts[r].q2][rifts[r].q3];
+        if (q->rift_count < MAX_Q_RIFTS) { 
+            q->rifts[q->rift_count++] = &rifts[r]; 
+            long long v = galaxy_master.g[rifts[r].q1][rifts[r].q2][rifts[r].q3];
+            if (v < 100000000000000LL) galaxy_master.g[rifts[r].q1][rifts[r].q2][rifts[r].q3] += 100000000000000LL;
+        }
+    }
+    for(int m=0; m<MAX_MONSTERS; m++) if(monsters[m].active) {
+        if (!IS_Q_VALID(monsters[m].q1, monsters[m].q2, monsters[m].q3)) continue;
+        QuadrantIndex *q = &spatial_index[monsters[m].q1][monsters[m].q2][monsters[m].q3];
+        if (q->monster_count < MAX_Q_MONSTERS) { 
+            q->monsters[q->monster_count++] = &monsters[m]; 
+            long long v = galaxy_master.g[monsters[m].q1][monsters[m].q2][monsters[m].q3];
+            /* 17th digit for Monsters */
+            if (v < 10000000000000000LL) galaxy_master.g[monsters[m].q1][monsters[m].q2][monsters[m].q3] += 10000000000000000LL;
         }
     }
     for(int u=0; u<MAX_CLIENTS; u++) if(players[u].active && players[u].name[0] != '\0') {
@@ -148,6 +287,14 @@ void save_galaxy() {
     fwrite(bases, sizeof(NPCBase), MAX_BASES, f);
     fwrite(nebulas, sizeof(NPCNebula), MAX_NEBULAS, f);
     fwrite(pulsars, sizeof(NPCPulsar), MAX_PULSARS, f);
+    fwrite(comets, sizeof(NPCComet), MAX_COMETS, f);
+    fwrite(asteroids, sizeof(NPCAsteroid), MAX_ASTEROIDS, f);
+    fwrite(derelicts, sizeof(NPCDerelict), MAX_DERELICTS, f);
+    fwrite(mines, sizeof(NPCMine), MAX_MINES, f);
+    fwrite(buoys, sizeof(NPCBuoy), MAX_BUOYS, f);
+    fwrite(platforms, sizeof(NPCPlatform), MAX_PLATFORMS, f);
+    fwrite(rifts, sizeof(NPCRift), MAX_RIFTS, f);
+    fwrite(monsters, sizeof(NPCMonster), MAX_MONSTERS, f);
     fwrite(players, sizeof(ConnectedPlayer), MAX_CLIENTS, f);
     fclose(f);
     time_t now = time(NULL);
@@ -173,6 +320,14 @@ int load_galaxy() {
     fread(bases, sizeof(NPCBase), MAX_BASES, f);
     fread(nebulas, sizeof(NPCNebula), MAX_NEBULAS, f);
     fread(pulsars, sizeof(NPCPulsar), MAX_PULSARS, f);
+    fread(comets, sizeof(NPCComet), MAX_COMETS, f);
+    fread(asteroids, sizeof(NPCAsteroid), MAX_ASTEROIDS, f);
+    fread(derelicts, sizeof(NPCDerelict), MAX_DERELICTS, f);
+    fread(mines, sizeof(NPCMine), MAX_MINES, f);
+    fread(buoys, sizeof(NPCBuoy), MAX_BUOYS, f);
+    fread(platforms, sizeof(NPCPlatform), MAX_PLATFORMS, f);
+    fread(rifts, sizeof(NPCRift), MAX_RIFTS, f);
+    fread(monsters, sizeof(NPCMonster), MAX_MONSTERS, f);
     fread(players, sizeof(ConnectedPlayer), MAX_CLIENTS, f);
     fclose(f);
     
@@ -201,6 +356,14 @@ const char* get_species_name(int s) {
         case FACTION_BREEN:      return "Breen"; 
         case FACTION_HIROGEN:    return "Hirogen";
         case 4: return "Star"; case 5: return "Planet"; case 6: return "Black Hole";
+        case 7: return "Nebula"; case 8: return "Pulsar"; case 9: return "Comet";
+        case 21: return "Asteroid";
+        case 23: return "Mine";
+        case 24: return "Comm Buoy";
+        case 25: return "Defense Platform";
+        case 26: return "Spatial Rift";
+        case 30: return "Crystalline Entity";
+        case 31: return "Space Amoeba";
         default: return "Unknown";
     }
 }
@@ -215,8 +378,16 @@ void generate_galaxy() {
     memset(black_holes, 0, sizeof(black_holes));
     memset(nebulas, 0, sizeof(nebulas));
     memset(pulsars, 0, sizeof(pulsars));
+    memset(comets, 0, sizeof(comets));
+    memset(asteroids, 0, sizeof(asteroids));
+    memset(derelicts, 0, sizeof(derelicts));
+    memset(mines, 0, sizeof(mines));
+    memset(buoys, 0, sizeof(buoys));
+    memset(platforms, 0, sizeof(platforms));
+    memset(rifts, 0, sizeof(rifts));
+    memset(monsters, 0, sizeof(monsters));
 
-    int n_count = 0, b_count = 0, p_count = 0, s_count = 0, bh_count = 0, neb_count = 0, pul_count = 0;
+    int n_count = 0, b_count = 0, p_count = 0, s_count = 0, bh_count = 0, neb_count = 0, pul_count = 0, com_count = 0, ast_count = 0, der_count = 0, mine_count = 0, buoy_count = 0, plat_count = 0, rift_count = 0, mon_count = 0;
     
     for(int i=1; i<=10; i++)
         for(int j=1; j<=10; j++)
@@ -229,8 +400,16 @@ void generate_galaxy() {
                 int bh = (rand()%100 < 10) ? 1 : 0;
                 int neb = (rand()%100 < 15) ? 1 : 0;
                 int pul = (rand()%100 < 5) ? 1 : 0;
+                int com = (rand()%100 < 10) ? 1 : 0;
+                int ast_field = (rand()%100 < 20) ? (rand()%10 + 5) : 0;
+                int der = (rand()%100 < 5) ? 1 : 0;
+                int mine_field = (kling > 0 && rand()%100 < 30) ? (rand()%5 + 3) : 0;
+                int buoy = (rand()%100 < 8) ? 1 : 0;
+                int plat = (kling > 0 && rand()%100 < 40) ? (rand()%2 + 1) : 0;
+                int rift = (rand()%100 < 5) ? 1 : 0;
+                int mon = (rand()%100 < 2) ? 1 : 0;
                 
-                int actual_k = 0, actual_b = 0, actual_p = 0, actual_s = 0, actual_bh = 0, actual_neb = 0, actual_pul = 0;
+                int actual_k = 0, actual_b = 0, actual_p = 0, actual_s = 0, actual_bh = 0, actual_neb = 0, actual_pul = 0, actual_com = 0, actual_ast = 0, actual_der = 0, actual_mine = 0, actual_buoy = 0, actual_plat = 0, actual_rift = 0, actual_mon = 0;
                 
                 for(int e=0; e<kling && n_count < MAX_NPC; e++) {
                     int faction = 10+(rand()%11);
@@ -266,8 +445,54 @@ void generate_galaxy() {
                 for(int p=0; p<pul && pul_count < MAX_PULSARS; p++) {
                     pulsars[pul_count] = (NPCPulsar){.id=pul_count, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .active=1}; pul_count++; actual_pul++;
                 }
+                for(int c=0; c<com && com_count < MAX_COMETS; c++) {
+                    double a = 10.0 + (rand()%300)/10.0; /* Semi-major axis 10-40 */
+                    double b = a * (0.5 + (rand()%40)/100.0); /* Elliptical (eccentricity) */
+                    double inc = (rand()%360) * M_PI/180.0;
+                    double angle = (rand()%360) * M_PI/180.0;
+                    double speed = 0.02 / a; /* Linear speed ~0.02 */
+                    
+                    comets[com_count] = (NPCComet){
+                        .id=com_count, .q1=i, .q2=j, .q3=l, 
+                        .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, 
+                        .a=a, .b=b, .angle=angle, .speed=speed, .inc=inc,
+                        .cx=50.0 + (rand()%100-50)/10.0, .cy=50.0 + (rand()%100-50)/10.0, .cz=50.0 + (rand()%100-50)/10.0,
+                        .active=1
+                    }; 
+                    com_count++; actual_com++;
+                }
+                for(int a=0; a<ast_field && ast_count < MAX_ASTEROIDS; a++) {
+                    asteroids[ast_count] = (NPCAsteroid){.id=ast_count, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .size=0.1f+(rand()%20)/100.0f, .active=1}; ast_count++; actual_ast++;
+                }
+                for(int d=0; d<der && der_count < MAX_DERELICTS; d++) {
+                    derelicts[der_count] = (NPCDerelict){.id=der_count, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .ship_class=rand()%13, .active=1}; der_count++; actual_der++;
+                }
+                for(int m=0; m<mine_field && mine_count < MAX_MINES; m++) {
+                    mines[mine_count] = (NPCMine){.id=mine_count, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .faction=FACTION_KLINGON, .active=1}; mine_count++; actual_mine++;
+                }
+                for(int bu=0; bu<buoy && buoy_count < MAX_BUOYS; bu++) {
+                    buoys[buoy_count] = (NPCBuoy){.id=buoy_count, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .active=1}; buoy_count++; actual_buoy++;
+                }
+                for(int pt=0; pt<plat && plat_count < MAX_PLATFORMS; pt++) {
+                    platforms[plat_count] = (NPCPlatform){.id=plat_count, .faction=FACTION_KLINGON, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .health=5000, .energy=10000, .fire_cooldown=0, .active=1}; plat_count++; actual_plat++;
+                }
+                for(int rf=0; rf<rift && rift_count < MAX_RIFTS; rf++) {
+                    rifts[rift_count] = (NPCRift){.id=rift_count, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .active=1}; rift_count++; actual_rift++;
+                }
+                for(int mo=0; mo<mon && mon_count < MAX_MONSTERS; mo++) {
+                    int type = (rand()%100 < 50) ? 30 : 31; /* 30=Crystalline, 31=Amoeba */
+                    monsters[mon_count] = (NPCMonster){.id=mon_count, .type=type, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .health=100000, .energy=100000, .active=1, .behavior_timer=0}; mon_count++; actual_mon++;
+                }
 
-                /* Cap values to 9 for BPNBS encoding (7-digit PuNBPNBS) */
+                /* Cap values to 9 for BPNBS encoding */
+                int c_mon = actual_mon > 9 ? 9 : actual_mon;
+                int c_rift = actual_rift > 9 ? 9 : actual_rift;
+                int c_plat = actual_plat > 9 ? 9 : actual_plat;
+                int c_buoy = actual_buoy > 9 ? 9 : actual_buoy;
+                int c_mine = actual_mine > 9 ? 9 : actual_mine;
+                int c_der = actual_der > 9 ? 9 : actual_der;
+                int c_ast = actual_ast > 9 ? 9 : actual_ast;
+                int c_com = actual_com > 9 ? 9 : actual_com;
                 int c_pul = actual_pul > 9 ? 9 : actual_pul;
                 int c_neb = actual_neb > 9 ? 9 : actual_neb;
                 int c_bh = actual_bh > 9 ? 9 : actual_bh;
@@ -276,9 +501,9 @@ void generate_galaxy() {
                 int c_b = actual_b > 9 ? 9 : actual_b;
                 int c_s = actual_s > 9 ? 9 : actual_s;
 
-                galaxy_master.g[i][j][l] = c_pul * 1000000 + c_neb * 100000 + c_bh * 10000 + c_p * 1000 + c_k * 100 + c_b * 10 + c_s;
+                galaxy_master.g[i][j][l] = (long long)c_mon * 10000000000000000LL + (long long)c_rift * 100000000000000LL + (long long)c_plat * 10000000000000LL + (long long)c_buoy * 1000000000000LL + (long long)c_mine * 100000000000LL + (long long)c_der * 10000000000LL + (long long)c_ast * 1000000000LL + (long long)c_com * 100000000LL + c_pul * 1000000 + c_neb * 100000 + c_bh * 10000 + c_p * 1000 + c_k * 100 + c_b * 10 + c_s;
                 galaxy_master.k9 += actual_k;
                 galaxy_master.b9 += actual_b;
             }
-    printf("Galaxy generated: %d NPCs, %d Stars, %d Planets, %d Bases, %d Black Holes, %d Nebulas, %d Pulsars.\n", n_count, s_count, p_count, b_count, bh_count, neb_count, pul_count);
+    printf("Galaxy generated: %d NPCs, %d Stars, %d Planets, %d Bases, %d Black Holes, %d Nebulas, %d Pulsars, %d Comets, %d Asteroids, %d Derelicts, %d Mines, %d Buoys, %d Platforms, %d Rifts, %d Monsters.\n", n_count, s_count, p_count, b_count, bh_count, neb_count, pul_count, com_count, ast_count, der_count, mine_count, buoy_count, plat_count, rift_count, mon_count);
 }

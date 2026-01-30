@@ -91,6 +91,8 @@ typedef struct {
     int cargo_torpedoes;
     int crew_count;
     int shields[6];
+    int inventory[7];
+    float system_health[8];
     int lock_target;
     uint8_t is_cloaked;
     NetPoint torp;
@@ -98,9 +100,11 @@ typedef struct {
     NetPoint wormhole;
     NetPoint jump_arrival;
     NetDismantle dismantle;
+    NetPoint supernova_pos; 
+    int supernova_q[3];
     int beam_count;
     NetBeam beams[MAX_NET_BEAMS];
-    int map_update_val;
+    long long map_update_val;
     int map_update_q[3];
     int object_count;
     NetObject objects[MAX_NET_OBJECTS];

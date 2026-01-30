@@ -54,10 +54,13 @@ typedef struct {
     /* UI Info */
     int shm_energy;
     int shm_crew;
+    int shm_torpedoes;
     int shm_shields[6];
     int shm_cargo_energy;
     int shm_cargo_torpedoes;
     int inventory[7];
+    float shm_system_health[8];
+    int shm_lock_target;
     int klingons;
     char quadrant[128];
     int shm_show_axes;
@@ -66,8 +69,8 @@ typedef struct {
     int is_cloaked;
     int shm_q[3]; /* Current Quadrant [x,y,z] */
 
-    /* Full Galaxy Data for Map Mode */
-    int shm_galaxy[11][11][11];
+    /* Full Galaxy Data for Map Mode - Using long long for 17-digit encoding */
+    long long shm_galaxy[11][11][11];
 
     /* Object List */
     int object_count;
@@ -81,6 +84,8 @@ typedef struct {
     SharedPoint boom;
     SharedPoint wormhole;
     SharedPoint jump_arrival;
+    SharedPoint supernova_pos;
+    int shm_sn_q[3];
     SharedDismantle dismantle;
     
     /* Synchronization counter */

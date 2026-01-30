@@ -223,6 +223,7 @@ void *network_listener(void *arg) {
                 /* Sincronizziamo lo stato locale con i dati ottimizzati dal server */
                 g_shared_state->shm_energy = upd.energy;
                 g_shared_state->shm_crew = upd.crew_count;
+                g_shared_state->shm_torpedoes = upd.torpedoes;
                 g_shared_state->shm_cargo_energy = upd.cargo_energy;
                 g_shared_state->shm_cargo_torpedoes = upd.cargo_torpedoes;
                 int total_s = 0;
@@ -230,18 +231,20 @@ void *network_listener(void *arg) {
                     g_shared_state->shm_shields[s] = upd.shields[s];
                     total_s += upd.shields[s];
                 }
+                for(int inv=0; inv<7; inv++) g_shared_state->inventory[inv] = upd.inventory[inv];
+                for(int sys=0; sys<8; sys++) g_shared_state->shm_system_health[sys] = upd.system_health[sys];
+                g_shared_state->shm_lock_target = upd.lock_target;
+                
                 g_shared_state->is_cloaked = upd.is_cloaked;
                 g_shared_state->shm_q[0] = upd.q1;
                 g_shared_state->shm_q[1] = upd.q2;
                 g_shared_state->shm_q[2] = upd.q3;
                 sprintf(g_shared_state->quadrant, "Q-%d-%d-%d", upd.q1, upd.q2, upd.q3);
 
-                /* Update dynamic galaxy data (e.g. Ion Storms) */
-                if (upd.map_update_val > 0) {
-                    int mq1 = upd.map_update_q[0], mq2 = upd.map_update_q[1], mq3 = upd.map_update_q[2];
-                    if (mq1 >= 1 && mq1 <= 10 && mq2 >= 1 && mq2 <= 10 && mq3 >= 1 && mq3 <= 10) {
-                        g_shared_state->shm_galaxy[mq1][mq2][mq3] = upd.map_update_val;
-                    }
+                /* Update dynamic galaxy data (e.g. Ion Storms, Supernovas) */
+                int mq1 = upd.map_update_q[0], mq2 = upd.map_update_q[1], mq3 = upd.map_update_q[2];
+                if (mq1 >= 1 && mq1 <= 10 && mq2 >= 1 && mq2 <= 10 && mq3 >= 1 && mq3 <= 10) {
+                    g_shared_state->shm_galaxy[mq1][mq2][mq3] = upd.map_update_val;
                 }
 
                 g_shared_state->object_count = upd.object_count;
@@ -308,6 +311,15 @@ void *network_listener(void *arg) {
                     g_shared_state->jump_arrival.shm_z = upd.jump_arrival.net_z;
                     g_shared_state->jump_arrival.active = 1;
                 }
+
+                /* Supernova Event */
+                g_shared_state->supernova_pos.shm_x = upd.supernova_pos.net_x;
+                g_shared_state->supernova_pos.shm_y = upd.supernova_pos.net_y;
+                g_shared_state->supernova_pos.shm_z = upd.supernova_pos.net_z;
+                g_shared_state->supernova_pos.active = upd.supernova_pos.active;
+                g_shared_state->shm_sn_q[0] = upd.supernova_q[0];
+                g_shared_state->shm_sn_q[1] = upd.supernova_q[1];
+                g_shared_state->shm_sn_q[2] = upd.supernova_q[2];
                 
                 g_shared_state->frame_id++; 
                 pthread_mutex_unlock(&g_shared_state->mutex);

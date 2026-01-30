@@ -45,7 +45,7 @@ typedef struct {
 
 typedef struct {
     /* Galaxy Data - Moved to TOP for reliable alignment and sync */
-    int g[11][11][11];          /* The Galaxy Cube (BPNBS Encoding) */
+    long long g[11][11][11];    /* The Galaxy Cube (BPNBS Encoding) */
     int z[11][11][11];          /* Scanned Map Cube */
 
     /* Coordinates */

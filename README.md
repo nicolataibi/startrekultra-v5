@@ -150,6 +150,39 @@ Il visualizzatore 3D implementa una pipeline di ombreggiatura programmabile:
 
 ---
 
+## 🌌 Enciclopedia Galattica: Entità e Fenomeni
+
+L'universo di Star Trek Ultra è un ecosistema dinamico popolato da 17 classi di entità, ognuna con proprietà fisiche, tattiche e visive uniche.
+
+### 🌟 Corpi Celesti e Fenomeni Astronomici
+*   **Stelle (Stars)**: Classificate in 7 tipi spettrali (O, B, A, F, G, K, M). Forniscono energia tramite *Solar Scooping* (`sco`) ma possono diventare instabili e innescare una **Supernova**, distruggendo l'intero quadrante.
+*   **Pianeti (Planets)**: Corpi celesti ricchi di minerali. Possono essere scansionati e scavati (`min`) per ottenere Dilithio, Tritanio e altre risorse vitali.
+*   **Buchi Neri (Black Holes)**: Singolarità gravitazionali con dischi di accrezione. Sono la fonte primaria di Antimateria (`har`), ma la loro attrazione può essere fatale.
+*   **Nebulose (Nebulas)**: Grandi nubi di gas ionizzati (Classi Mutara, Paulson, ecc.). Forniscono copertura tattica (occultamento naturale) ma drenano gli scudi e disturbano i sensori.
+*   **Pulsar**: Stelle di neutroni che emettono radiazioni letali. Navigare troppo vicino danneggia i sistemi e l'equipaggio.
+*   **Comete (Comets)**: Oggetti in movimento veloce con code volumetriche. Possono essere analizzate per raccogliere gas rari.
+*   **Faglie Spaziali (Spatial Rifts)**: Strappi nel tessuto spaziotemporale. Fungono da teletrasporti naturali che proiettano la nave in un punto casuale della galassia.
+
+### 🚩 Fazioni e Navi Intelligenti
+*   **Federazione (Player/Starbase)**: Include la tua nave e le Basi Stellari, dove puoi attraccare (`doc`) per riparazioni e rifornimenti completi.
+*   **Impero Klingon**: Guerrieri aggressivi che pattugliano i quadranti, spesso protetti da piattaforme difensive.
+*   **Impero Stellare Romulano**: Maestri dell'inganno che utilizzano l'occultamento per lanciare attacchi a sorpresa.
+*   **Collettivo Borg**: La minaccia più grande. I loro Cubi hanno una potenza di fuoco massiccia e capacità rigenerative superiori.
+*   **Fazioni NPC**: Cardassiani, Dominion (Jem'Hadar), Tholiani, Gorn, Ferengi, Specie 8472, Breen e Hirogen. Ognuna con diversi livelli di ostilità e potenza.
+
+### ⚠️ Pericoli e Risorse Tattiche
+*   **Campi di Asteroidi**: Detriti rocciosi che rappresentano un rischio fisico. Il danno da collisione aumenta con la velocità della nave.
+*   **Mine Spaziali**: Ordigni esplosivi occulti piazzati da fazioni ostili. Rilevabili solo tramite scansione ravvicinata.
+*   **Relitti alla Deriva (Derelicts)**: Gusci di navi distrutte. Possono essere smantellati (`dis`) per recuperare componenti e risorse.
+*   **Boe di Comunicazione (Buoys)**: Nodi di rete Starfleet. Trovarsi nelle vicinanze potenzia i sensori a lungo raggio (`lrs`), fornendo dati dettagliati sui quadranti vicini.
+*   **Piattaforme Difensive (Turrets)**: Sentinelle automatiche pesantemente armate che proteggono aree di interesse strategico.
+
+### 👾 Anomalie e Creature
+*   **Mostri Spaziali**: Include l'**Entità Cristallina** e l'**Ameba Spaziale**, creature uniche che cacciano attivamente i vascelli per nutrirsi della loro energia.
+*   **Tempeste Ioniche**: Fenomeni meteorologici che si spostano nella galassia, capaci di accecare i sensori e deviare la rotta delle navi in transito.
+
+---
+
 ## 🕹️ Manuale Operativo dei Comandi
 
 Di seguito la lista completa dei comandi disponibili, raggruppati per funzione.
@@ -282,6 +315,38 @@ Il quadrante è disseminato di fenomeni naturali rilevabili sia dai sensori che 
     *   **Effetto**: Stelle di neutroni in rapida rotazione che emettono radiazioni letali.
     *   **Visuale 3D**: Visibili come nuclei luminosi con fasci di radiazioni rotanti.
     *   **Pericolo**: Avvicinarsi troppo (Distanza < 2.5) danneggia gravemente gli scudi e uccide rapidamente l'equipaggio per irraggiamento.
+*   **Comete (ID 6xxx)**:
+    *   **Effetto**: Oggetti mobili veloci che attraversano il settore.
+    *   **Visuale 3D**: Nuclei ghiacciati con scia azzurra di gas e polveri.
+    *   **Risorsa**: Avvicinarsi alla coda (< 0.6) permette la raccolta di gas rari per la stiva.
+*   **Campi di Asteroidi (ID 8xxx)**:
+    *   **Effetto**: Ammassi di rocce spaziali di varie dimensioni.
+    *   **Visuale 3D**: Rocce rotanti marroni di forma irregolare.
+    *   **Pericolo**: Navigare all'interno a velocità d'impulso elevata (> 0.1) causa danni continui a scudi e motori.
+*   **Relitti alla Deriva (ID 7xxx)**:
+    *   **Effetto**: Navi abbandonate della Flotta Stellare o di altre fazioni.
+    *   **Visuale 3D**: Scafi scuri e freddi che oscillano lentamente nello spazio.
+    *   **Opportunità**: Possono essere esplorati tramite il comando `bor` (arrembaggio) per recuperare Dilithio, Chip Isolineari o per eseguire riparazioni d'emergenza istantanee.
+*   **Campi Minati (ID 9xxx)**:
+    *   **Effetto**: Zone difensive con mine occulte piazzate da fazioni ostili.
+    *   **Visuale 3D**: Piccole sfere metalliche con aculei e luce rossa pulsante (visibili solo a distanza < 1.5).
+    *   **Pericolo**: La detonazione causa danni massicci a scudi ed energia. È consigliabile l'uso del comando `scan` per rilevarle prima dell'ingresso.
+*   **Boe di Comunicazione (ID 10xxx)**:
+    *   **Effetto**: Nodi di rete della Flotta Stellare per il monitoraggio del settore.
+    *   **Visuale 3D**: Strutture a traliccio con antenne rotanti e segnale blu pulsante.
+    *   **Vantaggio**: Trovarsi in prossimità di una boa (< 1.2) potenzia i sensori a lungo raggio (`lrs`), rivelando l'esatta composizione dei quadranti adiacenti invece di un semplice conteggio.
+*   **Piattaforme Difensive (ID 11xxx)**:
+    *   **Effetto**: Sentinelle statiche pesantemente armate a protezione di zone strategiche.
+    *   **Visuale 3D**: Strutture esagonali metalliche con banchi phaser attivi e nucleo energetico.
+    *   **Pericolo**: Estremamente pericolose se approcciate senza scudi al massimo. Aprono il fuoco automaticamente contro bersagli non occultati entro un raggio di 5.0 unità.
+*   **Faglie Spaziali (ID 12xxx)**:
+    *   **Effetto**: Teletrasporti naturali instabili causati da strappi nel tessuto spaziotemporale che ignorano le normali leggi della navigazione Warp.
+    *   **Visuale 3D**: Appaiono come anelli di energia ciano rotanti. Sulla mappa galattica e nei sensori (`srs` o `lrs`) sono segnate con il colore **Ciano** o la lettera **R**.
+    *   **Rischio/Opportunità**: Entrare in una faglia (Distanza < 0.5) proietta istantaneamente la nave in un punto completamente casuale dell'universo (quadrante e settore aleatori). Può essere un pericolo fatale (es. territorio Borg) o l'unica via di fuga veloce durante un attacco critico.
+*   **Mostri Spaziali (ID 13xxx)**:
+    *   **Entità Cristallina**: Predatore geometrico che insegue le navi e spara raggi a risonanza cristallina.
+    *   **Ameba Spaziale**: Gigantesca forma di vita che drena energia per contatto.
+    *   **Pericolo**: Estremamente rari e pericolosi. Richiedono tattiche di squadra o massima potenza di fuoco.
 *   **Tempeste Ioniche**:
     *   **Effetto**: Eventi casuali globali sincronizzati in tempo reale sulla mappa.
     *   **Frequenza**: Elevata (media statistica di un evento ogni 5-6 minuti).

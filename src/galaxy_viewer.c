@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include "../include/game_state.h"
 #include "../include/server_internal.h"
 #include "../include/network.h"
@@ -16,6 +17,16 @@ StarTrekGame galaxy_master;
 NPCShip npcs[MAX_NPC];
 NPCStar stars_data[MAX_STARS];
 NPCBlackHole black_holes[MAX_BH];
+NPCNebula nebulas[MAX_NEBULAS];
+NPCPulsar pulsars[MAX_PULSARS];
+NPCComet comets[MAX_COMETS];
+NPCAsteroid asteroids[MAX_ASTEROIDS];
+NPCDerelict derelicts[MAX_DERELICTS];
+NPCMine mines[MAX_MINES];
+NPCBuoy buoys[MAX_BUOYS];
+NPCPlatform platforms[MAX_PLATFORMS];
+NPCRift rifts[MAX_RIFTS];
+NPCMonster monsters[MAX_MONSTERS];
 NPCPlanet planets[MAX_PLANETS];
 NPCBase bases[MAX_BASES];
 ConnectedPlayer players[MAX_CLIENTS];
@@ -34,6 +45,14 @@ const char* get_faction_name(int faction) {
         case FACTION_SPECIES_8472: return "Species 8472";
         case FACTION_BREEN:      return "Breen";
         case FACTION_HIROGEN:    return "Hirogen";
+        case 21: return "Asteroid";
+        case 22: return "Derelict";
+        case 23: return "Mine";
+        case 24: return "Comm Buoy";
+        case 25: return "Defense Platform";
+        case 26: return "Spatial Rift";
+        case 30: return "Crystalline Entity";
+        case 31: return "Space Amoeba";
         default: return "Unknown";
     }
 }
@@ -72,6 +91,16 @@ int main(int argc, char *argv[]) {
     fread(black_holes, sizeof(NPCBlackHole), MAX_BH, f);
     fread(planets, sizeof(NPCPlanet), MAX_PLANETS, f);
     fread(bases, sizeof(NPCBase), MAX_BASES, f);
+    fread(nebulas, sizeof(NPCNebula), MAX_NEBULAS, f);
+    fread(pulsars, sizeof(NPCPulsar), MAX_PULSARS, f);
+    fread(comets, sizeof(NPCComet), MAX_COMETS, f);
+    fread(asteroids, sizeof(NPCAsteroid), MAX_ASTEROIDS, f);
+    fread(derelicts, sizeof(NPCDerelict), MAX_DERELICTS, f);
+    fread(mines, sizeof(NPCMine), MAX_MINES, f);
+    fread(buoys, sizeof(NPCBuoy), MAX_BUOYS, f);
+    fread(platforms, sizeof(NPCPlatform), MAX_PLATFORMS, f);
+    fread(rifts, sizeof(NPCRift), MAX_RIFTS, f);
+    fread(monsters, sizeof(NPCMonster), MAX_MONSTERS, f);
     fread(players, sizeof(ConnectedPlayer), MAX_CLIENTS, f);
     fclose(f);
 
@@ -81,12 +110,22 @@ int main(int argc, char *argv[]) {
     }
 
     if (strcmp(argv[1], "stats") == 0) {
-        int n_active = 0, s_active = 0, b_active = 0, p_active = 0, bh_active = 0;
+        int n_active = 0, s_active = 0, b_active = 0, p_active = 0, bh_active = 0, neb_active = 0, pul_active = 0, com_active = 0, ast_active = 0, der_active = 0, mine_active = 0, buoy_active = 0, plat_active = 0, rift_active = 0, mon_active = 0;
         for(int i=0; i<MAX_NPC; i++) if(npcs[i].active) n_active++;
         for(int i=0; i<MAX_STARS; i++) if(stars_data[i].active) s_active++;
         for(int i=0; i<MAX_BASES; i++) if(bases[i].active) b_active++;
         for(int i=0; i<MAX_PLANETS; i++) if(planets[i].active) p_active++;
         for(int i=0; i<MAX_BH; i++) if(black_holes[i].active) bh_active++;
+        for(int i=0; i<MAX_NEBULAS; i++) if(nebulas[i].active) neb_active++;
+        for(int i=0; i<MAX_PULSARS; i++) if(pulsars[i].active) pul_active++;
+        for(int i=0; i<MAX_COMETS; i++) if(comets[i].active) com_active++;
+        for(int i=0; i<MAX_ASTEROIDS; i++) if(asteroids[i].active) ast_active++;
+        for(int i=0; i<MAX_DERELICTS; i++) if(derelicts[i].active) der_active++;
+        for(int i=0; i<MAX_MINES; i++) if(mines[i].active) mine_active++;
+        for(int i=0; i<MAX_BUOYS; i++) if(buoys[i].active) buoy_active++;
+        for(int i=0; i<MAX_PLATFORMS; i++) if(platforms[i].active) plat_active++;
+        for(int i=0; i<MAX_RIFTS; i++) if(rifts[i].active) rift_active++;
+        for(int i=0; i<MAX_MONSTERS; i++) if(monsters[i].active) mon_active++;
 
         printf("--- Galaxy Statistics ---\n");
         printf("Version: %d\n", version);
@@ -95,6 +134,16 @@ int main(int argc, char *argv[]) {
         printf("Total Bases: %d\n", b_active);
         printf("Total Planets: %d\n", p_active);
         printf("Total Black Holes: %d\n", bh_active);
+        printf("Total Nebulas: %d\n", neb_active);
+        printf("Total Pulsars: %d\n", pul_active);
+        printf("Total Comets: %d\n", com_active);
+        printf("Total Asteroids: %d\n", ast_active);
+        printf("Total Derelicts: %d\n", der_active);
+        printf("Total Minefields: %d\n", mine_active);
+        printf("Total Comm Buoys: %d\n", buoy_active);
+        printf("Total Defense Platforms: %d\n", plat_active);
+        printf("Total Spatial Rifts: %d\n", rift_active);
+        printf("Total Space Monsters: %d\n", mon_active);
         printf("Galaxy Master K9: %d, B9: %d\n", galaxy_master.k9, galaxy_master.b9);
     } 
     else if (strcmp(argv[1], "map") == 0 && argc == 3) {
@@ -108,14 +157,33 @@ int main(int argc, char *argv[]) {
         for(int j=1; j<=10; j++) {
             printf("%2d ", j);
             for(int i=1; i<=10; i++) {
-                int bpnbs = galaxy_master.g[i][j][q3];
+                long long bpnbs = galaxy_master.g[i][j][q3];
+                int mon  = (bpnbs/10000000000000000LL)%10;
+                int rift = (bpnbs/100000000000000LL)%10;
+                int plat = (bpnbs/10000000000000LL)%10;
+                int buoy = (bpnbs/1000000000000LL)%10;
+                int mine = (bpnbs/100000000000LL)%10;
+                int der  = (bpnbs/10000000000LL)%10;
+                int ast  = (bpnbs/1000000000)%10;
+                int com  = (bpnbs/100000000)%10;
+                int s = (bpnbs/10000000)%10;
+                int p = (bpnbs/1000000)%10;
+                int n = (bpnbs/100000)%10;
                 int k = (bpnbs/100)%10;
                 int b = (bpnbs/10)%10;
-                int s = bpnbs%10;
+                int st = bpnbs%10;
                 
-                if (k > 0) printf(" K ");
-                else if (b > 0) printf(" B ");
-                else if (s > 0) printf(" * ");
+                if (s > 0) printf(" ~ "); /* Ion Storm */
+                else if (mon > 0) printf(" M "); /* Monster */
+                else if (rift > 0) printf(" R "); /* Rift */
+                else if (plat > 0) printf(" T "); /* Turret */
+                else if (buoy > 0) printf(" @ "); /* Buoy */
+                else if (mine > 0) printf(" X "); /* Mine */
+                else if (der > 0) printf(" D "); /* Derelict */
+                else if (ast > 0) printf(" A "); /* Asteroid */
+                else if (com > 0) printf(" C "); /* Comet */
+                else if (p > 0) printf(" P "); /* Pulsar */
+                else if (n > 0) printf(" N "); /* Nebula */
                 else printf(" . ");
             }
             printf(" (Y:%d)\n", j);
@@ -133,13 +201,15 @@ int main(int argc, char *argv[]) {
 
         printf("--- Objects in Quadrant [%d,%d,%d] ---\n", q1, q2, q3);
         
-        int bpnbs = galaxy_master.g[q1][q2][q3];
-        printf("BPNBS Encoding: %05d (BH: %d, P: %d, K: %d, B: %d, S: %d)\n", 
-               bpnbs, bpnbs/10000, (bpnbs/1000)%10, (bpnbs/100)%10, (bpnbs/10)%10, bpnbs%10);
+        long long bpnbs = galaxy_master.g[q1][q2][q3];
+        printf("BPNBS Encoding: %017lld\n", bpnbs);
 
         for(int i=0; i<MAX_NPC; i++) if(npcs[i].active && npcs[i].q1 == q1 && npcs[i].q2 == q2 && npcs[i].q3 == q3)
             printf("[NPC] ID:%d Faction:%s Coord:%.1f,%.1f,%.1f Energy:%d\n", npcs[i].id, get_faction_name(npcs[i].faction), npcs[i].x, npcs[i].y, npcs[i].z, npcs[i].energy);
         
+        for(int i=0; i<MAX_MONSTERS; i++) if(monsters[i].active && monsters[i].q1 == q1 && monsters[i].q2 == q2 && monsters[i].q3 == q3)
+            printf("[MONSTER] ID:%d Type:%s Coord:%.1f,%.1f,%.1f Health:%d\n", monsters[i].id+13000, get_faction_name(monsters[i].type), monsters[i].x, monsters[i].y, monsters[i].z, monsters[i].health);
+
         for(int i=0; i<MAX_BASES; i++) if(bases[i].active && bases[i].q1 == q1 && bases[i].q2 == q2 && bases[i].q3 == q3)
             printf("[BASE] ID:%d Faction:%s Coord:%.1f,%.1f,%.1f Health:%d\n", bases[i].id, get_faction_name(bases[i].faction), bases[i].x, bases[i].y, bases[i].z, bases[i].health);
 
@@ -151,6 +221,33 @@ int main(int argc, char *argv[]) {
 
         for(int i=0; i<MAX_BH; i++) if(black_holes[i].active && black_holes[i].q1 == q1 && black_holes[i].q2 == q2 && black_holes[i].q3 == q3)
             printf("[BLACK HOLE] ID:%d Coord:%.1f,%.1f,%.1f\n", black_holes[i].id, black_holes[i].x, black_holes[i].y, black_holes[i].z);
+
+        for(int i=0; i<MAX_NEBULAS; i++) if(nebulas[i].active && nebulas[i].q1 == q1 && nebulas[i].q2 == q2 && nebulas[i].q3 == q3)
+            printf("[NEBULA] ID:%d Coord:%.1f,%.1f,%.1f\n", nebulas[i].id, nebulas[i].x, nebulas[i].y, nebulas[i].z);
+
+        for(int i=0; i<MAX_PULSARS; i++) if(pulsars[i].active && pulsars[i].q1 == q1 && pulsars[i].q2 == q2 && pulsars[i].q3 == q3)
+            printf("[PULSAR] ID:%d Coord:%.1f,%.1f,%.1f\n", pulsars[i].id, pulsars[i].x, pulsars[i].y, pulsars[i].z);
+
+        for(int i=0; i<MAX_COMETS; i++) if(comets[i].active && comets[i].q1 == q1 && comets[i].q2 == q2 && comets[i].q3 == q3)
+            printf("[COMET] ID:%d Coord:%.1f,%.1f,%.1f Velocity:%.3f,%.3f,%.3f\n", comets[i].id, comets[i].x, comets[i].y, comets[i].z, comets[i].vx, comets[i].vy, comets[i].vz);
+
+        for(int i=0; i<MAX_ASTEROIDS; i++) if(asteroids[i].active && asteroids[i].q1 == q1 && asteroids[i].q2 == q2 && asteroids[i].q3 == q3)
+            printf("[ASTEROID] ID:%d Coord:%.1f,%.1f,%.1f Size:%.2f\n", asteroids[i].id, asteroids[i].x, asteroids[i].y, asteroids[i].z, asteroids[i].size);
+
+        for(int i=0; i<MAX_DERELICTS; i++) if(derelicts[i].active && derelicts[i].q1 == q1 && derelicts[i].q2 == q2 && derelicts[i].q3 == q3)
+            printf("[DERELICT] ID:%d Coord:%.1f,%.1f,%.1f Class:%d\n", derelicts[i].id, derelicts[i].x, derelicts[i].y, derelicts[i].z, derelicts[i].ship_class);
+
+        for(int i=0; i<MAX_MINES; i++) if(mines[i].active && mines[i].q1 == q1 && mines[i].q2 == q2 && mines[i].q3 == q3)
+            printf("[MINE] ID:%d Faction:%s Coord:%.1f,%.1f,%.1f\n", mines[i].id, get_faction_name(mines[i].faction), mines[i].x, mines[i].y, mines[i].z);
+
+        for(int i=0; i<MAX_BUOYS; i++) if(buoys[i].active && buoys[i].q1 == q1 && buoys[i].q2 == q2 && buoys[i].q3 == q3)
+            printf("[BUOY] ID:%d Coord:%.1f,%.1f,%.1f\n", buoys[i].id, buoys[i].x, buoys[i].y, buoys[i].z);
+
+        for(int i=0; i<MAX_PLATFORMS; i++) if(platforms[i].active && platforms[i].q1 == q1 && platforms[i].q2 == q2 && platforms[i].q3 == q3)
+            printf("[PLATFORM] ID:%d Faction:%s Coord:%.1f,%.1f,%.1f Health:%d Energy:%d\n", platforms[i].id, get_faction_name(platforms[i].faction), platforms[i].x, platforms[i].y, platforms[i].z, platforms[i].health, platforms[i].energy);
+
+        for(int i=0; i<MAX_RIFTS; i++) if(rifts[i].active && rifts[i].q1 == q1 && rifts[i].q2 == q2 && rifts[i].q3 == q3)
+            printf("[RIFT] ID:%d Coord:%.1f,%.1f,%.1f\n", rifts[i].id, rifts[i].x, rifts[i].y, rifts[i].z);
     }
     else if (strcmp(argv[1], "players") == 0) {
         printf("--- Persistent Players ---\n");
@@ -165,7 +262,7 @@ int main(int argc, char *argv[]) {
     }
     else if (strcmp(argv[1], "search") == 0 && argc == 3) {
         const char *name = argv[2];
-        printf("Searching for '%s'...\n", name);
+        printf("Searching for '%s'..\n", name);
         for(int i=0; i<MAX_CLIENTS; i++) {
             if (players[i].name[0] != '\0' && strcasestr(players[i].name, name)) {
                 printf("[PLAYER] Found: %s in Quadrant [%d,%d,%d]\n", players[i].name, players[i].state.q1, players[i].state.q2, players[i].state.q3);

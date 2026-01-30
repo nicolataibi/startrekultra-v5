@@ -150,6 +150,39 @@ The 3D viewer implements a programmable shading pipeline:
 
 ---
 
+## 🌌 Galactic Encyclopedia: Entities and Phenomena
+
+The Star Trek Ultra universe is a dynamic ecosystem populated by 17 classes of entities, each with unique physical, tactical, and visual properties.
+
+### 🌟 Celestial Bodies and Astronomical Phenomena
+*   **Stars**: Classified into 7 spectral types (O, B, A, F, G, K, M). They provide energy via *Solar Scooping* (`sco`) but can become unstable and trigger a **Supernova**, destroying the entire quadrant.
+*   **Planets**: Celestial bodies rich in minerals. They can be scanned and mined (`min`) for Dilithium, Tritanium, and other vital resources.
+*   **Black Holes**: Gravitational singularities with accretion disks. They are the primary source of Antimatter (`har`), but their pull can be fatal.
+*   **Nebulas**: Large clouds of ionized gases (Mutara, Paulson classes, etc.). They provide tactical cover (natural cloaking) but drain shields and disrupt sensors.
+*   **Pulsars**: Neutron stars emitting deadly radiation. Navigating too close damages systems and crew.
+*   **Comets**: Fast-moving objects with volumetric tails. They can be analyzed to collect rare gases.
+*   **Spatial Rifts**: Tears in the spacetime fabric. They act as natural teleporters that project the ship to a random point in the galaxy.
+
+### 🚩 Factions and Intelligent Ships
+*   **Federation (Player/Starbase)**: Includes your ship and Starbases, where you can dock (`doc`) for full repairs and resupply.
+*   **Klingon Empire**: Aggressive warriors patrolling quadrants, often protected by defense platforms.
+*   **Romulan Star Empire**: Masters of deception using cloaking devices to launch surprise attacks.
+*   **Borg Collective**: The greatest threat. Their Cubes have massive firepower and superior regenerative capabilities.
+*   **NPC Factions**: Cardassians, Dominion (Jem'Hadar), Tholians, Gorn, Ferengi, Species 8472, Breen, and Hirogen. Each with varying levels of hostility and power.
+
+### ⚠️ Tactical Hazards and Resources
+*   **Asteroid Fields**: Rocky debris posing a physical risk. Collision damage increases with ship speed.
+*   **Space Mines**: Hidden explosive devices placed by hostile factions. Detectable only via close-range scanning.
+*   **Derelict Ships**: Hulls of destroyed vessels. Can be dismantled (`dis`) to recover components and resources.
+*   **Communication Buoys**: Starfleet network nodes. Being nearby enhances long-range sensors (`lrs`), providing detailed data on adjacent quadrants.
+*   **Defense Platforms (Turrets)**: Heavily armed automated sentinels protecting strategic areas of interest.
+
+### 👾 Anomalies and Creatures
+*   **Space Monsters**: Includes the **Crystalline Entity** and the **Space Amoeba**, unique creatures that actively hunt vessels to feed on their energy.
+*   **Ion Storms**: Meteorological phenomena moving through the galaxy, capable of blinding sensors and diverting ships' courses.
+
+---
+
 ## 🕹️ Operational Command Manual
 
 Below is the complete list of available commands, grouped by function.
@@ -277,6 +310,38 @@ The quadrant is scattered with natural phenomena detectable by both sensors and 
     *   **Effect**: Rapidly rotating neutron stars emitting deadly radiation.
     *   **3D View**: Visible as bright cores with rotating radiation beams.
     *   **Hazard**: Approaching too close (Distance < 2.5) severely damages shields and rapidly kills crew via radiation poisoning.
+*   **Comets (ID 6xxx)**:
+    *   **Effect**: Fast-moving objects traversing the sector.
+    *   **3D View**: Icy nuclei with a blue trail of gas and dust.
+    *   **Resource**: Approaching the tail (< 0.6) allows the collection of rare gases.
+*   **Asteroid Fields (ID 8xxx)**:
+    *   **Effect**: Clusters of space rocks of various sizes.
+    *   **3D View**: Rotating brown rocks with irregular shapes.
+    *   **Hazard**: Navigating inside at high impulse speed (> 0.1) causes continuous damage to shields and engines.
+*   **Derelict Ships (ID 7xxx)**:
+    *   **Effect**: Abandoned Starfleet or alien vessels.
+    *   **3D View**: Dark and cold hulls drifting slowly in space.
+    *   **Opportunity**: Can be explored via the `bor` (boarding) command to recover Dilithium, Isolinear Chips, or to perform instant emergency repairs.
+*   **Minefields (ID 9xxx)**:
+    *   **Effect**: Defensive zones with cloaked mines placed by hostile factions.
+    *   **3D View**: Small spiked metallic spheres with pulsing red light (visible only at distance < 1.5).
+    *   **Hazard**: Detonation causes massive damage to shields and energy. Use the `scan` command to detect them before entering the sector.
+*   **Communication Buoys (ID 10xxx)**:
+    *   **Effect**: Starfleet network nodes for sector monitoring.
+    *   **3D View**: Lattice structures with rotating antennas and pulsing blue signals.
+    *   **Advantage**: Being near a buoy (< 1.2) enhances long-range sensors (`lrs`), revealing the exact composition of adjacent quadrants instead of a simple count.
+*   **Defense Platforms (ID 11xxx)**:
+    *   **Effect**: Heavily armed static sentinels protecting strategic zones.
+    *   **3D View**: Hexagonal metallic structures with active phaser banks and an energy core.
+    *   **Hazard**: Extremely dangerous if approached without full shields. Automatically fire at non-cloaked targets within a 5.0 unit range.
+*   **Spatial Rifts (ID 12xxx)**:
+    *   **Effect**: Unstable natural teleporters caused by tears in the spacetime fabric that ignore normal Warp navigation laws.
+    *   **3D View**: Rendered as rotating cyan energy rings. On the galactic map and sensors (`srs` or `lrs`), they are marked with **Cyan** color or the letter **R**.
+    *   **Risk/Opportunity**: Entering a rift (Distance < 0.5) instantly projects the ship to a completely random point in the universe (random quadrant and sector). It can be a fatal hazard (e.g., Borg territory) or the only quick escape route during a critical attack.
+*   **Space Monsters (ID 13xxx)**:
+    *   **Crystalline Entity**: Geometric predator that chases ships and fires crystalline resonance beams.
+    *   **Space Amoeba**: Giant lifeform that drains energy on contact.
+    *   **Hazard**: Extremely rare and dangerous. Require group tactics or maximum firepower.
 *   **Ion Storms**:
     *   **Effect**: Random global events synchronized in real-time on the map.
     *   **Frequency**: High (statistical average of one event every 5-6 minutes).

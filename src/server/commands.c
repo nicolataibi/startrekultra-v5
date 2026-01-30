@@ -129,75 +129,281 @@ void handle_cha(int i, const char *params) {
 }
 
 void handle_srs(int i, const char *params) {
-    char b[4096]; int q1=players[i].state.q1, q2=players[i].state.q2, q3=players[i].state.q3; double s1=players[i].state.s1, s2=players[i].state.s2, s3=players[i].state.s3;
+
+    char b[8192]; /* Increased buffer size for full listing */
+
+    int q1=players[i].state.q1, q2=players[i].state.q2, q3=players[i].state.q3; 
+
+    double s1=players[i].state.s1, s2=players[i].state.s2, s3=players[i].state.s3;
+
+    
+
     snprintf(b, sizeof(b), CYAN "\n--- SHORT RANGE SENSOR ANALYSIS ---\n" RESET "QUADRANT: [%d,%d,%d] | SECTOR: [%.1f,%.1f,%.1f]\n", q1, q2, q3, s1, s2, s3);
+
     snprintf(b+strlen(b), sizeof(b)-strlen(b), "ENERGY: %d | TORPEDOES: %d | STATUS: %s\n", players[i].state.energy, players[i].state.torpedoes, players[i].state.is_cloaked ? MAGENTA "CLOAKED" RESET : GREEN "NORMAL" RESET);
+
     strncat(b, "\nTYPE       ID    POSITION      DIST   H / M         DETAILS\n", sizeof(b)-strlen(b)-1);
+
+    
+
     QuadrantIndex *local_q = &spatial_index[q1][q2][q3];
+
     int locked_id = players[i].state.lock_target;
+
     bool chasing = (players[i].nav_state == NAV_STATE_CHASE);
 
+
+
+    /* 1. Players */
+
     for(int j=0; j<local_q->player_count; j++) {
+
         ConnectedPlayer *p = local_q->players[j]; if (p == &players[i] || p->state.is_cloaked) continue;
+
         double dx=p->state.s1-s1, dy=p->state.s2-s2, dz=p->state.s3-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=asin(dz/d)*180/M_PI;
+
         int pid = (int)(p-players)+1;
+
         char status[64] = "";
+
         if (pid == locked_id) { strcat(status, RED "[LOCKED]" RESET); if(chasing) strcat(status, B_RED "[CHASE]" RESET); }
+
         char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     %s (Player) [E:%d] %s\n", "Vessel", pid, p->state.s1, p->state.s2, p->state.s3, d, h, m, p->name, p->state.energy, status); strncat(b, line, sizeof(b)-strlen(b)-1);
+
     }
+
+
+
+    /* 2. NPC Ships */
+
     for(int n=0; n<local_q->npc_count; n++) {
+
         NPCShip *npc = local_q->npcs[n];
+
         double dx=npc->x-s1, dy=npc->y-s2, dz=npc->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=asin(dz/d)*180/M_PI;
+
         int nid = npc->id+100;
+
         char status[64] = "";
+
         if (nid == locked_id) { strcat(status, RED "[LOCKED]" RESET); if(chasing) strcat(status, B_RED "[CHASE]" RESET); }
+
         char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     %s [E:%d] [Engines:%.0f%%] %s\n", "Vessel", nid, npc->x, npc->y, npc->z, d, h, m, get_species_name(npc->faction), npc->energy, npc->engine_health, status); strncat(b, line, sizeof(b)-strlen(b)-1);
+
     }
-    for(int p=0; p<local_q->planet_count; p++) {
-        NPCPlanet *pl = local_q->planets[p];
-        double dx=pl->x-s1, dy=pl->y-s2, dz=pl->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
-        int plid = pl->id+1000;
-        char status[64] = "";
-        if (plid == locked_id) { strcat(status, RED "[LOCKED]" RESET); if(chasing) strcat(status, B_RED "[CHASE]" RESET); }
-        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Class-M Planet %s\n", "Planet", plid, pl->x, pl->y, pl->z, d, h, m, status); strncat(b, line, sizeof(b)-strlen(b)-1);
-    }
-    for(int s=0; s<local_q->star_count; s++) {
-        NPCStar *st = local_q->stars[s];
-        double dx=st->x-s1, dy=st->y-s2, dz=st->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
-        int sid = st->id+2000;
-        char status[64] = "";
-        if (sid == locked_id) { strcat(status, RED "[LOCKED]" RESET); if(chasing) strcat(status, B_RED "[CHASE]" RESET); }
-        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Star %s\n", "Star", sid, st->x, st->y, st->z, d, h, m, status); strncat(b, line, sizeof(b)-strlen(b)-1);
-    }
-    for(int h_idx=0; h_idx<local_q->bh_count; h_idx++) {
-        NPCBlackHole *bh = local_q->black_holes[h_idx];
-        double dx=bh->x-s1, dy=bh->y-s2, dz=bh->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double hh=atan2(dx,-dy)*180/M_PI; if(hh<0)hh+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
-        int bid = bh->id+3000;
-        char status[64] = "";
-        if (bid == locked_id) { strcat(status, RED "[LOCKED]" RESET); if(chasing) strcat(status, B_RED "[CHASE]" RESET); }
-        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Black Hole %s\n", "B-Hole", bid, bh->x, bh->y, bh->z, d, hh, m, status); strncat(b, line, sizeof(b)-strlen(b)-1);
-    }
+
+
+
+    /* 3. Starbases */
+
     for(int b_idx=0; b_idx<local_q->base_count; b_idx++) {
+
         NPCBase *ba = local_q->bases[b_idx];
+
         double dx=ba->x-s1, dy=ba->y-s2, dz=ba->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
+
         int baid = ba->id+500;
+
         char status[64] = "";
+
         if (baid == locked_id) { strcat(status, RED "[LOCKED]" RESET); if(chasing) strcat(status, B_RED "[CHASE]" RESET); }
+
         char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Federation Starbase %s\n", "Starbase", baid, ba->x, ba->y, ba->z, d, h, m, status); strncat(b, line, sizeof(b)-strlen(b)-1);
+
     }
+
+
+
+    /* 4. Planets */
+
+    for(int p=0; p<local_q->planet_count; p++) {
+
+        NPCPlanet *pl = local_q->planets[p];
+
+        double dx=pl->x-s1, dy=pl->y-s2, dz=pl->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
+
+        int plid = pl->id+1000;
+
+        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Class-M Planet\n", "Planet", plid, pl->x, pl->y, pl->z, d, h, m); strncat(b, line, sizeof(b)-strlen(b)-1);
+
+    }
+
+
+
+    /* 5. Stars */
+
+    for(int s=0; s<local_q->star_count; s++) {
+
+        NPCStar *st = local_q->stars[s];
+
+        double dx=st->x-s1, dy=st->y-s2, dz=st->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
+
+        int sid = st->id+2000;
+
+        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Star\n", "Star", sid, st->x, st->y, st->z, d, h, m); strncat(b, line, sizeof(b)-strlen(b)-1);
+
+    }
+
+
+
+    /* 6. Black Holes */
+
+    for(int h_idx=0; h_idx<local_q->bh_count; h_idx++) {
+
+        NPCBlackHole *bh = local_q->black_holes[h_idx];
+
+        double dx=bh->x-s1, dy=bh->y-s2, dz=bh->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double hh=atan2(dx,-dy)*180/M_PI; if(hh<0)hh+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
+
+        int bid = bh->id+3000;
+
+        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Black Hole (Grav Pull)\n", "B-Hole", bid, bh->x, bh->y, bh->z, d, hh, m); strncat(b, line, sizeof(b)-strlen(b)-1);
+
+    }
+
+
+
+    /* 7. Nebulas */
+
     for(int n_idx=0; n_idx<local_q->nebula_count; n_idx++) {
+
         NPCNebula *nb = local_q->nebulas[n_idx];
+
         double dx=nb->x-s1, dy=nb->y-s2, dz=nb->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
+
         int nid = nb->id+4000;
-        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Mutara Nebula Class\n", "Nebula", nid, nb->x, nb->y, nb->z, d, h, m); strncat(b, line, sizeof(b)-strlen(b)-1);
+
+        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Mutara Nebula\n", "Nebula", nid, nb->x, nb->y, nb->z, d, h, m); strncat(b, line, sizeof(b)-strlen(b)-1);
+
     }
-    for(int p_idx=0; p_idx<local_q->pulsar_count; p_idx++) {
+
+
+
+    /* 8. Pulsars */
+
+    for (int p_idx=0; p_idx<local_q->pulsar_count; p_idx++) {
+
         NPCPulsar *pu = local_q->pulsars[p_idx];
+
         double dx=pu->x-s1, dy=pu->y-s2, dz=pu->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
+
         int pid = pu->id+5000;
-        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Pulsar (Radiation Hazard)\n", "Pulsar", pid, pu->x, pu->y, pu->z, d, h, m); strncat(b, line, sizeof(b)-strlen(b)-1);
+
+        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Pulsar (Radiation)\n", "Pulsar", pid, pu->x, pu->y, pu->z, d, h, m); strncat(b, line, sizeof(b)-strlen(b)-1);
+
     }
-    send_server_msg(i, "COMPUTER", b);
+
+
+
+    /* 9. Comets */
+
+    for (int c_idx=0; c_idx<local_q->comet_count; c_idx++) {
+
+        NPCComet *co = local_q->comets[c_idx];
+
+        double dx=co->x-s1, dy=co->y-s2, dz=co->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
+
+        int cid = co->id+6000;
+
+        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Comet (Energy Source)\n", "Comet", cid, co->x, co->y, co->z, d, h, m); strncat(b, line, sizeof(b)-strlen(b)-1);
+
+    }
+
+
+
+    /* 10. Asteroids */
+
+    for (int a_idx=0; a_idx<local_q->asteroid_count; a_idx++) {
+
+        NPCAsteroid *as = local_q->asteroids[a_idx];
+
+        double dx=as->x-s1, dy=as->y-s2, dz=as->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
+
+        int aid = as->id+8000;
+
+        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Asteroid (Hazard)\n", "Asteroid", aid, as->x, as->y, as->z, d, h, m); strncat(b, line, sizeof(b)-strlen(b)-1);
+
+    }
+
+
+
+    /* 11. Monsters */
+
+    for (int m_idx = 0; m_idx < local_q->monster_count; m_idx++) {
+
+        NPCMonster *mo = local_q->monsters[m_idx];
+
+        double dx=mo->x-s1, dy=mo->y-s2, dz=mo->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
+
+        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     %s\n", "Monster", mo->id+13000, mo->x, mo->y, mo->z, d, h, m, (mo->type==30)?"Crystalline Entity":"Space Amoeba"); strncat(b, line, sizeof(b)-strlen(b)-1);
+
+    }
+
+
+
+    /* 12. Derelicts */
+
+    for (int d_idx = 0; d_idx < local_q->derelict_count; d_idx++) {
+
+        NPCDerelict *dr = local_q->derelicts[d_idx];
+
+        double dx=dr->x-s1, dy=dr->y-s2, dz=dr->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
+
+        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Derelict Ship\n", "Derelict", dr->id+7000, dr->x, dr->y, dr->z, d, h, m); strncat(b, line, sizeof(b)-strlen(b)-1);
+
+    }
+
+
+
+    /* 13. Defense Platforms */
+
+    for (int pt_idx = 0; pt_idx < local_q->platform_count; pt_idx++) {
+
+        NPCPlatform *pt = local_q->platforms[pt_idx];
+
+        double dx=pt->x-s1, dy=pt->y-s2, dz=pt->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
+
+        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Defense Platform\n", "Platform", pt->id+11000, pt->x, pt->y, pt->z, d, h, m); strncat(b, line, sizeof(b)-strlen(b)-1);
+
+    }
+
+
+
+    /* 14. Rifts, Buoys, Mines */
+
+    for (int rf_idx = 0; rf_idx < local_q->rift_count; rf_idx++) {
+
+        NPCRift *rf = local_q->rifts[rf_idx];
+
+        double dx=rf->x-s1, dy=rf->y-s2, dz=rf->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
+
+        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Spatial Rift\n", "Rift", rf->id+12000, rf->x, rf->y, rf->z, d, h, m); strncat(b, line, sizeof(b)-strlen(b)-1);
+
+    }
+
+    for (int bu_idx = 0; bu_idx < local_q->buoy_count; bu_idx++) {
+
+        NPCBuoy *bu = local_q->buoys[bu_idx];
+
+        double dx=bu->x-s1, dy=bu->y-s2, dz=bu->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
+
+        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Comm Buoy\n", "Buoy", bu->id+10000, bu->x, bu->y, bu->z, d, h, m); strncat(b, line, sizeof(b)-strlen(b)-1);
+
+    }
+
+    for (int mi_idx = 0; mi_idx < local_q->mine_count; mi_idx++) {
+
+        NPCMine *mi = local_q->mines[mi_idx];
+
+        double dx=mi->x-s1, dy=mi->y-s2, dz=mi->z-s3; double d=sqrt(dx*dx+dy*dy+dz*dz); double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=(d>0.001)?asin(dz/d)*180/M_PI:0;
+
+        char line[256]; snprintf(line, sizeof(line), "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Spatial Mine\n", "Mine", mi->id+9000, mi->x, mi->y, mi->z, d, h, m); strncat(b, line, sizeof(b)-strlen(b)-1);
+
+    }
+
+    
+
+    send_server_msg(i, "SCIENCE", b);
+
 }
 
 void handle_scan(int i, const char *params) {
@@ -252,6 +458,12 @@ void handle_scan(int i, const char *params) {
                 found = true;
                 snprintf(rep, sizeof(rep), RED "\n--- WARNING: PULSAR DETECTED ---\n" RESET "TYPE: Rotating Neutron Star\nRADIATION: Extreme (Gamma/X-Ray)\nADVISORY: Maintain minimum safe distance 2.0. Shield failure imminent in proximity.\n");
             }
+        } else if (tid >= 3000 && tid < 3000+MAX_BH) {
+            int idx = tid - 3000;
+            if (black_holes[idx].active && black_holes[idx].q1==pq1 && black_holes[idx].q2==pq2 && black_holes[idx].q3==pq3) {
+                found = true;
+                snprintf(rep, sizeof(rep), MAGENTA "\n--- SINGULARITY ANALYSIS ---\n" RESET "TYPE: Schwarzschild Black Hole\nEFFECT: Extreme Time-Dilation and Space Curvature.\nADVISORY: Significant gravitational pull detected within 3.0 units. Escape velocity required.\n");
+            }
         }
 
         if (found) send_server_msg(i, "SCIENCE", rep);
@@ -262,17 +474,154 @@ void handle_scan(int i, const char *params) {
 }
 
 void handle_lrs(int i, const char *params) {
-    char rep[4096] = YELLOW "\n--- 3D LONG RANGE SENSOR SCAN ---" RESET; char line[512]; int pq1 = players[i].state.q1, pq2 = players[i].state.q2, pq3 = players[i].state.q3; double ps1 = players[i].state.s1, ps2 = players[i].state.s2, ps3 = players[i].state.s3;
-    for (int l = pq3 + 1; l >= pq3 - 1; l--) { if (l < 1 || l > 10) continue; snprintf(line, sizeof(line), WHITE "\n[ DECK Z:%d ]\n" RESET, l); strncat(rep, line, sizeof(rep)-strlen(rep)-1); strncat(rep, "         X-1 (West)               X (Center)               X+1 (East)\n", sizeof(rep)-strlen(rep)-1);
+    char rep[4096];
+    char line[512]; 
+    int pq1 = players[i].state.q1, pq2 = players[i].state.q2, pq3 = players[i].state.q3; 
+    double ps1 = players[i].state.s1, ps2 = players[i].state.s2, ps3 = players[i].state.s3;
+
+    /* Check for nearby Comm Buoy boost */
+    bool buoy_boost = false;
+    QuadrantIndex *lq = &spatial_index[pq1][pq2][pq3];
+    for(int b=0; b<lq->buoy_count; b++) {
+        double d = sqrt(pow(lq->buoys[b]->x - ps1, 2) + pow(lq->buoys[b]->y - ps2, 2) + pow(lq->buoys[b]->z - ps3, 2));
+        if (d < 1.2) { buoy_boost = true; break; }
+    }
+
+    if (buoy_boost) {
+        snprintf(rep, sizeof(rep), B_BLUE "\n--- LONG RANGE SCAN (LINK: ACTIVE / HIGH-RES) ---" RESET);
+    } else {
+        snprintf(rep, sizeof(rep), YELLOW "\n--- LONG RANGE SCAN (LINK: OFFLINE / LOW-RES) ---" RESET);
+    }
+
+    strncat(rep, "\nFormat: [KBP SHNU | CADX @TRM] (15-Class Tactical Analysis)\n", sizeof(rep)-strlen(rep)-1);
+    strncat(rep, "K:Enemy B:Base P:Planet S:Star | H:B-Hole N:Nebula U:Pulsar ~:Storm\n", sizeof(rep)-strlen(rep)-1);
+    strncat(rep, "C:Comet A:Asteroid D:Derelict X:Mine | @:Buoy T:Turret R:Rift M:Monster\n", sizeof(rep)-strlen(rep)-1);
+
+    for (int l = pq3 + 1; l >= pq3 - 1; l--) { 
+        if (l < 1 || l > 10) continue; 
+        snprintf(line, sizeof(line), WHITE "\n[ DECK Z:%d ]\n" RESET, l); 
+        strncat(rep, line, sizeof(rep)-strlen(rep)-1); 
+        
+        /* Column Headers with absolute Q1 (X) coordinates */
+        snprintf(line, sizeof(line), "         Q1:%-2d (West)            Q1:%-2d (Center)          Q1:%-2d (East)\n", pq1-1, pq1, pq1+1);
+        strncat(rep, line, sizeof(rep)-strlen(rep)-1);
+
         for (int y = pq2 - 1; y <= pq2 + 1; y++) {
-            if (y == pq2 - 1) strncat(rep, "Y-1 (N) ", sizeof(rep)-strlen(rep)-1); else if (y == pq2) strncat(rep, "Y   (C) ", sizeof(rep)-strlen(rep)-1); else strncat(rep, "Y+1 (S) ", sizeof(rep)-strlen(rep)-1);
+            if (y < 1 || y > 10) {
+                strncat(rep, "        [   OUT   ]              [   OUT   ]              [   OUT   ]\n", sizeof(rep)-strlen(rep)-1);
+                continue;
+            }
+            
+            /* Row Header with absolute Q2 (Y) coordinate */
+            snprintf(line, sizeof(line), "Q2:%-2d ", y);
+            strncat(rep, line, sizeof(rep)-strlen(rep)-1);
+            
             for (int x = pq1 - 1; x <= pq1 + 1; x++) {
-                if (x >= 1 && x <= 10 && y >= 1 && y <= 10) {
-                    QuadrantIndex *qi = &spatial_index[x][y][l]; int val = qi->bh_count * 10000 + qi->planet_count * 1000 + (qi->npc_count + qi->player_count) * 100 + qi->base_count * 10 + qi->star_count; int h = -1;
-                    if (y == pq2 - 1) { if (x == pq1 - 1) h = 315; else if (x == pq1) h = 0; else h = 45; } else if (y == pq2) { if (x == pq1 - 1) h = 270; else if (x == pq1 + 1) h = 90; } else if (y == pq2 + 1) { if (x == pq1 - 1) h = 225; else if (x == pq1) h = 180; else h = 135; }
-                    double dx_s = (x - pq1) * 10.0 + (5.5 - ps1); double dy_s = (pq2 - y) * 10.0 + (ps2 - 5.5); double dz_s = (l - pq3) * 10.0 + (5.5 - ps3); double dist_s = sqrt(dx_s*dx_s + dy_s*dy_s + dz_s*dz_s); double w_req = dist_s / 10.0; int m = (dist_s > 0.001) ? (int)(asin(dz_s / dist_s) * 180.0 / M_PI) : 0;
-                    if (x == pq1 && y == pq2 && l == pq3) strncat(rep, ":[        " BLUE "YOU" RESET "         ]: ", sizeof(rep)-strlen(rep)-1); else { snprintf(line, sizeof(line), "[%05d/H%03d/M%+03d/W%.1f]: ", val, (h==-1?0:h), m, w_req); strncat(rep, line, sizeof(rep)-strlen(rep)-1); }
-                } else strncat(rep, ":[        ***         ]: ", sizeof(rep)-strlen(rep)-1);
+                if (x >= 1 && x <= 10) {
+                    long long val = galaxy_master.g[x][y][l];
+                    
+                    /* Calculate Navigation Data to Quadrant Center */
+                    double tx = (x - 1) * 10.0 + 5.0;
+                    double ty = (y - 1) * 10.0 + 5.0;
+                    double tz = (l - 1) * 10.0 + 5.0;
+                    double dx = tx - players[i].gx;
+                    double dy = ty - players[i].gy;
+                    double dz = tz - players[i].gz;
+                    double dist = sqrt(dx*dx + dy*dy + dz*dz);
+                    double h = atan2(dx, -dy) * 180.0 / M_PI; if (h < 0) h += 360.0;
+                    double m = (dist > 0.01) ? asin(dz / dist) * 180.0 / M_PI : 0;
+                    double w = dist / 10.0; /* Warp distance in quadrants */
+
+                    bool is_sn = (val < 0);
+                    if (supernova_event.supernova_timer > 0 && x == supernova_event.supernova_q1 && y == supernova_event.supernova_q2 && l == supernova_event.supernova_q3) is_sn = true;
+
+                                        if (x == pq1 && y == pq2 && l == pq3) {
+
+                                            strncat(rep, ":[        " BLUE "YOU" RESET "         ]: ", sizeof(rep)-strlen(rep)-1);
+
+                                        } else if (is_sn) {
+
+                                            snprintf(line, sizeof(line), ":[  " RED "SUPERNOVA" RESET "  ] H:%03.0f M:%+03.0f W:%4.1f: ", h, m, w);
+
+                                            strncat(rep, line, sizeof(rep)-strlen(rep)-1);
+
+                                        } else {
+
+                                            /* Extract tactical information from 17-digit encoding */
+
+                                            int mon  = (val / 10000000000000000LL) % 10;
+
+                                            int rift = (val / 100000000000000LL) % 10;
+
+                                            int plat = (val / 10000000000000LL) % 10;
+
+                                            int buoy = (val / 1000000000000LL) % 10;
+
+                                            int mine = (val / 100000000000LL) % 10;
+
+                                            int der  = (val / 10000000000LL) % 10;
+
+                                            int ast  = (val / 1000000000LL) % 10;
+
+                                            int com  = (val / 100000000LL) % 10;
+
+                                            int sto  = (val / 10000000LL) % 10;
+
+                                            int pul  = (val / 1000000LL) % 10;
+
+                                            int neb  = (val / 100000LL) % 10;
+
+                                            int bh   = (val / 10000LL) % 10;
+
+                                            int p    = (val / 1000LL) % 10;
+
+                                            int k    = (val / 100LL) % 10;
+
+                                            int b    = (val / 10LL) % 10;
+
+                                            int s    = val % 10;
+
+                    
+
+                                            /* Unified 16-Class Tactical Analysis [KBP SHNU | CADX @TRM] */
+
+                                            char sym_h = (bh > 0) ? 'H' : '.';
+
+                                            char sym_n = (neb > 0) ? 'N' : '.';
+
+                                            char sym_u = (pul > 0) ? 'U' : '.';
+
+                                            char sym_s = (sto > 0) ? '~' : '.';
+
+                                            char sym_c = (com > 0) ? 'C' : '.';
+
+                                            char sym_a = (ast > 0) ? 'A' : '.';
+
+                                            char sym_d = (der > 0) ? 'D' : '.';
+
+                                            char sym_x = (mine > 0) ? 'X' : '.';
+
+                                            char sym_at = (buoy > 0) ? '@' : '.';
+
+                                            char sym_t = (plat > 0) ? 'T' : '.';
+
+                                            char sym_r = (rift > 0) ? 'R' : '.';
+
+                                            char sym_m = (mon > 0) ? 'M' : '.';
+
+                    
+
+                                            /* Format: KBP S H N U ~ | C A D X @ T R M */
+                                            /* But we use the user's requested grouping: [KBP SHNU | CADX @TRM] */
+                                            /* We show counts for K,B,P and icons for the rest to save space */
+                                            snprintf(line, sizeof(line), ":[%d%d%d %c%c%c%c%c | %c%c%c%c %c%c%c%c] H:%03.0f M:%+03.0f W:%4.1f ", 
+                                                k, b, p, (s>0)?'S':'.', sym_h, sym_n, sym_u, sym_s,
+                                                sym_c, sym_a, sym_d, sym_x, sym_at, sym_t, sym_r, sym_m,
+                                                h, m, w);
+                                            
+                                            strncat(rep, line, sizeof(rep)-strlen(rep)-1);
+                                        }
+                                    } else strncat(rep, ":[        ***         ]: ", sizeof(rep)-strlen(rep)-1);
             }
             strncat(rep, "\n", sizeof(rep)-strlen(rep)-1);
         }
@@ -332,13 +681,23 @@ void handle_tor(int i, const char *params) {
         else if(tid>=100 && tid<100+MAX_NPC && npcs[tid-100].active) { tx=npcs[tid-100].x; ty=npcs[tid-100].y; tz=npcs[tid-100].z; found=true; }
         if(found) { double dx=tx-players[i].state.s1, dy=ty-players[i].state.s2, dz=tz-players[i].state.s3; h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; m=asin(dz/sqrt(dx*dx+dy*dy+dz*dz))*180/M_PI; manual=false; }
     }
-    if(manual && sscanf(params, "%lf %lf", &h, &m)!=2) manual=false;
-    if((!manual || tid>0) && players[i].state.torpedoes > 0) {
+    if(manual && sscanf(params, "%lf %lf", &h, &m)==2) {
+        /* Manual parameters provided, valid launch */
+    } else if (!manual) {
+        /* Already calculated from lock, valid launch */
+    } else {
+        /* No lock and no valid manual parameters */
+        return; 
+    }
+    
+    if(players[i].state.torpedoes > 0) {
         players[i].state.torpedoes--; players[i].torp_active=true; 
         players[i].torp_target = (manual) ? 0 : tid;
         players[i].tx=players[i].state.s1; players[i].ty=players[i].state.s2; players[i].tz=players[i].state.s3;
         players[i].tdx=cos(m*M_PI/180)*sin(h*M_PI/180); players[i].tdy=cos(m*M_PI/180)*-cos(h*M_PI/180); players[i].tdz=sin(m*M_PI/180);
         send_server_msg(i, "TACTICAL", manual ? "Torpedo away (Manual)." : "Torpedo away (Locked).");
+    } else {
+        send_server_msg(i, "TACTICAL", "Insufficient torpedoes.");
     }
 }
 
@@ -380,11 +739,19 @@ void handle_bor(int i, const char *params) {
     int pq1 = players[i].state.q1, pq2 = players[i].state.q2, pq3 = players[i].state.q3;
     if (tid >= 1 && tid <= 32 && players[tid-1].active && players[tid-1].state.q1 == pq1 && players[tid-1].state.q2 == pq2 && players[tid-1].state.q3 == pq3) { tx = players[tid-1].state.s1; ty = players[tid-1].state.s2; tz = players[tid-1].state.s3; found = true; }
     else if (tid >= 100 && tid < 500 && npcs[tid-100].active && npcs[tid-100].q1 == pq1 && npcs[tid-100].q2 == pq2 && npcs[tid-100].q3 == pq3) { tx = npcs[tid-100].x; ty = npcs[tid-100].y; tz = npcs[tid-100].z; found = true; }
+    else if (tid >= 7000 && tid < 7000+MAX_DERELICTS && derelicts[tid-7000].active && derelicts[tid-7000].q1 == pq1 && derelicts[tid-7000].q2 == pq2 && derelicts[tid-7000].q3 == pq3) { tx = derelicts[tid-7000].x; ty = derelicts[tid-7000].y; tz = derelicts[tid-7000].z; found = true; }
     if (found) {
         double d = sqrt(pow(tx-players[i].state.s1,2)+pow(ty-players[i].state.s2,2)+pow(tz-players[i].state.s3,2));
         if (d < 1.0) {
             players[i].state.energy -= 5000;
-            if (rand()%100 < 80) {
+            if (tid >= 7000) {
+                /* Boarding a Derelict */
+                derelicts[tid-7000].active = 0; /* Ship is salvaged */
+                int reward = rand() % 3;
+                if (reward == 0) { players[i].state.inventory[1] += 50; send_server_msg(i, "SCIENCE", "Recovered intact Dilithium crystals from the derelict core."); }
+                else if (reward == 1) { players[i].state.inventory[5] += 100; send_server_msg(i, "ENGINEERING", "Salvaged advanced Isolinear Chips from the ship's computer."); }
+                else { for(int s=0; s<8; s++) players[i].state.system_health[s] = 100.0f; send_server_msg(i, "REPAIR", "Found automated repair drones. All systems restored!"); }
+            } else if (rand()%100 < 80) {
                 if (tid <= 32) { for(int s=0; s<8; s++) players[tid-1].state.system_health[s] *= 0.5f; players[tid-1].nav_state = NAV_STATE_IDLE; send_server_msg(tid, "CRITICAL", "ENEMY BOARDING PARTIES ON ALL DECKS!"); } 
                 else { npcs[tid-100].engine_health = 0; npcs[tid-100].energy *= 0.7; }
                 send_server_msg(i, "TACTICAL", "Boarding successful. Enemy systems disabled.");
@@ -485,6 +852,29 @@ void handle_psy(int i, const char *params) {
     } else {
         send_server_msg(i, "COMPUTER", "No Corbomite devices available in inventory.");
     }
+}
+
+void handle_supernova(int i, const char *params) {
+    if (supernova_event.supernova_timer > 0) {
+        send_server_msg(i, "COMPUTER", "A supernova event is already in progress.");
+        return;
+    }
+    int q1 = players[i].state.q1, q2 = players[i].state.q2, q3 = players[i].state.q3;
+    supernova_event.supernova_q1 = q1;
+    supernova_event.supernova_q2 = q2;
+    supernova_event.supernova_q3 = q3;
+    supernova_event.supernova_timer = 1800; /* 60 seconds */
+    
+    /* Find a star to explode */
+    supernova_event.x = 5.0; supernova_event.y = 5.0; supernova_event.z = 5.0;
+    QuadrantIndex *qi = &spatial_index[q1][q2][q3];
+    if (qi->star_count > 0) {
+        supernova_event.x = qi->stars[0]->x;
+        supernova_event.y = qi->stars[0]->y;
+        supernova_event.z = qi->stars[0]->z;
+    }
+
+    send_server_msg(i, "ADMIN", "SUPERNOVA INITIATED IN CURRENT QUADRANT.");
 }
 
 void handle_xxx(int i, const char *params) {
@@ -669,6 +1059,7 @@ static const CommandDef command_registry[] = {
     {"help", handle_help,"Display this directory"},
     {"aux ", handle_aux, "Auxiliary Systems"},
     {"xxx",  handle_xxx, "Self-Destruct"},
+    {"supernova", handle_supernova, "Admin: Trigger Supernova"},
     {NULL, NULL, NULL}
 };
 
