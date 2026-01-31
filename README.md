@@ -223,6 +223,44 @@ Di seguito la lista completa dei comandi disponibili, raggruppati per funzione.
     *   Se `lock` attivo: Guida automatica (basta digitare `tor`).
     *   Senza lock: Traiettoria balistica manuale.
 *   `lock <ID>`: **Target Lock**. Aggancia i sistemi di puntamento sul bersaglio ID (0 per sbloccare).
+
+### 🆔 Schema Identificativi Galattici (Universal ID)
+Per interagire con gli oggetti della galassia tramite i comandi `lock`, `scan`, `pha`, `tor`, `bor` e `dis`, il sistema utilizza un sistema di ID univoci. Usa il comando `srs` per identificare gli ID degli oggetti nel tuo settore.
+
+| Categoria | Intervallo ID | Esempio | Utilizzo Principale |
+| :--- | :--- | :--- | :--- |
+| **Player** | 1 - 999 | `lock 1` | Tuo vascello o altri giocatori |
+| **NPC (Nemici)** | 1.000 - 1.999 | `lock 1050` | Inseguimento (`cha`) e combattimento |
+| **Basi Stellari** | 2.000 - 2.999 | `lock 2005` | Attracco (`doc`) e rifornimento |
+| **Pianeti** | 3.000 - 3.999 | `lock 3012` | Estrazione mineraria (`min`) |
+| **Stelle** | 4.000 - 6.999 | `lock 4500` | Raccolta energia solare (`sco`) |
+| **Buchi Neri** | 7.000 - 7.999 | `lock 7001` | Raccolta antimateria (`har`) |
+| **Nebulose** | 8.000 - 8.999 | `lock 8000` | Analisi scientifica e copertura |
+| **Pulsar** | 9.000 - 9.999 | `lock 9000` | Monitoraggio radiazioni |
+| **Comete** | 10.000 - 10.999| `lock 10001` | Inseguimento e raccolta gas rari |
+| **Relitti** | 11.000 - 11.999| `lock 11005` | Abbordaggio (`bor`) e recupero tech |
+| **Asteroidi** | 12.000 - 13.999| `lock 12000` | Navigazione di precisione |
+| **Mine** | 14.000 - 14.999| `lock 14000` | Allerta tattica ed evitamento |
+| **Boe Comm.** | 15.000 - 15.999| `lock 15000` | Link dati e potenziamento `lrs` |
+| **Piattaforme** | 16.000 - 16.999| `lock 16000` | Distruzione sentinelle ostili |
+| **Rift Spaziali** | 17.000 - 17.999| `lock 17000` | Utilizzo per salti casuali |
+| **Mostri** | 18.000 - 18.999| `lock 18000` | Combattimento estremo |
+
+**Nota**: Il lock funziona solo se l'oggetto è nel tuo quadrante attuale. Se l'ID esiste ma è lontano, il computer indicherà le coordinate `Q[x,y,z]` del bersaglio.
+
+### 🔄 Workflow Operativo Consigliato
+Per eseguire operazioni complesse (estrazione, rifornimento, abbordaggio), segui questa sequenza ottimizzata:
+
+1.  **Identificazione**: Usa `srs` per trovare l'ID dell'oggetto (es. Stella ID `4226`).
+2.  **Aggancio**: Esegui `lock 4226`. Vedrai l'ID confermato sul tuo HUD 3D.
+3.  **Avvicinamento**: Usa `apr 4226 1.5`. Il pilota automatico ti porterà alla distanza ideale.
+4.  **Interazione**: Una volta giunto a destinazione, lancia il comando specifico:
+    *   `sco` per le **Stelle** (Ricarica energia).
+    *   `min` per i **Pianeti** (Estrazione minerali).
+    *   `har` per i **Buchi Neri** (Raccolta antimateria).
+    *   `bor` per i **Relitti** (Recupero materiali e riparazioni).
+    *   `cha` per le **Comete** (Inseguimento e raccolta gas).
+    *   `pha` / `tor` per **Nemici/Mostri/Piattaforme** (Combattimento).
 *   `she <F> <R> <T> <B> <L> <RI>`: **Shield Configuration**. Distribuisce energia ai 6 scudi.
 *   `clo`: **Cloaking Device**. Attiva/Disattiva occultamento (consuma energia).
 *   `pow <E> <S> <W>`: **Power Distribution**. Ripartisce energia reattore (Motori, Scudi, Armi %).

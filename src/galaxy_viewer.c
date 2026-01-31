@@ -169,9 +169,6 @@ int main(int argc, char *argv[]) {
                 int s = (bpnbs/10000000)%10;
                 int p = (bpnbs/1000000)%10;
                 int n = (bpnbs/100000)%10;
-                int k = (bpnbs/100)%10;
-                int b = (bpnbs/10)%10;
-                int st = bpnbs%10;
                 
                 if (s > 0) printf(" ~ "); /* Ion Storm */
                 else if (mon > 0) printf(" M "); /* Monster */
@@ -205,49 +202,49 @@ int main(int argc, char *argv[]) {
         printf("BPNBS Encoding: %017lld\n", bpnbs);
 
         for(int i=0; i<MAX_NPC; i++) if(npcs[i].active && npcs[i].q1 == q1 && npcs[i].q2 == q2 && npcs[i].q3 == q3)
-            printf("[NPC] ID:%d Faction:%s Coord:%.1f,%.1f,%.1f Energy:%d\n", npcs[i].id, get_faction_name(npcs[i].faction), npcs[i].x, npcs[i].y, npcs[i].z, npcs[i].energy);
-        
+            printf("[NPC] ID:%d Faction:%s Coord:%.1f,%.1f,%.1f Energy:%d AI:%d\n", npcs[i].id+1000, get_faction_name(npcs[i].faction), npcs[i].x, npcs[i].y, npcs[i].z, npcs[i].energy, npcs[i].ai_state);
+
         for(int i=0; i<MAX_MONSTERS; i++) if(monsters[i].active && monsters[i].q1 == q1 && monsters[i].q2 == q2 && monsters[i].q3 == q3)
-            printf("[MONSTER] ID:%d Type:%s Coord:%.1f,%.1f,%.1f Health:%d\n", monsters[i].id+13000, get_faction_name(monsters[i].type), monsters[i].x, monsters[i].y, monsters[i].z, monsters[i].health);
+            printf("[MONSTER] ID:%d Type:%s Coord:%.1f,%.1f,%.1f Health:%d\n", monsters[i].id+18000, get_faction_name(monsters[i].type), monsters[i].x, monsters[i].y, monsters[i].z, monsters[i].health);
 
         for(int i=0; i<MAX_BASES; i++) if(bases[i].active && bases[i].q1 == q1 && bases[i].q2 == q2 && bases[i].q3 == q3)
-            printf("[BASE] ID:%d Faction:%s Coord:%.1f,%.1f,%.1f Health:%d\n", bases[i].id, get_faction_name(bases[i].faction), bases[i].x, bases[i].y, bases[i].z, bases[i].health);
+            printf("[BASE] ID:%d Faction:%s Coord:%.1f,%.1f,%.1f Health:%d\n", bases[i].id+2000, get_faction_name(bases[i].faction), bases[i].x, bases[i].y, bases[i].z, bases[i].health);
 
         for(int i=0; i<MAX_PLANETS; i++) if(planets[i].active && planets[i].q1 == q1 && planets[i].q2 == q2 && planets[i].q3 == q3)
-            printf("[PLANET] ID:%d Type:%d Coord:%.1f,%.1f,%.1f Resources:%d\n", planets[i].id, planets[i].resource_type, planets[i].x, planets[i].y, planets[i].z, planets[i].amount);
+            printf("[PLANET] ID:%d Type:%d Coord:%.1f,%.1f,%.1f Resources:%d\n", planets[i].id+3000, planets[i].resource_type, planets[i].x, planets[i].y, planets[i].z, planets[i].amount);
 
         for(int i=0; i<MAX_STARS; i++) if(stars_data[i].active && stars_data[i].q1 == q1 && stars_data[i].q2 == q2 && stars_data[i].q3 == q3)
-            printf("[STAR] ID:%d Coord:%.1f,%.1f,%.1f\n", stars_data[i].id, stars_data[i].x, stars_data[i].y, stars_data[i].z);
+            printf("[STAR] ID:%d Coord:%.1f,%.1f,%.1f\n", stars_data[i].id+4000, stars_data[i].x, stars_data[i].y, stars_data[i].z);
 
         for(int i=0; i<MAX_BH; i++) if(black_holes[i].active && black_holes[i].q1 == q1 && black_holes[i].q2 == q2 && black_holes[i].q3 == q3)
-            printf("[BLACK HOLE] ID:%d Coord:%.1f,%.1f,%.1f\n", black_holes[i].id, black_holes[i].x, black_holes[i].y, black_holes[i].z);
+            printf("[BLACK HOLE] ID:%d Coord:%.1f,%.1f,%.1f\n", black_holes[i].id+7000, black_holes[i].x, black_holes[i].y, black_holes[i].z);
 
         for(int i=0; i<MAX_NEBULAS; i++) if(nebulas[i].active && nebulas[i].q1 == q1 && nebulas[i].q2 == q2 && nebulas[i].q3 == q3)
-            printf("[NEBULA] ID:%d Coord:%.1f,%.1f,%.1f\n", nebulas[i].id, nebulas[i].x, nebulas[i].y, nebulas[i].z);
+            printf("[NEBULA] ID:%d Coord:%.1f,%.1f,%.1f\n", nebulas[i].id+8000, nebulas[i].x, nebulas[i].y, nebulas[i].z);
 
         for(int i=0; i<MAX_PULSARS; i++) if(pulsars[i].active && pulsars[i].q1 == q1 && pulsars[i].q2 == q2 && pulsars[i].q3 == q3)
-            printf("[PULSAR] ID:%d Coord:%.1f,%.1f,%.1f\n", pulsars[i].id, pulsars[i].x, pulsars[i].y, pulsars[i].z);
+            printf("[PULSAR] ID:%d Coord:%.1f,%.1f,%.1f\n", pulsars[i].id+9000, pulsars[i].x, pulsars[i].y, pulsars[i].z);
 
         for(int i=0; i<MAX_COMETS; i++) if(comets[i].active && comets[i].q1 == q1 && comets[i].q2 == q2 && comets[i].q3 == q3)
-            printf("[COMET] ID:%d Coord:%.1f,%.1f,%.1f Velocity:%.3f,%.3f,%.3f\n", comets[i].id, comets[i].x, comets[i].y, comets[i].z, comets[i].vx, comets[i].vy, comets[i].vz);
+            printf("[COMET] ID:%d Coord:%.1f,%.1f,%.1f Angle:%.3f Speed:%.3f\n", comets[i].id+10000, comets[i].x, comets[i].y, comets[i].z, comets[i].angle, comets[i].speed);
 
         for(int i=0; i<MAX_ASTEROIDS; i++) if(asteroids[i].active && asteroids[i].q1 == q1 && asteroids[i].q2 == q2 && asteroids[i].q3 == q3)
-            printf("[ASTEROID] ID:%d Coord:%.1f,%.1f,%.1f Size:%.2f\n", asteroids[i].id, asteroids[i].x, asteroids[i].y, asteroids[i].z, asteroids[i].size);
+            printf("[ASTEROID] ID:%d Coord:%.1f,%.1f,%.1f Size:%.2f\n", asteroids[i].id+12000, asteroids[i].x, asteroids[i].y, asteroids[i].z, asteroids[i].size);
 
         for(int i=0; i<MAX_DERELICTS; i++) if(derelicts[i].active && derelicts[i].q1 == q1 && derelicts[i].q2 == q2 && derelicts[i].q3 == q3)
-            printf("[DERELICT] ID:%d Coord:%.1f,%.1f,%.1f Class:%d\n", derelicts[i].id, derelicts[i].x, derelicts[i].y, derelicts[i].z, derelicts[i].ship_class);
+            printf("[DERELICT] ID:%d Coord:%.1f,%.1f,%.1f Class:%d\n", derelicts[i].id+11000, derelicts[i].x, derelicts[i].y, derelicts[i].z, derelicts[i].ship_class);
 
         for(int i=0; i<MAX_MINES; i++) if(mines[i].active && mines[i].q1 == q1 && mines[i].q2 == q2 && mines[i].q3 == q3)
-            printf("[MINE] ID:%d Faction:%s Coord:%.1f,%.1f,%.1f\n", mines[i].id, get_faction_name(mines[i].faction), mines[i].x, mines[i].y, mines[i].z);
+            printf("[MINE] ID:%d Faction:%s Coord:%.1f,%.1f,%.1f\n", mines[i].id+14000, get_faction_name(mines[i].faction), mines[i].x, mines[i].y, mines[i].z);
 
         for(int i=0; i<MAX_BUOYS; i++) if(buoys[i].active && buoys[i].q1 == q1 && buoys[i].q2 == q2 && buoys[i].q3 == q3)
-            printf("[BUOY] ID:%d Coord:%.1f,%.1f,%.1f\n", buoys[i].id, buoys[i].x, buoys[i].y, buoys[i].z);
+            printf("[BUOY] ID:%d Coord:%.1f,%.1f,%.1f\n", buoys[i].id+15000, buoys[i].x, buoys[i].y, buoys[i].z);
 
         for(int i=0; i<MAX_PLATFORMS; i++) if(platforms[i].active && platforms[i].q1 == q1 && platforms[i].q2 == q2 && platforms[i].q3 == q3)
-            printf("[PLATFORM] ID:%d Faction:%s Coord:%.1f,%.1f,%.1f Health:%d Energy:%d\n", platforms[i].id, get_faction_name(platforms[i].faction), platforms[i].x, platforms[i].y, platforms[i].z, platforms[i].health, platforms[i].energy);
+            printf("[PLATFORM] ID:%d Faction:%s Coord:%.1f,%.1f,%.1f Health:%d Energy:%d\n", platforms[i].id+16000, get_faction_name(platforms[i].faction), platforms[i].x, platforms[i].y, platforms[i].z, platforms[i].health, platforms[i].energy);
 
         for(int i=0; i<MAX_RIFTS; i++) if(rifts[i].active && rifts[i].q1 == q1 && rifts[i].q2 == q2 && rifts[i].q3 == q3)
-            printf("[RIFT] ID:%d Coord:%.1f,%.1f,%.1f\n", rifts[i].id, rifts[i].x, rifts[i].y, rifts[i].z);
+            printf("[RIFT] ID:%d Coord:%.1f,%.1f,%.1f\n", rifts[i].id+17000, rifts[i].x, rifts[i].y, rifts[i].z);
     }
     else if (strcmp(argv[1], "players") == 0) {
         printf("--- Persistent Players ---\n");

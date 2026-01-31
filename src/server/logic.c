@@ -755,17 +755,37 @@ void update_game_logic() {
             if (tid >= 1 && tid <= 32) {
                 /* Players can be locked as long as they are active anywhere */
                 if (players[tid-1].active) valid = true;
-            } else if (tid >= 100 && tid < 100+MAX_NPC) {
-                if (npcs[tid-100].active) valid = true;
-            } else if (tid >= 500 && tid < 500+MAX_BASES) {
+            } else if (tid >= 1000 && tid < 1000+MAX_NPC) {
+                if (npcs[tid-1000].active) valid = true;
+            } else if (tid >= 2000 && tid < 2000+MAX_BASES) {
                 /* Static objects remain local-only for locking sanity */
-                if (bases[tid-500].active && bases[tid-500].q1 == pq1 && bases[tid-500].q2 == pq2 && bases[tid-500].q3 == pq3) valid = true;
-            } else if (tid >= 1000 && tid < 1000+MAX_PLANETS) {
-                if (planets[tid-1000].active && planets[tid-1000].q1 == pq1 && planets[tid-1000].q2 == pq2 && planets[tid-1000].q3 == pq3) valid = true;
-            } else if (tid >= 2000 && tid < 2000+MAX_STARS) {
-                if (stars_data[tid-2000].active && stars_data[tid-2000].q1 == pq1 && stars_data[tid-2000].q2 == pq2 && stars_data[tid-2000].q3 == pq3) valid = true;
-            } else if (tid >= 3000 && tid < 3000+MAX_BH) {
-                if (black_holes[tid-3000].active && black_holes[tid-3000].q1 == pq1 && black_holes[tid-3000].q2 == pq2 && black_holes[tid-3000].q3 == pq3) valid = true;
+                if (bases[tid-2000].active && bases[tid-2000].q1 == pq1 && bases[tid-2000].q2 == pq2 && bases[tid-2000].q3 == pq3) valid = true;
+            } else if (tid >= 3000 && tid < 3000+MAX_PLANETS) {
+                if (planets[tid-3000].active && planets[tid-3000].q1 == pq1 && planets[tid-3000].q2 == pq2 && planets[tid-3000].q3 == pq3) valid = true;
+            } else if (tid >= 4000 && tid < 4000+MAX_STARS) {
+                if (stars_data[tid-4000].active && stars_data[tid-4000].q1 == pq1 && stars_data[tid-4000].q2 == pq2 && stars_data[tid-4000].q3 == pq3) valid = true;
+            } else if (tid >= 7000 && tid < 7000+MAX_BH) {
+                if (black_holes[tid-7000].active && black_holes[tid-7000].q1 == pq1 && black_holes[tid-7000].q2 == pq2 && black_holes[tid-7000].q3 == pq3) valid = true;
+            } else if (tid >= 8000 && tid < 8000+MAX_NEBULAS) {
+                if (nebulas[tid-8000].active && nebulas[tid-8000].q1 == pq1 && nebulas[tid-8000].q2 == pq2 && nebulas[tid-8000].q3 == pq3) valid = true;
+            } else if (tid >= 9000 && tid < 9000+MAX_PULSARS) {
+                if (pulsars[tid-9000].active && pulsars[tid-9000].q1 == pq1 && pulsars[tid-9000].q2 == pq2 && pulsars[tid-9000].q3 == pq3) valid = true;
+            } else if (tid >= 10000 && tid < 10000+MAX_COMETS) {
+                if (comets[tid-10000].active && comets[tid-10000].q1 == pq1 && comets[tid-10000].q2 == pq2 && comets[tid-10000].q3 == pq3) valid = true;
+            } else if (tid >= 11000 && tid < 11000+MAX_DERELICTS) {
+                if (derelicts[tid-11000].active && derelicts[tid-11000].q1 == pq1 && derelicts[tid-11000].q2 == pq2 && derelicts[tid-11000].q3 == pq3) valid = true;
+            } else if (tid >= 12000 && tid < 12000+MAX_ASTEROIDS) {
+                if (asteroids[tid-12000].active && asteroids[tid-12000].q1 == pq1 && asteroids[tid-12000].q2 == pq2 && asteroids[tid-12000].q3 == pq3) valid = true;
+            } else if (tid >= 14000 && tid < 14000+MAX_MINES) {
+                if (mines[tid-14000].active && mines[tid-14000].q1 == pq1 && mines[tid-14000].q2 == pq2 && mines[tid-14000].q3 == pq3) valid = true;
+            } else if (tid >= 15000 && tid < 15000+MAX_BUOYS) {
+                if (buoys[tid-15000].active && buoys[tid-15000].q1 == pq1 && buoys[tid-15000].q2 == pq2 && buoys[tid-15000].q3 == pq3) valid = true;
+            } else if (tid >= 16000 && tid < 16000+MAX_PLATFORMS) {
+                if (platforms[tid-16000].active && platforms[tid-16000].q1 == pq1 && platforms[tid-16000].q2 == pq2 && platforms[tid-16000].q3 == pq3) valid = true;
+            } else if (tid >= 17000 && tid < 17000+MAX_RIFTS) {
+                if (rifts[tid-17000].active && rifts[tid-17000].q1 == pq1 && rifts[tid-17000].q2 == pq2 && rifts[tid-17000].q3 == pq3) valid = true;
+            } else if (tid >= 18000 && tid < 18000+MAX_MONSTERS) {
+                if (monsters[tid-18000].active && monsters[tid-18000].q1 == pq1 && monsters[tid-18000].q2 == pq2 && monsters[tid-18000].q3 == pq3) valid = true;
             }
 
             if (!valid) {
@@ -783,8 +803,12 @@ void update_game_logic() {
                 int pq1 = players[i].state.q1, pq2 = players[i].state.q2, pq3 = players[i].state.q3;
                 if (tid <= 32 && players[tid-1].active && players[tid-1].state.q1 == pq1 && players[tid-1].state.q2 == pq2 && players[tid-1].state.q3 == pq3) {
                     target_x = players[tid-1].state.s1; target_y = players[tid-1].state.s2; target_z = players[tid-1].state.s3;
-                } else if (tid >= 100 && tid < 100+MAX_NPC && npcs[tid-100].active && npcs[tid-100].q1 == pq1 && npcs[tid-100].q2 == pq2 && npcs[tid-100].q3 == pq3) {
-                    target_x = npcs[tid-100].x; target_y = npcs[tid-100].y; target_z = npcs[tid-100].z;
+                } else if (tid >= 1000 && tid < 1000+MAX_NPC && npcs[tid-1000].active && npcs[tid-1000].q1 == pq1 && npcs[tid-1000].q2 == pq2 && npcs[tid-1000].q3 == pq3) {
+                    target_x = npcs[tid-1000].x; target_y = npcs[tid-1000].y; target_z = npcs[tid-1000].z;
+                } else if (tid >= 16000 && tid < 16000+MAX_PLATFORMS && platforms[tid-16000].active && platforms[tid-16000].q1 == pq1 && platforms[tid-16000].q2 == pq2 && platforms[tid-16000].q3 == pq3) {
+                    target_x = platforms[tid-16000].x; target_y = platforms[tid-16000].y; target_z = platforms[tid-16000].z;
+                } else if (tid >= 18000 && tid < 18000+MAX_MONSTERS && monsters[tid-18000].active && monsters[tid-18000].q1 == pq1 && monsters[tid-18000].q2 == pq2 && monsters[tid-18000].q3 == pq3) {
+                    target_x = monsters[tid-18000].x; target_y = monsters[tid-18000].y; target_z = monsters[tid-18000].z;
                 }
                 if (target_x != -1) {
                     double dx = target_x - players[i].tx, dy = target_y - players[i].ty, dz = target_z - players[i].tz;
@@ -823,6 +847,16 @@ void update_game_logic() {
                 NPCShip *npc = lq->npcs[n];
                 double d = sqrt(pow(players[i].tx - npc->x, 2) + pow(players[i].ty - npc->y, 2) + pow(players[i].tz - npc->z, 2));
                 if (d < 0.5) { npc->energy -= 75000; if(npc->energy <= 0) { npc->active = 0; players[i].state.boom = (NetPoint){(float)npc->x, (float)npc->y, (float)npc->z, 1}; } hit = true; break; }
+            }
+            if (!hit) for (int pt=0; pt<lq->platform_count; pt++) {
+                NPCPlatform *plat = lq->platforms[pt];
+                double d = sqrt(pow(players[i].tx - plat->x, 2) + pow(players[i].ty - plat->y, 2) + pow(players[i].tz - plat->z, 2));
+                if (d < 0.5) { plat->energy -= 50000; if(plat->energy <= 0) { plat->active = 0; players[i].state.boom = (NetPoint){(float)plat->x, (float)plat->y, (float)plat->z, 1}; } hit = true; break; }
+            }
+            if (!hit) for (int mo=0; mo<lq->monster_count; mo++) {
+                NPCMonster *mon = lq->monsters[mo];
+                double d = sqrt(pow(players[i].tx - mon->x, 2) + pow(players[i].ty - mon->y, 2) + pow(players[i].tz - mon->z, 2));
+                if (d < 0.5) { mon->energy -= 100000; if(mon->energy <= 0) { mon->active = 0; players[i].state.boom = (NetPoint){(float)mon->x, (float)mon->y, (float)mon->z, 1}; } hit = true; break; }
             }
             if (hit || players[i].tx<0||players[i].tx>10||players[i].ty<0||players[i].ty>10||players[i].tz<0||players[i].tz>10) {
                 if (hit) { players[i].state.boom = (NetPoint){(float)players[i].tx, (float)players[i].ty, (float)players[i].tz, 1}; send_server_msg(i, "TACTICAL", "Torpedo impact confirmed."); }
@@ -864,18 +898,18 @@ void update_game_logic() {
             for(int n=0; n<lq->npc_count && o_idx < MAX_NET_OBJECTS; n++) {
                 NPCShip *npc = lq->npcs[n]; if(!npc->active) continue;
                 int max_e = (npc->faction==FACTION_BORG)?100000:50000;
-                upd.objects[o_idx] = (NetObject){(float)npc->x,(float)npc->y,(float)npc->z,0,0,npc->faction,0,1,(int)((npc->energy/(float)max_e)*100),npc->id+100,""};
+                upd.objects[o_idx] = (NetObject){(float)npc->x,(float)npc->y,(float)npc->z,0,0,npc->faction,0,1,(int)((npc->energy/(float)max_e)*100),npc->id+1000,""};
                 strncpy(upd.objects[o_idx++].name, get_species_name(npc->faction), 63);
             }
-            for(int p=0; p<lq->planet_count && o_idx < MAX_NET_OBJECTS; p++) if(lq->planets[p]->active) upd.objects[o_idx++] = (NetObject){(float)lq->planets[p]->x,(float)lq->planets[p]->y,(float)lq->planets[p]->z,0,0,5,lq->planets[p]->resource_type,1,100,lq->planets[p]->id+1000,"Planet"};
-            for(int s=0; s<lq->star_count && o_idx < MAX_NET_OBJECTS; s++) if(lq->stars[s]->active) upd.objects[o_idx++] = (NetObject){(float)lq->stars[s]->x,(float)lq->stars[s]->y,(float)lq->stars[s]->z,0,0,4,lq->stars[s]->id % 7,1,100,lq->stars[s]->id+2000,"Star"};
-            for(int h=0; h<lq->bh_count && o_idx < MAX_NET_OBJECTS; h++) if(lq->black_holes[h]->active) upd.objects[o_idx++] = (NetObject){(float)lq->black_holes[h]->x,(float)lq->black_holes[h]->y,(float)lq->black_holes[h]->z,0,0,6,0,1,100,lq->black_holes[h]->id+3000,"Black Hole"};
-            for(int b=0; b<lq->base_count && o_idx < MAX_NET_OBJECTS; b++) if(lq->bases[b]->active) upd.objects[o_idx++] = (NetObject){(float)lq->bases[b]->x,(float)lq->bases[b]->y,(float)lq->bases[b]->z,0,0,3,0,1,100,lq->bases[b]->id+500,"Starbase"};
-            for(int n=0; n<lq->nebula_count && o_idx < MAX_NET_OBJECTS; n++) upd.objects[o_idx++] = (NetObject){(float)lq->nebulas[n]->x,(float)lq->nebulas[n]->y,(float)lq->nebulas[n]->z,0,0,7,lq->nebulas[n]->id % 5,1,100,lq->nebulas[n]->id+4000,"Nebula"};
-            for(int p=0; p<lq->pulsar_count && o_idx < MAX_NET_OBJECTS; p++) upd.objects[o_idx++] = (NetObject){(float)lq->pulsars[p]->x,(float)lq->pulsars[p]->y,(float)lq->pulsars[p]->z,0,0,8,0,1,100,lq->pulsars[p]->id+5000,"Pulsar"};
-            for(int c=0; c<lq->comet_count && o_idx < MAX_NET_OBJECTS; c++) upd.objects[o_idx++] = (NetObject){(float)lq->comets[c]->x,(float)lq->comets[c]->y,(float)lq->comets[c]->z,0,0,9,0,1,100,lq->comets[c]->id+6000,"Comet"};
-            for(int a=0; a<lq->asteroid_count && o_idx < MAX_NET_OBJECTS; a++) upd.objects[o_idx++] = (NetObject){(float)lq->asteroids[a]->x,(float)lq->asteroids[a]->y,(float)lq->asteroids[a]->z,0,0,21,0,1,100,lq->asteroids[a]->id+8000,"Asteroid"};
-            for(int d=0; d<lq->derelict_count && o_idx < MAX_NET_OBJECTS; d++) upd.objects[o_idx++] = (NetObject){(float)lq->derelicts[d]->x,(float)lq->derelicts[d]->y,(float)lq->derelicts[d]->z,0,0,22,lq->derelicts[d]->ship_class,1,30,lq->derelicts[d]->id+7000,"Derelict"};
+            for(int p=0; p<lq->planet_count && o_idx < MAX_NET_OBJECTS; p++) if(lq->planets[p]->active) upd.objects[o_idx++] = (NetObject){(float)lq->planets[p]->x,(float)lq->planets[p]->y,(float)lq->planets[p]->z,0,0,5,lq->planets[p]->resource_type,1,100,lq->planets[p]->id+3000,"Planet"};
+            for(int s=0; s<lq->star_count && o_idx < MAX_NET_OBJECTS; s++) if(lq->stars[s]->active) upd.objects[o_idx++] = (NetObject){(float)lq->stars[s]->x,(float)lq->stars[s]->y,(float)lq->stars[s]->z,0,0,4,lq->stars[s]->id % 7,1,100,lq->stars[s]->id+4000,"Star"};
+            for(int h=0; h<lq->bh_count && o_idx < MAX_NET_OBJECTS; h++) if(lq->black_holes[h]->active) upd.objects[o_idx++] = (NetObject){(float)lq->black_holes[h]->x,(float)lq->black_holes[h]->y,(float)lq->black_holes[h]->z,0,0,6,0,1,100,lq->black_holes[h]->id+7000,"Black Hole"};
+            for(int b=0; b<lq->base_count && o_idx < MAX_NET_OBJECTS; b++) if(lq->bases[b]->active) upd.objects[o_idx++] = (NetObject){(float)lq->bases[b]->x,(float)lq->bases[b]->y,(float)lq->bases[b]->z,0,0,3,0,1,100,lq->bases[b]->id+2000,"Starbase"};
+            for(int n=0; n<lq->nebula_count && o_idx < MAX_NET_OBJECTS; n++) upd.objects[o_idx++] = (NetObject){(float)lq->nebulas[n]->x,(float)lq->nebulas[n]->y,(float)lq->nebulas[n]->z,0,0,7,lq->nebulas[n]->id % 5,1,100,lq->nebulas[n]->id+8000,"Nebula"};
+            for(int p=0; p<lq->pulsar_count && o_idx < MAX_NET_OBJECTS; p++) upd.objects[o_idx++] = (NetObject){(float)lq->pulsars[p]->x,(float)lq->pulsars[p]->y,(float)lq->pulsars[p]->z,0,0,8,0,1,100,lq->pulsars[p]->id+9000,"Pulsar"};
+            for(int c=0; c<lq->comet_count && o_idx < MAX_NET_OBJECTS; c++) upd.objects[o_idx++] = (NetObject){(float)lq->comets[c]->x,(float)lq->comets[c]->y,(float)lq->comets[c]->z,0,0,9,0,1,100,lq->comets[c]->id+10000,"Comet"};
+            for(int a=0; a<lq->asteroid_count && o_idx < MAX_NET_OBJECTS; a++) upd.objects[o_idx++] = (NetObject){(float)lq->asteroids[a]->x,(float)lq->asteroids[a]->y,(float)lq->asteroids[a]->z,0,0,21,0,1,100,lq->asteroids[a]->id+12000,"Asteroid"};
+            for(int d=0; d<lq->derelict_count && o_idx < MAX_NET_OBJECTS; d++) upd.objects[o_idx++] = (NetObject){(float)lq->derelicts[d]->x,(float)lq->derelicts[d]->y,(float)lq->derelicts[d]->z,0,0,22,lq->derelicts[d]->ship_class,1,30,lq->derelicts[d]->id+11000,"Derelict"};
             for(int m=0; m<lq->mine_count && o_idx < MAX_NET_OBJECTS; m++) {
                 double dx = lq->mines[m]->x - players[i].state.s1;
                 double dy = lq->mines[m]->y - players[i].state.s2;
@@ -883,21 +917,21 @@ void update_game_logic() {
                 double dist = sqrt(dx*dx + dy*dy + dz*dz);
                 /* Mines are only visible if very close (Tactical warning) */
                 if (dist < 1.5) {
-                    upd.objects[o_idx++] = (NetObject){(float)lq->mines[m]->x,(float)lq->mines[m]->y,(float)lq->mines[m]->z,0,0,23,0,1,100,lq->mines[m]->id+9000,"Cloaked Mine"};
+                    upd.objects[o_idx++] = (NetObject){(float)lq->mines[m]->x,(float)lq->mines[m]->y,(float)lq->mines[m]->z,0,0,23,0,1,100,lq->mines[m]->id+14000,"Cloaked Mine"};
                 }
             }
             for(int b_idx=0; b_idx<lq->buoy_count && o_idx < MAX_NET_OBJECTS; b_idx++) {
-                upd.objects[o_idx++] = (NetObject){(float)lq->buoys[b_idx]->x,(float)lq->buoys[b_idx]->y,(float)lq->buoys[b_idx]->z,0,0,24,0,1,100,lq->buoys[b_idx]->id+10000,"Comm Buoy"};
+                upd.objects[o_idx++] = (NetObject){(float)lq->buoys[b_idx]->x,(float)lq->buoys[b_idx]->y,(float)lq->buoys[b_idx]->z,0,0,24,0,1,100,lq->buoys[b_idx]->id+15000,"Comm Buoy"};
             }
             for(int pt=0; pt<lq->platform_count && o_idx < MAX_NET_OBJECTS; pt++) {
-                upd.objects[o_idx++] = (NetObject){(float)lq->platforms[pt]->x,(float)lq->platforms[pt]->y,(float)lq->platforms[pt]->z,0,0,25,0,1,(int)((lq->platforms[pt]->energy/10000.0)*100),lq->platforms[pt]->id+11000,"Defense Platform"};
+                upd.objects[o_idx++] = (NetObject){(float)lq->platforms[pt]->x,(float)lq->platforms[pt]->y,(float)lq->platforms[pt]->z,0,0,25,0,1,(int)((lq->platforms[pt]->energy/10000.0)*100),lq->platforms[pt]->id+16000,"Defense Platform"};
             }
             for(int rf=0; rf<lq->rift_count && o_idx < MAX_NET_OBJECTS; rf++) {
-                upd.objects[o_idx++] = (NetObject){(float)lq->rifts[rf]->x,(float)lq->rifts[rf]->y,(float)lq->rifts[rf]->z,0,0,26,0,1,100,lq->rifts[rf]->id+12000,"Spatial Rift"};
+                upd.objects[o_idx++] = (NetObject){(float)lq->rifts[rf]->x,(float)lq->rifts[rf]->y,(float)lq->rifts[rf]->z,0,0,26,0,1,100,lq->rifts[rf]->id+17000,"Spatial Rift"};
             }
             for(int mo=0; mo<lq->monster_count && o_idx < MAX_NET_OBJECTS; mo++) {
                 NetObject *no = &upd.objects[o_idx++];
-                *no = (NetObject){(float)lq->monsters[mo]->x,(float)lq->monsters[mo]->y,(float)lq->monsters[mo]->z,0,0,lq->monsters[mo]->type,0,1,100,lq->monsters[mo]->id+13000,""};
+                *no = (NetObject){(float)lq->monsters[mo]->x,(float)lq->monsters[mo]->y,(float)lq->monsters[mo]->z,0,0,lq->monsters[mo]->type,0,1,100,lq->monsters[mo]->id+18000,""};
                 strncpy(no->name, (lq->monsters[mo]->type==30)?"Crystalline Entity":"Space Amoeba", 63);
             }
         }

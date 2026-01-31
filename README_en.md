@@ -223,6 +223,44 @@ Below is the complete list of available commands, grouped by function.
     *   If `lock` active: Automatic guidance (just type `tor`).
     *   Without lock: Manual ballistic trajectory.
 *   `lock <ID>`: **Target Lock**. Locks targeting systems on target ID (0 to unlock).
+
+### 🆔 Galactic Identifier Schema (Universal ID)
+To interact with galactic objects using the `lock`, `scan`, `pha`, `tor`, `bor`, and `dis` commands, the system employs a unique ID system. Use the `srs` command to identify the IDs of objects in your sector.
+
+| Category | ID Range | Example | Primary Usage |
+| :--- | :--- | :--- | :--- |
+| **Player** | 1 - 999 | `lock 1` | Your vessel or other players |
+| **NPC (Enemy)** | 1,000 - 1,999 | `lock 1050` | Chasing (`cha`) and combat |
+| **Starbases** | 2,000 - 2,999 | `lock 2005` | Docking (`doc`) and resupply |
+| **Planets** | 3,000 - 3,999 | `lock 3012` | Planetary mining (`min`) |
+| **Stars** | 4,000 - 6,999 | `lock 4500` | Solar scooping (`sco`) |
+| **Black Holes** | 7,000 - 7,999 | `lock 7001` | Antimatter harvest (`har`) |
+| **Nebulas** | 8,000 - 8,999 | `lock 8000` | Scientific analysis and cover |
+| **Pulsars** | 9,000 - 9.999 | `lock 9000` | Radiation monitoring |
+| **Comets** | 10,000 - 10,999| `lock 10001` | Chasing and rare gas collection |
+| **Derelicts** | 11,000 - 11,999| `lock 11005` | Boarding (`bor`) and tech recovery |
+| **Asteroids** | 12,000 - 13,999| `lock 12000` | Precision navigation |
+| **Mines** | 14,000 - 14,999| `lock 14000` | Tactical alert and avoidance |
+| **Comm Buoys** | 15,000 - 15,999| `lock 15000` | Data link and `lrs` boost |
+| **Platforms** | 16,000 - 16,999| `lock 16000` | Destroying hostile sentinels |
+| **Spatial Rifts** | 17,000 - 17,999| `lock 17000` | Use for random jumps |
+| **Monsters** | 18,000 - 18,999| `lock 18000` | Extreme combat scenarios |
+
+**Note**: Locking only works if the object is in your current quadrant. If the ID exists but is far away, the computer will indicate the target's `Q[x,y,z]` coordinates.
+
+### 🔄 Recommended Tactical Workflow
+To perform complex operations (mining, resupply, boarding), follow this optimized sequence:
+
+1.  **Identification**: Use `srs` to find the object ID (e.g., Star ID `4226`).
+2.  **Lock-on**: Execute `lock 4226`. You will see the ID confirmed on your 3D HUD.
+3.  **Approach**: Use `apr 4226 1.5`. The autopilot will bring you to the ideal interaction distance.
+4.  **Interaction**: Once you arrive, launch the specific command:
+    *   `sco` for **Stars** (Energy recharge).
+    *   `min` for **Planets** (Mineral mining).
+    *   `har` for **Black Holes** (Antimatter harvest).
+    *   `bor` for **Derelicts** (Tech recovery and repairs).
+    *   `cha` for **Comets** (Chase and gas collection).
+    *   `pha` / `tor` for **Enemies/Monsters/Platforms** (Combat).
 *   `she <F> <R> <T> <B> <L> <RI>`: **Shield Configuration**. Distributes energy to the 6 shields.
 *   `clo`: **Cloaking Device**. Activates/Deactivates cloak (consumes energy).
 *   `pow <E> <S> <W>`: **Power Distribution**. Allocates reactor energy (Engines, Shields, Weapons %).
