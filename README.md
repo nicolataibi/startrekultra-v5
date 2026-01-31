@@ -261,6 +261,25 @@ Per eseguire operazioni complesse (estrazione, rifornimento, abbordaggio), segui
     *   `bor` per i **Relitti** (Recupero materiali e riparazioni).
     *   `cha` per le **Comete** (Inseguimento e raccolta gas).
     *   `pha` / `tor` per **Nemici/Mostri/Piattaforme** (Combattimento).
+
+### 📏 Tabella Distanze di Interazione
+Distanze espresse in unità di settore (0.0 - 10.0). Se la distanza è superiore al limite, il computer risponderà "No [oggetto] in range".
+
+| Oggetto / Entità | Comando / Azione | Distanza Minima | Effetto / Interazione |
+| :--- | :--- | :--- | :--- |
+| **Stella** | `sco` | **< 2.0** | Ricarica energia solare (Solar Scooping) |
+| **Pianeta** | `min` | **< 2.0** | Estrazione risorse minerarie |
+| **Base Stellare** | `doc` | **< 2.0** | Riparazione completa, ricarica energia e siluri |
+| **Buco Nero** | `har` | **< 2.0** | Raccolta antimateria (Harvesting) |
+| **Relitto** | `dis` | **< 1.5** | Smantellamento per recuperare componenti e risorse |
+| **Nave Nemica** | `bor` | **< 1.0** | Operazione di abbordaggio (Boarding Party) |
+| **Nave Nemica** | `pha` (Fuoco) | **< 6.0** | Gittata massima efficace dei phaser NPC |
+| **Siluro Photon** | (Impatto) | **< 0.5** | Distanza di collisione per l'esplosione |
+| **Boa Com.** | (Passivo) | **< 1.2** | Boost segnale o messaggi automatici |
+| **Mostro (Amoeba)** | (Contatto) | **< 1.5** | Inizio drenaggio energetico critico |
+| **Crystalline E.** | (Risonanza) | **< 4.0** | Gittata del raggio a risonanza cristallina |
+| **Corpi Celesti** | (Collisione) | **< 1.0** | Danno strutturale e attivazione soccorso d'emergenza |
+
 *   `she <F> <R> <T> <B> <L> <RI>`: **Shield Configuration**. Distribuisce energia ai 6 scudi.
 *   `clo`: **Cloaking Device**. Attiva/Disattiva occultamento (consuma energia).
 *   `pow <E> <S> <W>`: **Power Distribution**. Ripartisce energia reattore (Motori, Scudi, Armi %).

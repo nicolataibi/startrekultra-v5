@@ -1261,7 +1261,7 @@ void handle_sco(int i, const char *params) {
     bool near=false; for(int s=0; s<MAX_STARS; s++) if(stars_data[s].active && stars_data[s].q1==players[i].state.q1 && stars_data[s].q2==players[i].state.q2 && stars_data[s].q3==players[i].state.q3) {
         double d=sqrt(pow(stars_data[s].x-players[i].state.s1,2)+pow(stars_data[s].y-players[i].state.s2,2)+pow(stars_data[s].z-players[i].state.s3,2)); if(d<2.0) { near=true; break; }
     }
-    if(near) { players[i].state.cargo_energy += 5000; if(players[i].state.cargo_energy > 100000) players[i].state.cargo_energy = 100000; int s_idx = rand()%6; players[i].state.shields[s_idx] -= 500; if(players[i].state.shields[s_idx]<0) players[i].state.shields[s_idx]=0; send_server_msg(i, "ENGINEERING", "Solar energy stored."); } 
+    if(near) { players[i].state.cargo_energy += 5000; if(players[i].state.cargo_energy > 1000000) players[i].state.cargo_energy = 1000000; int s_idx = rand()%6; players[i].state.shields[s_idx] -= 500; if(players[i].state.shields[s_idx]<0) players[i].state.shields[s_idx]=0; send_server_msg(i, "ENGINEERING", "Solar energy stored."); } 
     else send_server_msg(i, "COMPUTER", "No star in range.");
 }
 
@@ -1269,7 +1269,7 @@ void handle_har(int i, const char *params) {
     bool near=false; for(int h=0; h<MAX_BH; h++) if(black_holes[h].active && black_holes[h].q1==players[i].state.q1 && black_holes[h].q2==players[i].state.q2 && black_holes[h].q3==players[i].state.q3) {
         double d=sqrt(pow(black_holes[h].x-players[i].state.s1,2)+pow(black_holes[h].y-players[i].state.s2,2)+pow(black_holes[h].z-players[i].state.s3,2)); if(d<2.0) { near=true; break; }
     }
-    if(near) { players[i].state.cargo_energy += 10000; if(players[i].state.cargo_energy > 100000) players[i].state.cargo_energy = 100000; players[i].state.inventory[1] += 100; int s_idx = rand()%6; players[i].state.shields[s_idx] -= 1000; if(players[i].state.shields[s_idx]<0) players[i].state.shields[s_idx]=0; send_server_msg(i, "ENGINEERING", "Antimatter stored."); } 
+    if(near) { players[i].state.cargo_energy += 10000; if(players[i].state.cargo_energy > 1000000) players[i].state.cargo_energy = 1000000; players[i].state.inventory[1] += 100; int s_idx = rand()%6; players[i].state.shields[s_idx] -= 1000; if(players[i].state.shields[s_idx]<0) players[i].state.shields[s_idx]=0; send_server_msg(i, "ENGINEERING", "Antimatter stored."); } 
     else send_server_msg(i, "COMPUTER", "No black hole in range.");
 }
 
@@ -1277,7 +1277,14 @@ void handle_doc(int i, const char *params) {
     bool near=false; for(int b=0; b<MAX_BASES; b++) if(bases[b].active && bases[b].q1==players[i].state.q1 && bases[b].q2==players[i].state.q2 && bases[b].q3==players[i].state.q3) {
         double d=sqrt(pow(bases[b].x-players[i].state.s1,2)+pow(bases[b].y-players[i].state.s2,2)+pow(bases[b].z-players[i].state.s3,2)); if(d<2.0) { near=true; break; } 
     }
-    if(near) { players[i].state.energy=100000; players[i].state.torpedoes=100; for(int s=0;s<8;s++) players[i].state.system_health[s]=100.0f; send_server_msg(i, "STARBASE", "Docking complete."); } 
+    if(near) { 
+        players[i].state.energy=1000000; 
+        players[i].state.torpedoes=1000; 
+        players[i].state.cargo_energy=1000000;
+        players[i].state.cargo_torpedoes=1000;
+        for(int s=0;s<8;s++) players[i].state.system_health[s]=100.0f; 
+        send_server_msg(i, "STARBASE", "Docking complete. Reactor and Cargo Bay replenished."); 
+    } 
     else send_server_msg(i,"COMPUTER","No starbase in range.");
 }
 
@@ -1290,8 +1297,8 @@ void handle_con(int i, const char *params) {
         else if(t==3) { players[i].state.cargo_torpedoes+=a/20; } 
         else if(t==6) { players[i].state.cargo_energy+=a*5; }
         
-        if(players[i].state.cargo_energy>100000) players[i].state.cargo_energy=100000; 
-        if(players[i].state.cargo_torpedoes>100) players[i].state.cargo_torpedoes=100;
+        if(players[i].state.cargo_energy>1000000) players[i].state.cargo_energy=1000000; 
+        if(players[i].state.cargo_torpedoes>1000) players[i].state.cargo_torpedoes=1000;
         
         send_server_msg(i,"ENGINEERING","Assets stored in Cargo Bay.");
     }
@@ -1299,8 +1306,8 @@ void handle_con(int i, const char *params) {
 
 void handle_load(int i, const char *params) {
     int type, amount; if (sscanf(params, "%d %d", &type, &amount) == 2) {
-        if (type == 1) { if(amount>players[i].state.cargo_energy) amount=players[i].state.cargo_energy; players[i].state.cargo_energy-=amount; players[i].state.energy+=amount; if(players[i].state.energy>100000) players[i].state.energy=100000; send_server_msg(i,"ENGINEERING","Energy loaded."); }
-        else if (type == 2) { if(amount>players[i].state.cargo_torpedoes) amount=players[i].state.cargo_torpedoes; players[i].state.cargo_torpedoes-=amount; players[i].state.torpedoes+=amount; if(players[i].state.torpedoes>100) players[i].state.torpedoes=100; send_server_msg(i,"TACTICAL","Torps loaded."); }
+        if (type == 1) { if(amount>players[i].state.cargo_energy) amount=players[i].state.cargo_energy; players[i].state.cargo_energy-=amount; players[i].state.energy+=amount; if(players[i].state.energy>1000000) players[i].state.energy=1000000; send_server_msg(i,"ENGINEERING","Energy loaded."); }
+        else if (type == 2) { if(amount>players[i].state.cargo_torpedoes) amount=players[i].state.cargo_torpedoes; players[i].state.cargo_torpedoes-=amount; players[i].state.torpedoes+=amount; if(players[i].state.torpedoes>1000) players[i].state.torpedoes=1000; send_server_msg(i,"TACTICAL","Torps loaded."); }
     }
 }
 
@@ -1374,8 +1381,8 @@ void handle_sta(int i, const char *params) {
     snprintf(b+strlen(b), sizeof(b)-strlen(b), " HEADING:  %03.0f\302\260        MARK:   %+03.0f\302\260\n", players[i].state.ent_h, players[i].state.ent_m);
     snprintf(b+strlen(b), sizeof(b)-strlen(b), " NAV MODE: %s\n", (players[i].nav_state == NAV_STATE_CHASE) ? B_RED "[ CHASE ACTIVE ]" RESET : "[ NORMAL ]");
     strcat(b, BLUE "\n[ POWER AND REACTOR STATUS ]\n" RESET);
-    float en_pct = (players[i].state.energy / 100000.0f) * 100.0f; char en_bar[21]; int en_fills = (int)(en_pct / 5); for(int j=0; j<20; j++) en_bar[j] = (j < en_fills) ? '|' : '-'; en_bar[20] = '\0';
-    snprintf(b+strlen(b), sizeof(b)-strlen(b), " MAIN REACTOR: [%s] %d / 100000 (%.1f%%)\n ALLOCATION:   ENGINES: %.0f%%  SHIELDS: %.0f%%  WEAPONS: %.0f%%\n", en_bar, players[i].state.energy, en_pct, players[i].state.power_dist[0]*100, players[i].state.power_dist[1]*100, players[i].state.power_dist[2]*100);
+    float en_pct = (players[i].state.energy / 1000000.0f) * 100.0f; char en_bar[21]; int en_fills = (int)(en_pct / 5); for(int j=0; j<20; j++) en_bar[j] = (j < en_fills) ? '|' : '-'; en_bar[20] = '\0';
+    snprintf(b+strlen(b), sizeof(b)-strlen(b), " MAIN REACTOR: [%s] %d / 1000000 (%.1f%%)\n ALLOCATION:   ENGINES: %.0f%%  SHIELDS: %.0f%%  WEAPONS: %.0f%%\n", en_bar, players[i].state.energy, en_pct, players[i].state.power_dist[0]*100, players[i].state.power_dist[1]*100, players[i].state.power_dist[2]*100);
     strcat(b, YELLOW "[ CARGO BAY - LOGISTICS ]\n" RESET);
     snprintf(b+strlen(b), sizeof(b)-strlen(b), " STORED ENERGY: %-6d  STORED TORPS: %-3d\n", players[i].state.cargo_energy, players[i].state.cargo_torpedoes);
     strcat(b, YELLOW "[ STORED MINERALS & RESOURCES ]\n" RESET);

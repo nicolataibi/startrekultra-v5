@@ -261,6 +261,25 @@ To perform complex operations (mining, resupply, boarding), follow this optimize
     *   `bor` for **Derelicts** (Tech recovery and repairs).
     *   `cha` for **Comets** (Chase and gas collection).
     *   `pha` / `tor` for **Enemies/Monsters/Platforms** (Combat).
+
+### 📏 Interaction Distances Table
+Distances expressed in sector units (0.0 - 10.0). If your distance is greater than the limit, the computer will respond with "No [object] in range".
+
+| Object / Entity | Command / Action | Minimum Distance | Effect / Interaction |
+| :--- | :--- | :--- | :--- |
+| **Star** | `sco` | **< 2.0** | Solar scooping (energy recharge) |
+| **Planet** | `min` | **< 2.0** | Planetary mining |
+| **Starbase** | `doc` | **< 2.0** | Full repair, energy and torpedo refill |
+| **Black Hole** | `har` | **< 2.0** | Antimatter harvesting |
+| **Derelict** | `dis` | **< 1.5** | Dismantling for resources |
+| **Enemy Ship** | `bor` | **< 1.0** | Boarding party operation |
+| **Enemy Ship** | `pha` (Fire) | **< 6.0** | Maximum NPC phaser range |
+| **Photon Torpedo** | (Impact) | **< 0.5** | Collision distance for detonation |
+| **Comm Buoy** | (Passive) | **< 1.2** | Signal boost or auto-messages |
+| **Space Amoeba** | (Contact) | **< 1.5** | Critical energy drain start |
+| **Crystalline E.** | (Resonance) | **< 4.0** | Range of the resonance beam |
+| **Celestial Body** | (Collision) | **< 1.0** | Hull damage and emergency rescue trigger |
+
 *   `she <F> <R> <T> <B> <L> <RI>`: **Shield Configuration**. Distributes energy to the 6 shields.
 *   `clo`: **Cloaking Device**. Activates/Deactivates cloak (consumes energy).
 *   `pow <E> <S> <W>`: **Power Distribution**. Allocates reactor energy (Engines, Shields, Weapons %).

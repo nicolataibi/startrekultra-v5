@@ -66,9 +66,9 @@ void update_npc_ai(int n) {
             players[closest_p].state.beams[0] = (NetBeam){(float)npcs[n].x, (float)npcs[n].y, (float)npcs[n].z, 1};
             
             /* Damage Calculation */
-            int dmg = 100;
-            if (npcs[n].faction == FACTION_BORG) dmg = 500;
-            else if (npcs[n].faction == FACTION_KLINGON) dmg = 250;
+            int dmg = 10;
+            if (npcs[n].faction == FACTION_BORG) dmg = 50;
+            else if (npcs[n].faction == FACTION_KLINGON) dmg = 25;
             
             players[closest_p].state.energy -= dmg;
             npcs[n].fire_cooldown = (npcs[n].faction == FACTION_BORG) ? 100 : 150;
@@ -147,7 +147,7 @@ void update_game_logic() {
                     /* Fire! */
                     p->state.beam_count = 1;
                     p->state.beams[0] = (NetBeam){(float)platforms[pt].x, (float)platforms[pt].y, (float)platforms[pt].z, 1};
-                    p->state.energy -= 1000; /* Heavy damage */
+                    p->state.energy -= 100; /* Heavy damage */
                     platforms[pt].fire_cooldown = 100; /* ~3.3 seconds */
                     break;
                 }
@@ -287,13 +287,13 @@ void update_game_logic() {
                 if (min_d < 4.0 && global_tick % 60 == 0) {
                     target->state.beam_count = 1;
                     target->state.beams[0] = (NetBeam){(float)monsters[mo].x, (float)monsters[mo].y, (float)monsters[mo].z, 30};
-                    target->state.energy -= 5000;
+                    target->state.energy -= 500;
                     send_server_msg((int)(target-players), "SCIENCE", "CRYSTALLINE RESONANCE DETECTED! SHIELDS BUCKLING!");
                 }
             }
         } else if (monsters[mo].type == 31) { /* Space Amoeba */
             if (target && min_d < 1.5) {
-                target->state.energy -= 2000;
+                target->state.energy -= 200;
                 if (global_tick % 30 == 0) send_server_msg((int)(target-players), "WARNING", "SPACE AMOEBA ADHERING TO HULL! ENERGY DRAIN CRITICAL!");
             }
         }
@@ -886,13 +886,13 @@ void update_game_logic() {
         upd.lock_target = players[i].state.lock_target;
         upd.is_cloaked = players[i].state.is_cloaked;
         int o_idx = 0;
-        upd.objects[o_idx] = (NetObject){(float)players[i].state.s1,(float)players[i].state.s2,(float)players[i].state.s3,(float)players[i].state.ent_h,(float)players[i].state.ent_m,1,players[i].ship_class,1,(int)((players[i].state.energy/100000.0)*100),i+1,""};
+        upd.objects[o_idx] = (NetObject){(float)players[i].state.s1,(float)players[i].state.s2,(float)players[i].state.s3,(float)players[i].state.ent_h,(float)players[i].state.ent_m,1,players[i].ship_class,1,(int)((players[i].state.energy/1000000.0)*100),i+1,""};
         strncpy(upd.objects[o_idx++].name, players[i].name, 63);
         if (IS_Q_VALID(upd.q1, upd.q2, upd.q3)) {
             QuadrantIndex *lq = &spatial_index[upd.q1][upd.q2][upd.q3];
             for(int j=0; j<lq->player_count; j++) {
                 ConnectedPlayer *p = lq->players[j]; if (p == &players[i] || !p->active || o_idx >= MAX_NET_OBJECTS) continue;
-                upd.objects[o_idx] = (NetObject){(float)p->state.s1,(float)p->state.s2,(float)p->state.s3,(float)p->state.ent_h,(float)p->state.ent_m,1,p->ship_class,1,(int)((p->state.energy/100000.0)*100),(int)(p-players)+1,""};
+                upd.objects[o_idx] = (NetObject){(float)p->state.s1,(float)p->state.s2,(float)p->state.s3,(float)p->state.ent_h,(float)p->state.ent_m,1,p->ship_class,1,(int)((p->state.energy/1000000.0)*100),(int)(p-players)+1,""};
                 strncpy(upd.objects[o_idx++].name, p->name, 63);
             }
             for(int n=0; n<lq->npc_count && o_idx < MAX_NET_OBJECTS; n++) {

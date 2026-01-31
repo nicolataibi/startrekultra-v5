@@ -2024,7 +2024,7 @@ void display() {
 
         /* 2. Vital Resources */
         glColor3f(1.0f, 1.0f, 1.0f);
-        sprintf(buf, "ENERGY: %-6d (CARGO: %-6d) | TORPS: %-2d (CARGO: %-3d)", g_energy, g_cargo_energy, g_torpedoes_launcher, g_cargo_torps);
+        sprintf(buf, "ENERGY: %-7d (CARGO: %-7d) | TORPS: %-4d (CARGO: %-4d)", g_energy, g_cargo_energy, g_torpedoes_launcher, g_cargo_torps);
         drawText3D(x_off, y_pos, 0, buf); y_pos -= 18;
         sprintf(buf, "CREW:   %-4d   SHIELDS AVG: %-3d%%      | LOCK:  ", g_crew, g_shields);
         drawText3D(x_off, y_pos, 0, buf);

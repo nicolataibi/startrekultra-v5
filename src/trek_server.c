@@ -131,7 +131,7 @@ int main(int argc, char *argv[]) {
                                 int is_new = (players[slot].name[0] == '\0');
                                 if (is_new) {
                                     strcpy(players[slot].name, pkt.name); players[slot].faction = pkt.faction; players[slot].ship_class = pkt.ship_class;
-                                    players[slot].state.energy = 100000; players[slot].state.torpedoes = 100;
+                                    players[slot].state.energy = 1000000; players[slot].state.torpedoes = 1000;
                                     int crew = 400;
                                     switch(pkt.ship_class) {
                                         case SHIP_CLASS_GALAXY:    crew = 1012; break;
@@ -187,7 +187,7 @@ int main(int argc, char *argv[]) {
                                     if (needs_rescue) {
                                         players[slot].state.q1 = rand()%10 + 1; players[slot].state.q2 = rand()%10 + 1; players[slot].state.q3 = rand()%10 + 1;
                                         players[slot].state.s1 = 5.0; players[slot].state.s2 = 5.0; players[slot].state.s3 = 5.0;
-                                        players[slot].state.energy = 50000;
+                                        players[slot].state.energy = 500000;
                                         if (players[slot].state.crew_count <= 0) players[slot].state.crew_count = 100;
                                         for(int s=0; s<8; s++) players[slot].state.system_health[s] = 80.0f;
                                         players[slot].gx = (players[slot].state.q1-1)*10.0 + 5.0;
