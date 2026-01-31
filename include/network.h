@@ -19,6 +19,11 @@
 #define PKT_UPDATE 3
 #define PKT_MESSAGE 4
 #define PKT_QUERY 5
+#define PKT_HANDSHAKE 6
+
+#define CRYPTO_NONE 0
+#define CRYPTO_AES  1
+#define CRYPTO_CHACHA 2
 
 #define SCOPE_GLOBAL 0
 #define SCOPE_FACTION 1
@@ -70,12 +75,23 @@ typedef struct {
 
 typedef struct {
     int type;
+    int pubkey_len;
+    uint8_t pubkey[256]; /* Standard EC Public Key */
+} PacketHandshake;
+
+typedef struct {
+    int type;
     char from[64];
     int faction;
     int scope; /* 0: Global, 1: Faction, 2: Private */
     int target_id; /* Player ID (1-based) for Private Message */
     int length;
-    char text[4096];
+    long long origin_frame; /* Server frame used for frequency scrambling */
+    uint8_t is_encrypted;
+    uint8_t crypto_algo; /* 1: AES, 2: ChaCha */
+    uint8_t iv[12];      /* GCM/Poly Standard IV */
+    uint8_t tag[16];     /* Auth Tag */
+    char text[65536];
 } PacketMessage;
 
 /* Update Packet: Optimized for variable length transmission */
@@ -95,6 +111,7 @@ typedef struct {
     float system_health[8];
     int lock_target;
     uint8_t is_cloaked;
+    uint8_t encryption_enabled;
     NetPoint torp;
     NetPoint boom;
     NetPoint wormhole;

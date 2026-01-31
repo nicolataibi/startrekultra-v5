@@ -21,6 +21,8 @@
 #include <pthread.h>
 #include "shared_state.h"
 
+#define IS_Q_VALID(q1,q2,q3) ((q1)>=1 && (q1)<=10 && (q2)>=1 && (q2)<=10 && (q3)>=1 && (q3)<=10)
+
 #include "network.h"
 
 /* VBO Globals */
@@ -556,16 +558,18 @@ void drawHUD(int obj_idx) {
     glGetDoublev(GL_PROJECTION_MATRIX, proj);
     glGetIntegerv(GL_VIEWPORT, view);
 
-    if (gluProject(x, y, z + 0.8f, model, proj, view, &winX, &winY, &winZ) == GL_TRUE) {
-        /* Check if behind camera */
-        if (winZ > 1.0) return;
+    /* Project slightly above the ship (1.5 units instead of 0.8) to clear the hull */
+    if (gluProject(x, y, z + 1.5f, model, proj, view, &winX, &winY, &winZ) == GL_TRUE) {
+        /* Check if behind camera or too close to clip plane */
+        if (winZ < 0.0 || winZ > 1.0) return;
 
-        glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix(); glLoadIdentity();
         gluOrtho2D(0, view[2], 0, view[3]);
         glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
         glDisable(GL_LIGHTING); glDisable(GL_DEPTH_TEST);
 
-        /* Draw Name/ID */
+        /* Draw Name/ID - Use a fixed offset from winY to keep it above health bar */
         char buf[128];
         if (type == 1) {
             /* Player: Class (Captain) */
@@ -573,8 +577,13 @@ void drawHUD(int obj_idx) {
             glColor3f(0.0f, 1.0f, 1.0f); /* Cyan for player */
         } else if (type >= 10 && type < 21) {
             /* NPC: Species [ID] */
-            sprintf(buf, "%s [%d]", obj->name, id);
-            glColor3f(1.0f, 0.3f, 0.3f); /* Redish for NPCs */
+            if (type == 12) { /* Borg Special */
+                sprintf(buf, "BORG CUBE [%d]", id);
+                glColor3f(0.0f, 1.0f, 0.0f); /* Green for Borg */
+            } else {
+                sprintf(buf, "%s [%d]", (obj->name[0] != '\0') ? obj->name : getSpeciesName(type), id);
+                glColor3f(1.0f, 0.3f, 0.3f); /* Redish for NPCs */
+            }
         } else {
             /* Other: Name based on type */
             const char* type_name = "Object";
@@ -608,7 +617,11 @@ void drawHUD(int obj_idx) {
                 case 25: type_name = "PLATFORM"; glColor3f(1.0f, 0.6f, 0.0f); break;
                 case 26: type_name = "RIFT"; glColor3f(0.0f, 1.0f, 1.0f); break;
                 case 30: 
-                case 31: type_name = "SPACE MONSTER"; glColor3f(1.0f, 1.0f, 1.0f); break;
+                case 31: {
+                    type_name = (type == 30) ? "CRYSTALLINE ENTITY" : "SPACE AMOEBA";
+                    glColor3f(1.0f, 1.0f, 1.0f);
+                    sprintf(buf, "%s [%d]", type_name, id);
+                } break;
             }
             if (type == 4 || type == 5) {
                 /* Already handled above with specific formatting */
@@ -619,7 +632,7 @@ void drawHUD(int obj_idx) {
             }
         }
         
-        glRasterPos2f(winX - (strlen(buf)*4), winY + 15);
+        glRasterPos2f(winX - (strlen(buf)*4), winY + 25);
         for(int i=0; i<strlen(buf); i++) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, buf[i]);
 
         /* Draw Health Bar (Ships, Bases, Platforms, Monsters) */
@@ -867,6 +880,17 @@ void drawGalaxy() {
         glRotatef(i, 0, 1, 0);
         glTranslatef(1.5f, 0, 0);
         glutSolidSphere(0.015, 4, 4);
+        glPopMatrix();
+    }
+
+    /* Subspace Sensor Probes (Unique to Galaxy Class Command Ship) */
+    for(int i=0; i<3; i++) {
+        glPushMatrix();
+        glRotatef(pulse * 30.0f + (i * 120), 0, 1, 0); 
+        glRotatef(30.0f, 1, 0, 1);
+        glTranslatef(2.2f, 0, 0);
+        glColor3f(0.0f, 0.7f, 1.0f); 
+        glutSolidSphere(0.03, 8, 8);
         glPopMatrix();
     }
     glEnable(GL_LIGHTING);
@@ -1363,7 +1387,9 @@ void drawComet(float x, float y, float z) {
     glutSolidSphere(0.25f, 16, 16);
     
     /* Volumetric Tail (Multiple cones/layers) */
-    glRotatef(180, 0, 1, 0); /* Tail points away from movement (simulated) */
+    /* Point tail in negative X direction (opposite to movement) */
+    glPushMatrix();
+    glRotatef(90, 0, 1, 0); 
     for(int i=0; i<3; i++) {
         glPushMatrix();
         float length = 1.5f + i*0.5f;
@@ -1374,6 +1400,7 @@ void drawComet(float x, float y, float z) {
         glutSolidCone(width, length, 12, 4);
         glPopMatrix();
     }
+    glPopMatrix();
     
     glDisable(GL_BLEND);
     glPopMatrix();
@@ -1847,12 +1874,104 @@ void drawDismantle() {
     glEnable(GL_LIGHTING);
 }
 
+void drawFaceLabels() {
+    if (!g_show_hud || g_show_map) return;
+    
+    int q1 = g_my_q[0];
+    int q2 = g_my_q[1];
+    int q3 = g_my_q[2];
+
+    struct {
+        float x, y, z;
+        int nq[3];
+    } faces[6] = {
+        { 5.5f, 0, 0, {q1+1, q2, q3} },   /* Right (X+) */
+        {-5.5f, 0, 0, {q1-1, q2, q3} },   /* Left (X-) */
+        { 0, 5.5f, 0, {q1, q2, q3+1} },   /* Top (Z+) -> Y+ in viewer */
+        { 0,-5.5f, 0, {q1, q2, q3-1} },   /* Down (Z-) -> Y- in viewer */
+        { 0, 0,-5.5f, {q1, q2+1, q3} },   /* Fore (Y+) -> Z- in viewer */
+        { 0, 0, 5.5f, {q1, q2-1, q3} }    /* Aft (Y-) -> Z+ in viewer */
+    };
+
+    GLdouble model[16], proj[16];
+    GLint view[4];
+    glGetDoublev(GL_MODELVIEW_MATRIX, model);
+    glGetDoublev(GL_PROJECTION_MATRIX, proj);
+    glGetIntegerv(GL_VIEWPORT, view);
+
+    for(int i=0; i<6; i++) {
+        if (!IS_Q_VALID(faces[i].nq[0], faces[i].nq[1], faces[i].nq[2])) continue;
+        
+        GLdouble winX, winY, winZ;
+        if (gluProject(faces[i].x, faces[i].y, faces[i].z, model, proj, view, &winX, &winY, &winZ) == GL_TRUE) {
+            if (winZ < 0.0 || winZ > 1.0) continue;
+            
+            char buf[32];
+            sprintf(buf, "[%d,%d,%d]", faces[i].nq[0], faces[i].nq[1], faces[i].nq[2]);
+            
+            glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
+            gluOrtho2D(0, view[2], 0, view[3]);
+            glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+            glDisable(GL_LIGHTING); glDisable(GL_DEPTH_TEST);
+            
+            glColor3f(0.0f, 0.8f, 0.8f); /* Cyan-ish LCARS */
+            glRasterPos2f(winX - 25, winY);
+            for(int k=0; k<strlen(buf); k++) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, buf[k]);
+            
+            glEnable(GL_DEPTH_TEST); glEnable(GL_LIGHTING);
+            glMatrixMode(GL_PROJECTION); glPopMatrix();
+            glMatrixMode(GL_MODELVIEW); glPopMatrix();
+        }
+    }
+}
+
+void drawTacticalCube() {
+    glDisable(GL_LIGHTING);
+    glLineWidth(2.0f);
+    
+    float min = -5.5f;
+    float mid = 0.0f;
+    float max = 5.5f;
+
+    /* 1. AFT PLANE (Anello Posteriore - Rosso) - Facing Z+ (Viewer) */
+    glColor3f(1.0f, 0.0f, 0.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex3f(min, min, max); glVertex3f(max, min, max);
+    glVertex3f(max, max, max); glVertex3f(min, max, max);
+    glEnd();
+
+    /* 2. FORWARD PLANE (Anello Frontale - Verde) - Facing Z- (Viewer) */
+    glColor3f(0.0f, 1.0f, 0.0f);
+    glBegin(GL_LINE_LOOP);
+    glVertex3f(min, min, min); glVertex3f(max, min, min);
+    glVertex3f(max, max, min); glVertex3f(min, max, min);
+    glEnd();
+
+    /* 3. LONGITUDINAL CONNECTORS (Sfumati Rosso -> Giallo -> Verde) */
+    glBegin(GL_LINES);
+    for(int i=0; i<4; i++) {
+        float x = (i==0 || i==3) ? min : max;
+        float y = (i<2) ? min : max;
+        
+        /* Parte posteriore -> centro (Rosso -> Giallo) */
+        glColor3f(1.0f, 0.0f, 0.0f); glVertex3f(x, y, max);
+        glColor3f(1.0f, 1.0f, 0.0f); glVertex3f(x, y, mid);
+        
+        /* Parte centro -> anteriore (Giallo -> Verde) */
+        glColor3f(1.0f, 1.0f, 0.0f); glVertex3f(x, y, mid);
+        glColor3f(0.0f, 1.0f, 0.0f); glVertex3f(x, y, min);
+    }
+    glEnd();
+
+    glEnable(GL_LIGHTING);
+}
+
 void display() {
     if (g_data_dirty) { loadGameState(); g_data_dirty = 0; }
     
     /* RESET STACKS */
     glMatrixMode(GL_PROJECTION); glLoadIdentity();
-    gluPerspective(45, 1.33, 1, 500);
+    gluPerspective(45, 1.33, 0.1, 500); /* Near plane lowered to 0.1 for close tactical view */
     glMatrixMode(GL_MODELVIEW); glLoadIdentity();
 
     /* Sky color pulse if supernova imminent */
@@ -1896,7 +2015,7 @@ void display() {
         /* 2. LOCAL OBJECTS: Follow the ship movement */
         glTranslatef(-enterpriseX, -enterpriseY, -enterpriseZ);
         
-        glColor3f(0.2, 0.2, 0.5); glutWireCube(11.0);
+        drawTacticalCube();
         if (g_show_axes) drawCompass();
         if (g_show_grid) drawGrid();
         
@@ -1969,6 +2088,8 @@ void display() {
             }
             glPopMatrix();
         }
+
+        drawFaceLabels();
 
         /* Draw Ship HUD Overlay (Tactical Mode) */
         if (g_show_hud) {
@@ -2129,31 +2250,70 @@ void display() {
                 }
             }
         }
+
+        /* --- BOTTOM RIGHT: Subspace Telemetry --- */
+        int ty = 120;
+        glColor3f(0.0f, 0.8f, 1.0f); /* LCARS Blue */
+        drawText3D(750, ty, 0, "--- SUBSPACE UPLINK DIAGNOSTICS ---"); ty -= 20;
+        
+        glColor3f(0.0f, 0.5f, 0.7f);
+        sprintf(buf, "LINK UPTIME: %02ld:%02ld:%02ld", g_shared_state->net_uptime/3600, (g_shared_state->net_uptime%3600)/60, g_shared_state->net_uptime%60);
+        drawText3D(750, ty, 0, buf); ty -= 15;
+        
+        sprintf(buf, "BANDWIDTH: %.2f KB/s | PPS: %d", g_shared_state->net_kbps, g_shared_state->net_packet_count);
+        drawText3D(750, ty, 0, buf); ty -= 15;
+        
+        sprintf(buf, "PULSE JITTER: %.2f ms", g_shared_state->net_jitter);
+        drawText3D(750, ty, 0, buf); ty -= 15;
+        
+        sprintf(buf, "SIGNAL INTEGRITY: %.1f%%", g_shared_state->net_integrity);
+        drawText3D(750, ty, 0, buf); ty -= 15;
+
+        sprintf(buf, "AVG FRAME: %d bytes (Opt: %.1f%%)", g_shared_state->net_avg_packet_size, g_shared_state->net_efficiency);
+        drawText3D(750, ty, 0, buf); ty -= 15;
+
+        if (g_shared_state->shm_crypto_algo == CRYPTO_AES) {
+            glColor3f(0.0f, 1.0f, 0.0f);
+            drawText3D(750, ty, 0, "ENCRYPTION: AES-256-GCM ACTIVE");
+        } else if (g_shared_state->shm_crypto_algo == CRYPTO_CHACHA) {
+            glColor3f(0.0f, 1.0f, 0.5f);
+            drawText3D(750, ty, 0, "ENCRYPTION: CHACHA20-POLY ACTIVE");
+        } else {
+            glColor3f(1.0f, 0.0f, 0.0f);
+            drawText3D(750, ty, 0, "ENCRYPTION: DISABLED / RAW");
+        }
     }
 
-    if (g_show_hud && g_sn_pos.active && g_my_q[0] == g_sn_q[0] && g_my_q[1] == g_sn_q[1] && g_my_q[2] == g_sn_q[2]) {
-        /* Supernova Overlay - Using Global Broadcast State (PRIMARY) */
-        glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1000, 0, 1000); glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
-        glDisable(GL_LIGHTING);
-        int sec = g_sn_pos.timer / 30;
+    long long sn_val = g_shared_state->shm_galaxy[g_my_q[0]][g_my_q[1]][g_my_q[2]];
+    if (g_show_hud && ((g_sn_pos.active && g_sn_pos.timer > 0) || sn_val < 0)) {
+        /* Supernova Overlay - Centered and prominently Red */
+        glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1000, 0, 1000); 
+        glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
+        glDisable(GL_LIGHTING); glDisable(GL_DEPTH_TEST);
+        
+        int sec = 0;
+        /* Sanity check: ensure we don't treat BPNBS encoded data as a timer */
+        if (sn_val < 0 && sn_val > -5000) {
+            sec = (int)(-sn_val / 30);
+        } else if (g_sn_pos.active && g_sn_pos.timer < 5000) {
+            sec = g_sn_pos.timer / 30;
+        }
+        
+        if (sec > 99) sec = 99; /* Cap display */
         if (sec < 0) sec = 0;
-        if (sec > 60) sec = 60;
-        glColor3f(1.0f, 0.0f, 0.0f);
-        sprintf(buf, "!!! WARNING: SUPERNOVA IMMINENT IN %d SECONDS !!!", sec);
-        drawText3D(200, 500, 0, buf);
-        glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
-    } else if (g_show_hud && g_shared_state->shm_galaxy[g_my_q[0]][g_my_q[1]][g_my_q[2]] < 0) {
-        /* Supernova Overlay - Using Local Map Data (FALLBACK) */
-        glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1000, 0, 1000); glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
-        glDisable(GL_LIGHTING);
-        long long val = g_shared_state->shm_galaxy[g_my_q[0]][g_my_q[1]][g_my_q[2]];
-        int sec = (int)(-val / 30);
-        if (sec < 0) sec = 0;
-        if (sec > 60) sec = 60;
-        glColor3f(1.0f, 0.0f, 0.0f);
-        sprintf(buf, "!!! WARNING: SUPERNOVA IMMINENT IN %d SECONDS !!!", sec);
-        drawText3D(200, 500, 0, buf);
-        glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
+        
+        char sn_buf[128];
+        glColor3f(1.0f, 0.0f, 0.0f); /* Bright Red */
+        if (sn_val < 0 || (g_my_q[0] == g_sn_q[0] && g_my_q[1] == g_sn_q[1] && g_my_q[2] == g_sn_q[2])) {
+            sprintf(sn_buf, "!!! CRITICAL: SUPERNOVA IMMINENT IN THIS SECTOR: %d SEC !!!", sec);
+        } else {
+            sprintf(sn_buf, "!!! WARNING: SUPERNOVA DETECTED IN Q-%d-%d-%d: %d SEC !!!", g_sn_q[0], g_sn_q[1], g_sn_q[2], sec);
+        }
+        drawText3D(200, 500, 0, sn_buf);
+        
+        glEnable(GL_DEPTH_TEST); glEnable(GL_LIGHTING);
+        glMatrixMode(GL_PROJECTION); glPopMatrix(); 
+        glMatrixMode(GL_MODELVIEW); glPopMatrix();
     }
 
     glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
@@ -2172,6 +2332,9 @@ void timer(int v) {
     /* Update Boom Timer */
     if (g_boom.timer > 0) g_boom.timer--;
     
+    /* Update Supernova timer */
+    if (g_sn_pos.active && g_sn_pos.timer > 0) g_sn_pos.timer--;
+
     /* Update Jump Arrival Timer */
     if (g_jump_arrival.timer > 0) {
         g_jump_arrival.timer--;

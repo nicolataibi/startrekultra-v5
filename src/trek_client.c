@@ -20,7 +20,12 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <stddef.h>
+#include <math.h>
+#include <openssl/evp.h>
 #include "network.h"
+
+/* Pre-Shared Subspace Encryption Key (Must match server) */
+const uint8_t SUBSPACE_KEY[32] = "TREK-ULTRA-SECURE-CRYPTO-2026-!!";
 #include "shared_state.h"
 #include "ui.h"
 
@@ -171,31 +176,83 @@ void *network_listener(void *arg) {
         }
         
         if (type == PKT_MESSAGE) {
-            PacketMessage msg;
-            msg.type = type;
+            PacketMessage *msg = malloc(sizeof(PacketMessage));
+            if (!msg) { perror("malloc failed"); exit(1); }
+            msg->type = type;
             size_t fixed_size = offsetof(PacketMessage, text);
-            if (read_all(sock, ((char*)&msg) + sizeof(int), fixed_size - sizeof(int)) <= 0) {
-                g_running = 0;
-                break;
+            if (read_all(sock, ((char*)msg) + sizeof(int), fixed_size - sizeof(int)) <= 0) {
+                free(msg); g_running = 0; break;
             }
             
-            if (msg.length > 0) {
-                if (read_all(sock, msg.text, msg.length + 1) <= 0) {
-                    g_running = 0;
-                    break;
+            if (msg->length > 0) {
+                if (read_all(sock, msg->text, msg->length) <= 0) {
+                    free(msg); g_running = 0; break;
                 }
-            } else msg.text[0] = '\0';
+                
+                if (msg->is_encrypted) {
+                    if (g_shared_state && g_shared_state->shm_crypto_algo == msg->crypto_algo) {
+                        /* 1. Reverse Rotating Frequency offuscation on IV using packet's embedded frame */
+                        for(int i=0; i<8; i++) msg->iv[i] ^= ((msg->origin_frame >> (i*8)) & 0xFF);
+
+                        /* 2. Decrypt the payload */
+                        char decrypted[65536];
+                        EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+                        
+                        const EVP_CIPHER *cipher = (msg->crypto_algo == CRYPTO_CHACHA) ? EVP_chacha20_poly1305() : EVP_aes_256_gcm();
+                        const uint8_t *k = SUBSPACE_KEY; /* Client currently uses Master Key */
+                        
+                        EVP_DecryptInit_ex(ctx, cipher, NULL, k, msg->iv);
+                        
+                        int outlen;
+                        EVP_DecryptUpdate(ctx, (uint8_t*)decrypted, &outlen, (const uint8_t*)msg->text, msg->length);
+                        EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, msg->tag);
+                        
+                        int final_len;
+                        if (EVP_DecryptFinal_ex(ctx, (uint8_t*)decrypted + outlen, &final_len) > 0) {
+                            decrypted[outlen + final_len] = '\0';
+                            strncpy(msg->text, decrypted, 65535);
+                        } else {
+                            strcpy(msg->text, B_RED "<< ERROR: SUBSPACE DECRYPTION FAILED - FREQUENCY MISMATCH OR INVALID KEY >>" RESET);
+                        }
+                        EVP_CIPHER_CTX_free(ctx);
+                    } else if (g_shared_state && g_shared_state->shm_crypto_algo != CRYPTO_NONE) {
+                        /* Encryption protocol mismatch (e.g. Captain listening on AES but incoming is ChaCha) */
+                        char noise[128];
+                        int noise_len = (msg->length > 64) ? 64 : msg->length;
+                        for(int n=0; n<noise_len; n++) {
+                            unsigned char c_raw = (unsigned char)msg->text[n];
+                            noise[n] = (c_raw % 94) + 33; 
+                        }
+                        noise[noise_len] = '\0';
+                        snprintf(msg->text, 65535, B_RED "<< SIGNAL DISTURBED: FREQUENCY MISMATCH >>" RESET "\n [HINT]: Try 'enc aes' or 'enc chacha' to match the incoming frequency.\n [RAW_DATA]: %s...", noise);
+                    } else {
+                        /* Encryption protocol mismatch - Show simulated binary noise */
+                        char noise[128];
+                        int noise_len = (msg->length > 64) ? 64 : msg->length;
+                        for(int n=0; n<noise_len; n++) {
+                            unsigned char c_raw = (unsigned char)msg->text[n];
+                            noise[n] = (c_raw % 94) + 33; 
+                        }
+                        noise[noise_len] = '\0';
+                        snprintf(msg->text, 65535, B_RED "<< SIGNAL GARBLED: ENCRYPTION PROTOCOL MISMATCH >>" RESET "\n [HINT]: Try 'enc aes' or 'enc chacha' to match the incoming frequency.\n [RAW_DATA]: %s...", noise);
+                    }
+                } else {
+                    /* Plaintext message, just null terminate */
+                    if (msg->length < 65536) msg->text[msg->length] = '\0';
+                }
+            } else msg->text[0] = '\0';
             
             printf("\r\033[K"); /* Pulisce la riga di input attuale */
-            if (strcmp(msg.from, "SERVER") == 0 || strcmp(msg.from, "COMPUTER") == 0 || 
-                strcmp(msg.from, "SCIENCE") == 0 || strcmp(msg.from, "TACTICAL") == 0 ||
-                strcmp(msg.from, "ENGINEERING") == 0 || strcmp(msg.from, "HELMSMAN") == 0 ||
-                strcmp(msg.from, "WARNING") == 0 || strcmp(msg.from, "DAMAGE CONTROL") == 0) {
-                printf("%s\n", msg.text);
+            if (strcmp(msg->from, "SERVER") == 0 || strcmp(msg->from, "COMPUTER") == 0 || 
+                strcmp(msg->from, "SCIENCE") == 0 || strcmp(msg->from, "TACTICAL") == 0 ||
+                strcmp(msg->from, "ENGINEERING") == 0 || strcmp(msg->from, "HELMSMAN") == 0 ||
+                strcmp(msg->from, "WARNING") == 0 || strcmp(msg->from, "DAMAGE CONTROL") == 0) {
+                printf("%s\n", msg->text);
             } else {
-                printf(B_CYAN "[RADIO] %s (%s): %s\n" RESET, msg.from, 
-                       (msg.faction == FACTION_FEDERATION) ? "Starfleet" : "Alien", msg.text);
+                printf(B_CYAN "[RADIO] %s (%s): %s\n" RESET, msg->from, 
+                       (msg->faction == FACTION_FEDERATION) ? "Starfleet" : "Alien", msg->text);
             }
+            free(msg);
             reprint_prompt();
         } else if (type == PKT_UPDATE) {
             PacketUpdate upd;
@@ -203,7 +260,8 @@ void *network_listener(void *arg) {
             
             /* Read fixed part up to object_count field */
             size_t fixed_size = offsetof(PacketUpdate, objects);
-            if (read_all(sock, ((char*)&upd) + sizeof(int), fixed_size - sizeof(int)) <= 0) break;
+            int r_fixed = read_all(sock, ((char*)&upd) + sizeof(int), fixed_size - sizeof(int));
+            if (r_fixed <= 0) break;
             
             /* Safety check for object count to prevent buffer overflow */
             if (upd.object_count < 0 || upd.object_count > MAX_NET_OBJECTS) {
@@ -212,8 +270,62 @@ void *network_listener(void *arg) {
             }
 
             /* Read active objects only */
+            int r_objs = 0;
             if (upd.object_count > 0) {
-                if (read_all(sock, upd.objects, upd.object_count * sizeof(NetObject)) <= 0) break;
+                r_objs = read_all(sock, upd.objects, upd.object_count * sizeof(NetObject));
+                if (r_objs <= 0) break;
+            }
+
+            /* --- Telemetry Calculation --- */
+            static long long bytes_this_sec = 0;
+            static struct timespec last_ts = {0, 0};
+            static struct timespec link_start_ts = {0, 0};
+            static double last_packet_arrival = 0;
+            static double jitter_sum = 0;
+            static int packets_this_sec = 0;
+            struct timespec now_ts;
+            clock_gettime(CLOCK_MONOTONIC, &now_ts);
+            
+            if (link_start_ts.tv_sec == 0) link_start_ts = now_ts;
+
+            double now_secs = now_ts.tv_sec + now_ts.tv_nsec / 1e9;
+            if (last_packet_arrival > 0) {
+                double delta = (now_secs - last_packet_arrival) * 1000.0; /* ms */
+                double expected = 1000.0 / 30.0; /* 33.3ms for 30Hz */
+                jitter_sum += fabs(delta - expected);
+            }
+            last_packet_arrival = now_secs;
+
+            int current_pkt_size = r_fixed + r_objs + sizeof(int);
+            bytes_this_sec += current_pkt_size;
+            packets_this_sec++;
+
+            double elapsed = (now_ts.tv_sec - last_ts.tv_sec) + (now_ts.tv_nsec - last_ts.tv_nsec) / 1e9;
+
+            if (elapsed >= 1.0) {
+                if (g_shared_state) {
+                    pthread_mutex_lock(&g_shared_state->mutex);
+                    g_shared_state->net_kbps = (float)(bytes_this_sec / 1024.0 / elapsed);
+                    g_shared_state->net_packet_count = (int)(packets_this_sec / elapsed);
+                    g_shared_state->net_avg_packet_size = (packets_this_sec > 0) ? (int)(bytes_this_sec / packets_this_sec) : 0;
+                    g_shared_state->net_jitter = (packets_this_sec > 0) ? (float)(jitter_sum / packets_this_sec) : 0;
+                    g_shared_state->net_uptime = now_ts.tv_sec - link_start_ts.tv_sec;
+                    /* Integrity: Based on jitter (lower jitter = higher integrity) */
+                    float integrity = 100.0f - (g_shared_state->net_jitter * 2.0f);
+                    if (integrity < 0) integrity = 0;
+                    if (integrity > 100) integrity = 100;
+                    g_shared_state->net_integrity = integrity;
+                    
+                    /* Efficiency: How much we send vs the maximum possible packet size */
+                    g_shared_state->net_efficiency = 100.0f * (1.0f - (float)current_pkt_size / sizeof(PacketUpdate));
+                    pthread_mutex_unlock(&g_shared_state->mutex);
+                }
+                bytes_this_sec = 0; packets_this_sec = 0; jitter_sum = 0; last_ts = now_ts;
+            }
+            if (g_shared_state) {
+                pthread_mutex_lock(&g_shared_state->mutex);
+                g_shared_state->net_last_packet_size = current_pkt_size;
+                pthread_mutex_unlock(&g_shared_state->mutex);
             }
             
             if (g_shared_state) {
@@ -365,7 +477,30 @@ int main(int argc, char *argv[]) {
 
     atexit(cleanup);
 
-    printf(B_YELLOW "--- TREK ULTRA CLIENT ---\n" RESET);
+    /* Schermata di Benvenuto */
+    printf("\033[2J\033[H"); /* Clear screen and home cursor */
+    printf(B_CYAN "  ____________________________________________________________________________\n" RESET);
+    printf(B_CYAN " /                                                                            \\\n" RESET);
+    printf(B_CYAN " | " B_WHITE "  ███████╗████████╗ █████╗ ██████╗     ████████╗██████╗ ███████╗██╗  ██╗" B_CYAN "   |\n" RESET);
+    printf(B_CYAN " | " B_WHITE "  ██╔════╝╚══██╔══╝██╔══██╗██╔══██╗    ╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝" B_CYAN "   |\n" RESET);
+    printf(B_CYAN " | " B_WHITE "  ███████╗   ██║   ███████║██████╔╝       ██║   ██████╔╝█████╗  █████╔╝ " B_CYAN "   |\n" RESET);
+    printf(B_CYAN " | " B_WHITE "  ╚════██║   ██║   ██╔══██║██╔══██╗       ██║   ██╔══██╗██╔══╝  ██╔═██╗ " B_CYAN "   |\n" RESET);
+    printf(B_CYAN " | " B_WHITE "  ███████║   ██║   ██║  ██║██║  ██║       ██║   ██║  ██║███████╗██║  ██╗" B_CYAN "   |\n" RESET);
+    printf(B_CYAN " | " B_WHITE "  ╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝       ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝" B_CYAN "   |\n" RESET);
+    printf(B_CYAN " |                                                                            |\n" RESET);
+    printf(B_CYAN " | " B_YELLOW "                    ██╗   ██╗██╗     ████████╗██████╗  █████╗" B_CYAN "              |\n" RESET);
+    printf(B_CYAN " | " B_YELLOW "                    ██║   ██║██║     ╚══██╔══╝██╔══██╗██╔══██╗" B_CYAN "             |\n" RESET);
+    printf(B_CYAN " | " B_YELLOW "                    ██║   ██║██║        ██║   ██████╔╝███████║" B_CYAN "             |\n" RESET);
+    printf(B_CYAN " | " B_YELLOW "                    ██║   ██║██║        ██║   ██╔══██╗██╔══██║" B_CYAN "             |\n" RESET);
+    printf(B_CYAN " | " B_YELLOW "                    ╚██████╔╝███████╗   ██║   ██║  ██║██║  ██║" B_CYAN "             |\n" RESET);
+    printf(B_CYAN " | " B_YELLOW "                     ╚═════╝ ╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝" B_CYAN "             |\n" RESET);
+    printf(B_CYAN " |                                                                            |\n" RESET);
+        printf(B_CYAN " | " B_WHITE "  Copyright (C) 2026 " B_GREEN "Nicola Taibi" B_WHITE "                                        " B_CYAN "  |\n" RESET);
+        printf(B_CYAN " | " B_WHITE "  AI Core Support by " B_BLUE "Google Gemini" B_WHITE "                                       " B_CYAN "  |\n" RESET);
+        printf(B_CYAN " | " B_WHITE "  License Type:      " B_YELLOW "GNU GPL v3.0" B_WHITE "                                        " B_CYAN "  |\n" RESET);
+        printf(B_CYAN " \\____________________________________________________________________________/\n\n" RESET);
+    
+
     LOG_DEBUG("sizeof(StarTrekGame) = %zu\n", sizeof(StarTrekGame));
     LOG_DEBUG("sizeof(PacketUpdate) = %zu\n", sizeof(PacketUpdate));
     printf("Server IP: "); scanf("%s", server_ip);
@@ -443,6 +578,7 @@ int main(int argc, char *argv[]) {
     if (g_shared_state) {
         pthread_mutex_lock(&g_shared_state->mutex);
         memcpy(g_shared_state->shm_galaxy, master_sync.g, sizeof(master_sync.g));
+        g_shared_state->shm_crypto_algo = CRYPTO_NONE;
         pthread_mutex_unlock(&g_shared_state->mutex);
     }
     
@@ -511,11 +647,14 @@ int main(int argc, char *argv[]) {
                         printf("imp H M S   : Impulse Drive (H, M, Speed 0.0-1.0). imp 0 0 0 to stop.\n");
                         printf("jum Q1 Q2 Q3: Wormhole Jump (Instant travel, costs 5000 En + 1 Dilithium)\n");
                         printf("srs         : Short Range Sensors (Current Quadrant View)\n");
-                        printf("lrs         : Long Range Sensors (3x3x3 Neighborhood Scan)\n");
-                        printf("pha E       : Fire Phasers (Distance-based damage, uses Energy)\n");
-                        printf("tor H M     : Launch Photon Torpedo (Ballistic projectile)\n");
+                        printf("lrs         : Long Range Sensors (LCARS Tactical Grid)\n");
+                        printf("pha <E>     : Fire Phasers at locked target (uses Energy E)\n");
+                        printf("pha <ID> <E>: Fire Phasers at specific target ID\n");
+                        printf("tor         : Launch Photon Torpedo at locked target\n");
+                        printf("tor <H> <M> : Launch Photon Torpedo at specific Heading/Mark\n");
                         printf("she F R T B L RI : Configure 6 Shield Quadrants\n");
                         printf("lock ID     : Lock-on Target (0:Self, 1+:Nearby vessels)\n");
+                        printf("enc aes/chacha/off : Toggle Subspace Encryption (Standard/Experimental)\n");
                         printf("scan ID     : Detailed analysis of vessel or anomaly\n");
                         printf("pow E S W   : Power Distribution (Engines, Shields, Weapons %%)\n");
                         printf("psy         : Psychological Warfare (Corbomite Bluff)\n");
@@ -529,7 +668,8 @@ int main(int argc, char *argv[]) {
                         printf("rep ID      : Repair System (Uses Tritanium or Isolinear Crystals)\n");
                         printf("inv         : Cargo Inventory Report\n");
                         printf("who         : List active captains in galaxy\n");
-                        printf("cal QX QY QZ: Navigation Calculator\n");
+                        printf("cal Q1 Q2 Q3: Warp Calculator (Inter-quadrant)\n");
+                        printf("ical X Y Z  : Impulse Calculator (Local sector coordinates)\n");
                         printf("apr ID DIST : Approach target autopilot\n");
                         printf("cha         : Chase locked target (Inter-sector aware)\n");
                         printf("sco         : Solar scooping for energy\n");
@@ -563,6 +703,30 @@ int main(int argc, char *argv[]) {
                             pthread_mutex_unlock(&g_shared_state->mutex);
                             printf("Starmap toggled.\n");
                         }
+                    } else if (strcmp(g_input_buf, "enc aes") == 0) {
+                        if (g_shared_state) {
+                            pthread_mutex_lock(&g_shared_state->mutex);
+                            g_shared_state->shm_crypto_algo = CRYPTO_AES;
+                            pthread_mutex_unlock(&g_shared_state->mutex);
+                        }
+                        PacketCommand cpkt = {PKT_COMMAND, "enc aes"};
+                        send(sock, &cpkt, sizeof(cpkt), 0);
+                    } else if (strcmp(g_input_buf, "enc chacha") == 0) {
+                        if (g_shared_state) {
+                            pthread_mutex_lock(&g_shared_state->mutex);
+                            g_shared_state->shm_crypto_algo = CRYPTO_CHACHA;
+                            pthread_mutex_unlock(&g_shared_state->mutex);
+                        }
+                        PacketCommand cpkt = {PKT_COMMAND, "enc chacha"};
+                        send(sock, &cpkt, sizeof(cpkt), 0);
+                    } else if (strcmp(g_input_buf, "enc off") == 0) {
+                        if (g_shared_state) {
+                            pthread_mutex_lock(&g_shared_state->mutex);
+                            g_shared_state->shm_crypto_algo = CRYPTO_NONE;
+                            pthread_mutex_unlock(&g_shared_state->mutex);
+                        }
+                        PacketCommand cpkt = {PKT_COMMAND, "enc off"};
+                        send(sock, &cpkt, sizeof(cpkt), 0);
                     } else if (strncmp(g_input_buf, "rad ", 4) == 0) {
                         PacketMessage mpkt;
                         memset(&mpkt, 0, sizeof(PacketMessage));

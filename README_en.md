@@ -192,11 +192,13 @@ Below is the complete list of available commands, grouped by function.
     *   `H`: Heading (0-359).
     *   `M`: Mark (-90 to +90).
     *   `W`: Warp Factor (0-8).
-*   `imp <H> <M> <S>`: **Impulse Drive**. Sub-light engines.
+*   `imp <H> <M> <S>`: **Impulse Drive**. Sub-light engines. `S` represents speed from 0.0 to 1.0 (Full Impulse). At maximum power (1.0), the ship travels at 1.5 sector units per second, crossing an entire quadrant in approximately 6.6 seconds.
     *   `S`: Speed (0.0 - 1.0).
     *   `imp 0 0 0`: All Stop.
-*   `cal <QX> <QY> <QZ>`: **Navigation Calculator**. Calculates H, M, W to reach a quadrant.
-*   `jum <QX> <QY> <QZ>`: **Wormhole Jump (Einstein-Rosen Bridge)**. Generates a wormhole for an instant jump to the destination quadrant.
+    *   `cal <QX> <QY> <QZ>`: **Warp Calculator**. Calculates H, M, W to reach a distant quadrant.
+    *   `ical <X> <Y> <Z>`: **Impulse Calculator**. Calculates H, M, and Distance to reach precise coordinates (0.0-10.0) within the current quadrant. Essential for mining and docking.
+    *   `jum <QX> <QY> <QZ>`: **Wormhole Jump (Einstein-Rosen Bridge)**.
+     Generates a wormhole for an instant jump to the destination quadrant.
     *   **Requirements**: 5000 units of Energy and 1 Dilithium Crystal.
     *   **Procedure**: Requires a singularity stabilization sequence of about 3 seconds.
 *   `apr <ID> <DIST>`: **Approach Autopilot**. Automatic approach to target ID up to DIST distance.
@@ -211,18 +213,25 @@ Below is the complete list of available commands, grouped by function.
     *   **Vessels**: Reveals hull integrity, shield levels per quadrant, residual energy, crew count, and subsystem damage.
     *   **Anomalies**: Provides scientific data on Nebulas and Pulsars.
 *   `srs`: **Short Range Sensors**. Detailed scan of the current quadrant.
-*   `lrs`: **Long Range Sensors**. 3x3x3 scan of surrounding quadrants.
+    *   **Neighborhood Scan**: If the ship is near sector boundaries (< 2.5 units), sensors automatically detect objects in adjacent quadrants, listing them in a dedicated section to prevent ambushes.
+*   `lrs`: **Long Range Sensors**. 3x3x3 scan of surrounding quadrants displayed via **LCARS Tactical Console** (Zones: Top, Center, Down).
+    *   **Navigation Solution**: Each quadrant includes `H / M / W` parameters calculated to reach it immediately.
+    *   **Primary Legend**: `[ H P N B S ]` (Black Holes, Planets, NPCs, Bases, Stars).
+    *   **Anomaly Symbols**: `~`:Nebula, `*`:Pulsar, `+`:Comet, `#`:Asteroid, `M`:Monster, `>`:Rift.
+    *   **Localization**: Your current quadrant is highlighted with a blue background.
 *   `aux probe <QX> <QY> <QZ>`: Launches a long-range probe to a specific quadrant.
 *   `sta`: **Status Report**. Complete report on ship state, mission, and **Crew** monitoring.
 *   `dam`: **Damage Report**. Detailed system damage.
 *   `who`: List of active captains in the galaxy.
 
 ### ⚔️ Tactical Combat
-*   `pha <E>`: **Fire Phasers**. Fire phasers with energy E. Damage based on distance.
-*   `tor <H> <M>`: **Fire Photon Torpedo**. Launches a torpedo.
-    *   If `lock` active: Automatic guidance (just type `tor`).
-    *   Without lock: Manual ballistic trajectory.
-*   `lock <ID>`: **Target Lock**. Locks targeting systems on target ID (0 to unlock).
+*   `pha <E>`: **Fire Phasers**. Fires phasers at the locked target (`lock`) using energy E. 
+*   `pha <ID> <E>`: Fires phasers at a specific target ID. Damage decreases with distance.
+*   `enc aes/chacha/off`: **Encryption Toggle**. Enables or disables encryption in real-time. Supports **AES-256-GCM** and **ChaCha20-Poly1305** standards. Essential for protecting communications and reading secure messages from other captains.
+*   `tor`: **Fire Photon Torpedo**. Launches an auto-guided torpedo at the locked target.
+*   `tor <H> <M>`: Launches a torpedo in manual ballistic mode (Heading/Mark).
+*   `lock <ID>`: **Target Lock**. Locks targeting systems onto target ID (0 to unlock). Essential for automated phaser and torpedo guidance.
+
 
 ### 🆔 Galactic Identifier Schema (Universal ID)
 To interact with galactic objects using the `lock`, `scan`, `pha`, `tor`, `bor`, and `dis` commands, the system employs a unique ID system. Use the `srs` command to identify the IDs of objects in your sector.
@@ -280,6 +289,28 @@ Distances expressed in sector units (0.0 - 10.0). If your distance is greater th
 | **Crystalline E.** | (Resonance) | **< 4.0** | Range of the resonance beam |
 | **Celestial Body** | (Collision) | **< 1.0** | Hull damage and emergency rescue trigger |
 
+### 🚀 Autopilot (`apr`)
+The `apr <ID> <DIST>` command allows you to automatically approach any object detected by sensors. For mobile entities, interception works across the entire galaxy.
+
+| Object Category | ID Range | Interaction Commands | Min. Distance | Navigation Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **Captains (Players)** | 1 - 32 | `rad`, `pha`, `tor`, `bor` | **< 1.0** (`bor`) | Galactic Tracking |
+| **NPC Ships (Aliens)** | 1000 - 1999 | `pha`, `tor`, `bor`, `scan` | **< 1.0** (`bor`) | Galactic Tracking |
+| **Starbases** | 2000 - 2199 | `doc`, `scan` | **< 2.0** | Current quadrant only |
+| **Planets** | 3000 - 3999 | `min`, `scan` | **< 2.0** | Current quadrant only |
+| **Stars** | 4000 - 6999 | `sco`, `scan` | **< 2.0** | Current quadrant only |
+| **Black Holes** | 7000 - 7199 | `har`, `scan` | **< 2.0** | Current quadrant only |
+| **Nebulas** | 8000 - 8499 | `scan` | - | Current quadrant only |
+| **Pulsars** | 9000 - 9199 | `scan` | - | Current quadrant only |
+| **Comets** | 10000 - 10299 | `cha`, `scan` | **< 0.6** (Gas) | **Galactic Tracking** |
+| **Derelicts** | 11000 - 11149 | `bor`, `dis`, `scan` | **< 1.5** | Current quadrant only |
+| **Asteroids** | 12000 - 13999 | `min`, `scan` | **< 1.0** | Current quadrant only |
+| **Mines** | 14000 - 14999 | `scan` | - | Current quadrant only |
+| **Comm Buoys** | 15000 - 15099 | `scan` | **< 1.2** | Current quadrant only |
+| **Defense Platforms** | 16000 - 16199 | `pha`, `tor`, `scan` | - | Current quadrant only |
+| **Spatial Rifts** | 17000 - 17049 | `scan` | - | Current quadrant only |
+| **Space Monsters** | 18000 - 18029 | `pha`, `tor`, `scan` | **< 1.5** | **Galactic Tracking** |
+
 *   `she <F> <R> <T> <B> <L> <RI>`: **Shield Configuration**. Distributes energy to the 6 shields.
 *   `clo`: **Cloaking Device**. Activates/Deactivates cloak (consumes energy).
 *   `pow <E> <S> <W>`: **Power Distribution**. Allocates reactor energy (Engines, Shields, Weapons %).
@@ -305,9 +336,38 @@ Distances expressed in sector units (0.0 - 10.0). If your distance is greater th
     *   **Vital Integrity**: If **Life Support** drops below 75%, the crew will start suffering periodic losses.
     *   **Failure Condition**: If crew reaches **zero**, the mission ends and the ship is considered lost.
 
-### 📡 Communications and Misc
+### 🛡️ Encryption and Electronic Warfare (Subspace Security)
+The system implements a military-grade security layer for all communications between vessels and fleet command.
+
+*   **Technical Implementation**: Encryption is managed via the **OpenSSL** library, using 256-bit algorithms with packet authentication (GCM/Poly).
+*   **Rotating Frequency Codes**: Each message has a unique signature based on the server's `frame_id`. This prevents an enemy from "recording and replaying" your commands.
+*   **Session Persistence & Handshake Safety**: While the server saves the captain's profile, encryption protocols are reset to `off` upon every new connection. This ensures that welcome messages and initial synchronization are always readable, preventing "lock-outs" due to forgotten protocol settings.
+*   **Dynamic Diagnostic Feedback**: In case of a protocol mismatch (e.g., one captain using AES and another using ChaCha), the bridge computer analyzes the binary noise and provides contextual hints (`[HINT]`) to help the captain synchronize the frequency.
+*   **Selective Decryption (Radio Frequencies)**: Different algorithms act as separate communication frequencies.
+    *   If a captain transmits in `enc aes`, only those tuned to `enc aes` will be able to read it.
+    *   If you are tuned to a different protocol (e.g., listening in AES but receiving ChaCha), you will see the message **<< SIGNAL DISTURBED: FREQUENCY MISMATCH >>**.
+    *   This forces allies to pre-coordinate on the mission "frequency" to be used.
+*   **Deterministic Synchronization**: Each packet carries its own `origin_frame`, allowing the receiver to reconstruct the exact original encryption frequency, making the system immune to network delays (lag).
+*   **Operational Commands**:
+    *   `enc aes`: Enables the **AES-256-GCM** standard (Robust, hardware accelerated).
+    *   `enc chacha`: Enables the **ChaCha20-Poly1305** standard (Modern, ultra-fast).
+    *   `enc off`: Disables security protocols (RAW communication).
+
+### 📡 Communications and Miscellaneous
 *   `rad <MSG>`: Sends radio message to all (Open channel).
-*   `rad @Fac <MSG>`: Sends to faction (e.g., `@Romulan Enemies sighted!`).
+    *   **Faction Table (@Fac)**:
+        | Faction | Full Name | Abbreviated |
+        | :--- | :--- | :--- |
+        | **Federation** | `@Federation` | `@Fed` |
+        | **Klingon** | `@Klingon` | `@Kli` |
+        | **Romulan** | `@Romulan` | `@Rom` |
+        | **Borg** | `@Borg` | `@Bor` |
+        | **Cardassian** | `@Cardassian` | `@Car` |
+        | **Dominion** | `@JemHadar` | `@Jem` |
+        | **Tholian** | `@Tholian` | `@Tho` |
+        | **Ferengi** | `@Ferengi` | `@Fer` |
+        | **Species 8472** | `@Species8472`| `@8472` |
+        | **Gorn / Breen / Hirogen** | Full Name | - |
 *   `rad #ID <MSG>`: Private message to player ID.
 *   `psy`: **Psychological Warfare**. Attempts bluff (Corbomite Maneuver).
 *   `axs` / `grd`: Activates/Deactivates 3D visual guides (Axes / Grid).
@@ -321,7 +381,8 @@ The system uses spatial projection algorithms to anchor information directly abo
 
 #### 🧭 3D Tactical Compass (`axs`)
 By activating visual axes (`axs`), the simulator projects a spherical reference system centered on your ship:
-*   **Heading Ring**: A graduated horizontal disk rotating with the ship, indicating the 360 degrees of the galactic plane.
+*   **Boundary Coordinates**: At the center of each face of the tactical cube, the coordinates `[X,Y,Z]` of adjacent quadrants are projected, allowing instantaneous identification of the destination for a warp jump or impulse maneuver towards a neighboring sector.
+*   **Heading Ring**: A graduated horizontal disk that rotates with the ship, indicating the 360 degrees of the galactic plane.
 *   **Mark Arc**: A vertical guide displaying zenith inclination (-90/+90), crucial for complex 3D pursuits.
 *   **Galactic Axes**: Reference lines for X (red), Y (green), and Z (blue) axes delimiting the current sector boundaries.
 
@@ -330,6 +391,7 @@ The on-screen interface (Overlay) provides constant monitoring of vital paramete
 *   **Reactor & Shield Status**: Real-time display of available energy and average defensive grid power.
 *   **Sector Coordinates**: Instant conversion of spatial data into relative coordinates `[S1, S2, S3]` (0.0 - 10.0), mirroring those used in `nav` and `imp` commands.
 *   **Threat Detector**: A dynamic counter indicates the number of hostile vessels detected by sensors in the current quadrant.
+*   **Subspace Uplink Diagnostics Suite**: An advanced diagnostic panel (bottom right) monitoring the health of the neural/data link. It shows real-time Link Uptime, **Pulse Jitter**, **Signal Integrity**, protocol efficiency, and the active status of **AES-256-GCM** encryption.
 
 #### 🛠️ View Customization
 The commander can configure their interface via quick CLI commands:
@@ -345,15 +407,16 @@ The commander can configure their interface via quick CLI commands:
 ### NPC Ship Capabilities
 Computer-controlled ships (Klingons, Romulans, Borg, etc.) operate with standardized combat protocols:
 *   **Primary Armament**: Currently, NPC ships are equipped exclusively with **Phaser Banks**.
-*   **Firepower**: Enemy phasers inflict constant damage of **100 units** of energy per hit.
+*   **Firepower**: Enemy phasers inflict constant damage of **10 units** of energy per hit (reduced for balance).
 *   **Engagement Range**: Hostile ships will automatically open fire if a player enters within a **6.0 unit** range (Sector).
 *   **Fire Rate**: Approximately one shot every 5 seconds.
 *   **Tactics**: NPC ships do not use photon torpedoes. Their main strategy consists of direct approach (Chase) or fleeing if energy drops below critical levels.
 
-### Photon Torpedo Dynamics
-Torpedoes (command `tor`) are physically simulated weapons with precision:
-*   **Collision**: Torpedoes must physically hit the target (distance < 0.5) to explode.
-*   **Guidance**: If launched with an active `lock`, torpedoes correct course by 20% per tick towards the target, allowing hits on moving ships.
+### ☄️ Photon Torpedo Dynamics
+Torpedoes (`tor` command) are physically simulated weapons with high precision:
+*   **Collision**: Torpedoes must physically hit the target (distance **< 0.8**) to explode (increased radius to prevent tunneling).
+*   **Guidance**: If launched with an active `lock`, torpedoes correct their course by **35%** per tick towards the target, allowing hits on agile ships.
+*   **Comet Chasing**: You can use the `cha` (Chase) command to follow comets along their galactic orbit, making gas collection easier.
 *   **Obstacles**: Celestial bodies like **Stars, Planets, and Black Holes** are solid physical objects. A torpedo impacting them will be absorbed/destroyed without hitting the target behind them. Use galactic terrain for cover!
 *   **Starbases**: Starbases also block torpedoes. Beware of friendly or incidental fire.
 
@@ -566,19 +629,22 @@ To guarantee career continuity even in the most disastrous tactical situations, 
 *   **Rescue Actions**: Starfleet Command executes the following automatic operations:
     *   **Spatial Relocation**: The ship is teleported to a random and safe sector of the galaxy, away from immediate threats.
     *   **Systems Restoration**: Emergency repair of all 8 core subsystems up to **80% integrity**.
-    *   **Energy Recharge**: Supply of **50,000 units** of emergency energy.
+    *   **Energy Recharge**: Supply of **500,000 units** of emergency energy.
+    *   **Torpedo Resupply**: Provision of **1,000 standard torpedoes**.
     *   **Rescue Crew**: If personnel was at zero, a minimum rescue team of **100 members** is assigned.
-
-This architecture guarantees that Star Trek Ultra is not just a game session, but a true evolving space career.
+    This architecture guarantees that Star Trek Ultra is not just a game session, but a true evolving space career.
 
 ## 🛠️ Technologies and System Requirements
 
 The Star Trek Ultra project is a demonstration of performance-oriented software engineering, utilizing the latest evolutions of the C language and Linux/POSIX system interfaces.
 
 ### 🏗️ Core Engine & Language Standards
-*   **C23 (ISO/IEC 9899:2024)**: The simulator adopts the latest C language standard. The use of `-std=c2x` allows the employment of modern features like native `true/false` constants, standardization attributes, and stricter type support, ensuring robust and future-proof code.
-*   **High-Performance Event Loop (`epoll`)**: The server abandons the traditional `select` model in favor of **Linux epoll**. Thanks to **Edge-Triggered (EPOLLET)** mode, the kernel notifies the server only when data is actually ready on the socket, drastically reducing system calls and allowing management of hundreds of clients with near-zero CPU overhead.
+*   **C23 (ISO/IEC 9899:2024)**: The simulator adopts the latest C language standard.
+*   **Subspace Security (OpenSSL)**: All text communications and LCARS reports are protected by military-grade encryption via the OpenSSL library. The system supports multiple algorithms (**AES-256-GCM** and **ChaCha20-Poly1305**) and implements **Rotating Frequency Codes**: each message's IV is synchronized with the server's `frame_id`, ensuring unique cryptographic signatures per tick and eliminating replay-attack risks.
+*   **High-Performance Event Loop (`epoll`)**: The server uses Linux epoll to handle hundreds of simultaneous connections with minimal latency.
 *   **Binary Protocol Efficiency**: Communication in the *Subspace Channel* is optimized via `pragma pack(1)`. This forces the compiler to eliminate any padding bytes between structure members, ensuring binary packets are as small as possible and portable across different architectures.
+*   **Extended Messaging Buffers**: The protocol supports text payloads up to **64KB** per packet, allowing the transmission of full sensor reports (`srs`) even in very high-density quadrants.
+*   **Hybrid Memory Management**: While the core engine uses static memory for speed, the client adopts **Dynamic Allocation (Heap)** for handling large asynchronous messages, preventing stack overflow risks and ensuring maximum stability for the listener thread.
 
 ### 🧵 Concurrency and Real-Time IPC
 *   **Zero-Copy Shared Memory**: The *Direct Bridge* architecture exploits **POSIX Shared Memory (`shm_open`)** and **mmap**. This allows sharing the entire galactic state between Client and Viewer without any memory copy operation (Zero-Copy), reducing IPC latency to nanosecond levels.
@@ -600,14 +666,32 @@ To compile the project, a Unix-like development environment (preferably Linux) i
 
 #### Ubuntu / Debian
 ```bash
-sudo apt-get install build-essential freeglut3-dev libglu1-mesa-dev libglew-dev
+sudo apt-get install build-essential freeglut3-dev libglu1-mesa-dev libglew-dev libssl-dev
 ```
 
 #### Fedora / Red Hat / AlmaLinux / CentOS
 ```bash
 sudo dnf groupinstall "Development Tools"
-sudo dnf install freeglut-devel mesa-libGLU-devel glew-devel
+sudo dnf install freeglut-devel mesa-libGLU-devel glew-devel openssl-devel
 ```
+
+---
+
+## 🛠️ Software Engineering Deep Dive
+
+### 📐 System Architecture and Design Patterns
+The project implements several advanced engineering solutions to handle real-time simulation:
+
+*   **O(1) Spatial Indexing**: The galaxy is managed via a 3D "bucket" spatial partitioning grid. Every quadrant is indexed in a `spatial_index[11][11][11]` structure, allowing instantaneous lookup of nearby objects and reducing the computational complexity of collision detection from $O(N^2)$ to $O(1)$ per sector.
+*   **Memory Safety & Allocation**: The core engine adopts a **Zero-Allocation** policy during the game loop. All buffers (NPCs, projectiles, particles) are pre-allocated at boot. This totally eliminates memory leak risks and frame drops caused by dynamic memory management during intensive sessions.
+*   **Bit-Packed State Encoding (BPNBS)**: To optimize network traffic, the synthetic state of each quadrant is encoded into a 64-bit integer (`long long`). Each digit or bit group represents an object category (BlackHole, Planet, NPC, Base, Star), allowing global galactic map updates with an overhead of just a few bytes.
+*   **Atomic Broadcast Pattern**: To ensure multi-player consistency, the server implements atomic update transmission. During broadcast, the galactic state is locked globally, ensuring each client receives an identical and synchronized data frame, eliminating ghosting or discrepancies between captains.
+*   **Real-Time Network Diagnostics**: The system doesn't just receive data; it analyzes signal quality by calculating **Pulse Jitter** (standard deviation of inter-frame arrival time) and **Signal Integrity**. These metrics allow real-time monitoring of simulation fluidity and binary protocol health.
+*   **Authoritative Multi-Channel Synchronization**: For cataclysmic events like Supernovas, the client implements fallback logic that cross-references global map data with specific event packets. This ensures that visual alarms and timers remain consistent and active, even in the presence of latency or partial data loss.
+*   **Data Integrity & Heuristic Filtering**: The viewer implements real-time validation algorithms to distinguish between structural quadrant data (BPNBS) and emergency temporal signals. This prevents display anomalies (such as 8-digit timers) by filtering corrupt or out-of-range data before it reaches the HUD.
+*   **Zero-Latency Protocol Switching**: The encryption system supports instantaneous state changes.
+ The client synchronizes its decryption state a fraction of a second before sending the command to the server, ensuring that even immediate response messages (Handshakes) are correctly processed without informational glitches.
+*   **Fixed Timestep Logic**: The server processes physics at a fixed 30Hz tick-rate (`clock_nanosleep`), while network health is monitored in real-time via a telemetry engine that calculates throughput and packets per second (PPS) to ensure a stable connection.
 
 ---
 *STARTREK ULTRA - 3D LOGIC ENGINE. Developed with technical excellence by Nicola Taibi*

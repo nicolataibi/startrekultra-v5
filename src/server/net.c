@@ -10,8 +10,44 @@
 #include <stddef.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <openssl/evp.h>
+#include <openssl/rand.h>
 #include "server_internal.h"
 #include "ui.h"
+
+/* Master Key for Subspace Communications (Used when session key is not negotiated) */
+static const uint8_t MASTER_SESSION_KEY[32] = "TREK-ULTRA-SECURE-CRYPTO-2026-!!";
+
+/* Advanced Subspace Encryption Engine */
+void encrypt_payload(PacketMessage *msg, const char *plaintext, const uint8_t *key) {
+    int plaintext_len = strlen(plaintext);
+    if (plaintext_len > 65535) plaintext_len = 65535;
+
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    RAND_bytes(msg->iv, 12); 
+    
+    const EVP_CIPHER *cipher = (msg->crypto_algo == CRYPTO_CHACHA) ? EVP_chacha20_poly1305() : EVP_aes_256_gcm();
+    
+    /* We use the random IV for encryption. 
+       THEN we will XOR the IV in the packet for transmission. */
+    EVP_EncryptInit_ex(ctx, cipher, NULL, key, msg->iv);
+    
+    int outlen;
+    EVP_EncryptUpdate(ctx, (uint8_t*)msg->text, &outlen, (const uint8_t*)plaintext, plaintext_len);
+    int final_len;
+    EVP_EncryptFinal_ex(ctx, (uint8_t*)msg->text + outlen, &final_len);
+    
+    /* Get Auth Tag */
+    EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, msg->tag);
+    
+    /* Rotating Frequency Integration: XOR the packet's IV field with frame_id for transmission.
+       The client MUST reverse this BEFORE calling DecryptInit using the embedded origin_frame. */
+    msg->origin_frame = galaxy_master.frame_id;
+    for(int i=0; i<8; i++) msg->iv[i] ^= ((msg->origin_frame >> (i*8)) & 0xFF);
+
+    msg->length = outlen + final_len;
+    EVP_CIPHER_CTX_free(ctx);
+}
 
 int read_all(int fd, void *buf, size_t len) {
     size_t total = 0;
@@ -37,13 +73,18 @@ int write_all(int fd, const void *buf, size_t len) {
 }
 
 void broadcast_message(PacketMessage *msg) {
-    int sockets[MAX_CLIENTS];
-    int count = 0;
+    char plaintext[65536];
+    strncpy(plaintext, msg->text, 65535);
 
     pthread_mutex_lock(&game_mutex);
-    msg->length = strlen(msg->text);
-    size_t pkt_size = offsetof(PacketMessage, text) + msg->length + 1;
-    if (pkt_size > sizeof(PacketMessage)) pkt_size = sizeof(PacketMessage);
+    
+    int sender_algo = CRYPTO_NONE;
+    for(int j=0; j<MAX_CLIENTS; j++) {
+        if (players[j].active && strcmp(players[j].name, msg->from) == 0) {
+            sender_algo = players[j].crypto_algo;
+            break;
+        }
+    }
 
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (players[i].active && players[i].socket != 0) {
@@ -53,15 +94,25 @@ void broadcast_message(PacketMessage *msg) {
                 bool is_sender = (strcmp(players[i].name, msg->from) == 0);
                 if (!is_target && !is_sender) continue;
             }
-            sockets[count] = players[i].socket;
-            count++;
+            
+            PacketMessage individual_msg = *msg;
+            if (sender_algo != CRYPTO_NONE) { 
+                individual_msg.is_encrypted = 1;
+                individual_msg.crypto_algo = sender_algo;
+                const uint8_t *k = players[i].session_key;
+                bool all_zero = true; for(int z=0; z<32; z++) if(k[z]!=0) all_zero=false;
+                encrypt_payload(&individual_msg, plaintext, all_zero ? MASTER_SESSION_KEY : k);
+            } else {
+                individual_msg.is_encrypted = 0;
+                strncpy(individual_msg.text, plaintext, 65535);
+                individual_msg.length = strlen(individual_msg.text);
+            }
+            
+            size_t pkt_size = offsetof(PacketMessage, text) + individual_msg.length;
+            write_all(players[i].socket, &individual_msg, pkt_size);
         }
     }
     pthread_mutex_unlock(&game_mutex);
-
-    for (int i = 0; i < count; i++) {
-        write_all(sockets[i], msg, pkt_size);
-    }
 }
 
 void send_server_msg(int p_idx, const char *from, const char *text) {
@@ -69,9 +120,19 @@ void send_server_msg(int p_idx, const char *from, const char *text) {
     memset(&msg, 0, sizeof(PacketMessage));
     msg.type = PKT_MESSAGE;
     strncpy(msg.from, from, 63);
-    strncpy(msg.text, text, 4095);
-    msg.length = strlen(msg.text);
-    size_t pkt_size = offsetof(PacketMessage, text) + msg.length + 1;
-    if (pkt_size > sizeof(PacketMessage)) pkt_size = sizeof(PacketMessage);
+    
+    if (players[p_idx].crypto_algo != CRYPTO_NONE) {
+        msg.is_encrypted = 1;
+        msg.crypto_algo = players[p_idx].crypto_algo;
+        const uint8_t *k = players[p_idx].session_key;
+        bool all_zero = true; for(int z=0; z<32; z++) if(k[z]!=0) all_zero=false;
+        encrypt_payload(&msg, text, all_zero ? MASTER_SESSION_KEY : k);
+    } else {
+        msg.is_encrypted = 0;
+        strncpy(msg.text, text, 65535);
+        msg.length = strlen(msg.text);
+    }
+    
+    size_t pkt_size = offsetof(PacketMessage, text) + msg.length;
     write_all(players[p_idx].socket, &msg, pkt_size);
 }

@@ -25,6 +25,7 @@
 
 pthread_mutex_t game_mutex = PTHREAD_MUTEX_INITIALIZER;
 int g_debug = 0;
+int global_tick = 0;
 
 void *game_loop_thread(void *arg) {
     struct timespec ts;
@@ -48,6 +49,24 @@ int main(int argc, char *argv[]) {
     
     memset(players, 0, sizeof(players)); srand(time(NULL)); 
     
+    /* Schermata di Benvenuto Server */
+    printf("\033[2J\033[H"); /* Clear screen */
+    printf("\033[1;31m  ____________________________________________________________________________\n" );
+    printf(" /                                                                            \\\n" );
+    printf(" | \033[1;37m  ███████╗████████╗ █████╗ ██████╗     ████████╗██████╗ ███████╗██╗  ██╗\033[1;31m   |\n" );
+    printf(" | \033[1;37m  ██╔════╝╚══██╔══╝██╔══██╗██╔══██╗    ╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝\033[1;31m   |\n" );
+    printf(" | \033[1;37m  ███████╗   ██║   ███████║██████╔╝       ██║   ██████╔╝█████╗  █████╔╝ \033[1;31m   |\n" );
+    printf(" | \033[1;37m  ╚════██║   ██║   ██╔══██║██╔══██╗       ██║   ██╔══██╗██╔══╝  ██╔═██╗ \033[1;31m   |\n" );
+    printf(" | \033[1;37m  ███████║   ██║   ██║  ██║██║  ██║       ██║   ██║  ██║███████╗██║  ██╗\033[1;31m   |\n" );
+    printf(" | \033[1;37m  ╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝       ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝\033[1;31m   |\n" );
+    printf(" |                                                                            |\n" );
+    printf(" | \033[1;31m                    ---  G A L A X Y   S E R V E R  ---\033[1;31m                    |\n" );
+    printf(" |                                                                            |\n" );
+    printf(" | \033[1;37m  Copyright (C) 2026 \033[1;32mNicola Taibi\033[1;37m                                        \033[1;31m  |\n" );
+    printf(" | \033[1;37m  AI Core Support by \033[1;34mGoogle Gemini\033[1;37m                                       \033[1;31m  |\n" );
+    printf(" | \033[1;37m  License Type:      \033[1;33mGNU GPL v3.0\033[1;37m                                        \033[1;31m  |\n" );
+    printf(" \\____________________________________________________________________________/\033[0m\n\n" );
+
     if (!load_galaxy()) { generate_galaxy(); save_galaxy(); }
     init_static_spatial_index();
     
@@ -81,7 +100,7 @@ int main(int argc, char *argv[]) {
                 int new_socket = accept(server_fd, (struct sockaddr *)&addr, (socklen_t*)&adlen);
                 if (new_socket == -1) { perror("accept"); continue; }
                 
-                ev.events = EPOLLIN | EPOLLET; /* Edge Triggered for performance */
+                ev.events = EPOLLIN; 
                 ev.data.fd = new_socket;
                 if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, new_socket, &ev) == -1) { perror("epoll_ctl: new_socket"); close(new_socket); }
                 LOG_DEBUG("New connection accepted: FD %d\n", new_socket);
@@ -196,10 +215,12 @@ int main(int argc, char *argv[]) {
                                         players[slot].nav_state = NAV_STATE_IDLE; players[slot].warp_speed = 0;
                                         players[slot].dx = 0; players[slot].dy = 0; players[slot].dz = 0;
                                         players[slot].active = 1;
+                                        players[slot].crypto_algo = CRYPTO_NONE; 
                                         pthread_mutex_unlock(&game_mutex);
                                         send_server_msg(slot, "STARFLEET", "EMERGENCY RESCUE: Your ship was recovered from a collision zone and towed to a safe sector.");
                                     } else {
                                         players[slot].active = 1;
+                                        players[slot].crypto_algo = CRYPTO_NONE; 
                                         pthread_mutex_unlock(&game_mutex);
                                         send_server_msg(slot, "SERVER", is_new ? "Welcome aboard, new Captain." : "Commander, welcome back.");
                                     }

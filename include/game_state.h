@@ -88,6 +88,7 @@ typedef struct {
     /* Visual preferences */
     uint8_t show_axes;
     uint8_t show_grid;
+    uint8_t shm_crypto_algo;
 
     /* Multi-user sync (Objects in current sector) */
     int object_count;

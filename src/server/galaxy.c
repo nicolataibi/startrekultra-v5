@@ -140,138 +140,137 @@ void init_static_spatial_index() {
 }
 
 void rebuild_spatial_index() {
-    if (!spatial_index) { init_static_spatial_index(); }
+    if (!spatial_index) {
+        spatial_index = calloc(11 * 11 * 11, sizeof(QuadrantIndex));
+        if (!spatial_index) { perror("Failed to allocate spatial_index"); exit(1); }
+    }
     
-    /* Optimization: Reset dynamic counts and refresh BPNBS index */
+    /* Step 1: Wipe the entire index to start fresh */
+    memset(spatial_index, 0, 11 * 11 * 11 * sizeof(QuadrantIndex));
+
+    /* Step 2: Populate Static Objects (Stars, Planets, Bases, etc.) */
+    for(int p=0; p<MAX_PLANETS; p++) if(planets[p].active) {
+        if (IS_Q_VALID(planets[p].q1, planets[p].q2, planets[p].q3)) {
+            QuadrantIndex *q = &spatial_index[planets[p].q1][planets[p].q2][planets[p].q3];
+            if (q->planet_count < MAX_Q_PLANETS) q->planets[q->planet_count++] = &planets[p];
+        }
+    }
+    for(int b=0; b<MAX_BASES; b++) if(bases[b].active) {
+        if (IS_Q_VALID(bases[b].q1, bases[b].q2, bases[b].q3)) {
+            QuadrantIndex *q = &spatial_index[bases[b].q1][bases[b].q2][bases[b].q3];
+            if (q->base_count < MAX_Q_BASES) q->bases[q->base_count++] = &bases[b];
+        }
+    }
+    for(int s=0; s<MAX_STARS; s++) if(stars_data[s].active) {
+        if (IS_Q_VALID(stars_data[s].q1, stars_data[s].q2, stars_data[s].q3)) {
+            QuadrantIndex *q = &spatial_index[stars_data[s].q1][stars_data[s].q2][stars_data[s].q3];
+            if (q->star_count < MAX_Q_STARS) q->stars[q->star_count++] = &stars_data[s];
+        }
+    }
+    for(int h=0; h<MAX_BH; h++) if(black_holes[h].active) {
+        if (IS_Q_VALID(black_holes[h].q1, black_holes[h].q2, black_holes[h].q3)) {
+            QuadrantIndex *q = &spatial_index[black_holes[h].q1][black_holes[h].q2][black_holes[h].q3];
+            if (q->bh_count < MAX_Q_BH) q->black_holes[q->bh_count++] = &black_holes[h];
+        }
+    }
+    for(int n=0; n<MAX_NEBULAS; n++) if(nebulas[n].active) {
+        if (IS_Q_VALID(nebulas[n].q1, nebulas[n].q2, nebulas[n].q3)) {
+            QuadrantIndex *q = &spatial_index[nebulas[n].q1][nebulas[n].q2][nebulas[n].q3];
+            if (q->nebula_count < MAX_Q_NEBULAS) q->nebulas[q->nebula_count++] = &nebulas[n];
+        }
+    }
+    for(int p=0; p<MAX_PULSARS; p++) if(pulsars[p].active) {
+        if (IS_Q_VALID(pulsars[p].q1, pulsars[p].q2, pulsars[p].q3)) {
+            QuadrantIndex *q = &spatial_index[pulsars[p].q1][pulsars[p].q2][pulsars[p].q3];
+            if (q->pulsar_count < MAX_Q_PULSARS) q->pulsars[q->pulsar_count++] = &pulsars[p];
+        }
+    }
+
+    /* Step 3: Populate Dynamic Objects (NPCs, Players, Comets, etc.) */
+    for(int n=0; n<MAX_NPC; n++) if(npcs[n].active) {
+        if (IS_Q_VALID(npcs[n].q1, npcs[n].q2, npcs[n].q3)) {
+            QuadrantIndex *q = &spatial_index[npcs[n].q1][npcs[n].q2][npcs[n].q3];
+            if (q->npc_count < MAX_Q_NPC) q->npcs[q->npc_count++] = &npcs[n];
+        }
+    }
+    for(int c=0; c<MAX_COMETS; c++) if(comets[c].active) {
+        if (IS_Q_VALID(comets[c].q1, comets[c].q2, comets[c].q3)) {
+            QuadrantIndex *q = &spatial_index[comets[c].q1][comets[c].q2][comets[c].q3];
+            if (q->comet_count < MAX_Q_COMETS) q->comets[q->comet_count++] = &comets[c];
+        }
+    }
+    for(int a=0; a<MAX_ASTEROIDS; a++) if(asteroids[a].active) {
+        if (IS_Q_VALID(asteroids[a].q1, asteroids[a].q2, asteroids[a].q3)) {
+            QuadrantIndex *q = &spatial_index[asteroids[a].q1][asteroids[a].q2][asteroids[a].q3];
+            if (q->asteroid_count < MAX_Q_ASTEROIDS) q->asteroids[q->asteroid_count++] = &asteroids[a];
+        }
+    }
+    for(int d=0; d<MAX_DERELICTS; d++) if(derelicts[d].active) {
+        if (IS_Q_VALID(derelicts[d].q1, derelicts[d].q2, derelicts[d].q3)) {
+            QuadrantIndex *q = &spatial_index[derelicts[d].q1][derelicts[d].q2][derelicts[d].q3];
+            if (q->derelict_count < MAX_Q_DERELICTS) q->derelicts[q->derelict_count++] = &derelicts[d];
+        }
+    }
+    for(int m=0; m<MAX_MINES; m++) if(mines[m].active) {
+        if (IS_Q_VALID(mines[m].q1, mines[m].q2, mines[m].q3)) {
+            QuadrantIndex *q = &spatial_index[mines[m].q1][mines[m].q2][mines[m].q3];
+            if (q->mine_count < MAX_Q_MINES) q->mines[q->mine_count++] = &mines[m];
+        }
+    }
+    for(int b=0; b<MAX_BUOYS; b++) if(buoys[b].active) {
+        if (IS_Q_VALID(buoys[b].q1, buoys[b].q2, buoys[b].q3)) {
+            QuadrantIndex *q = &spatial_index[buoys[b].q1][buoys[b].q2][buoys[b].q3];
+            if (q->buoy_count < MAX_Q_BUOYS) q->buoys[q->buoy_count++] = &buoys[b];
+        }
+    }
+    for(int pl=0; pl<MAX_PLATFORMS; pl++) if(platforms[pl].active) {
+        if (IS_Q_VALID(platforms[pl].q1, platforms[pl].q2, platforms[pl].q3)) {
+            QuadrantIndex *q = &spatial_index[platforms[pl].q1][platforms[pl].q2][platforms[pl].q3];
+            if (q->platform_count < MAX_Q_PLATFORMS) q->platforms[q->platform_count++] = &platforms[pl];
+        }
+    }
+    for(int r=0; r<MAX_RIFTS; r++) if(rifts[r].active) {
+        if (IS_Q_VALID(rifts[r].q1, rifts[r].q2, rifts[r].q3)) {
+            QuadrantIndex *q = &spatial_index[rifts[r].q1][rifts[r].q2][rifts[r].q3];
+            if (q->rift_count < MAX_Q_RIFTS) q->rifts[q->rift_count++] = &rifts[r];
+        }
+    }
+    for(int m=0; m<MAX_MONSTERS; m++) if(monsters[m].active) {
+        if (IS_Q_VALID(monsters[m].q1, monsters[m].q2, monsters[m].q3)) {
+            QuadrantIndex *q = &spatial_index[monsters[m].q1][monsters[m].q2][monsters[m].q3];
+            if (q->monster_count < MAX_Q_MONSTERS) q->monsters[q->monster_count++] = &monsters[m];
+        }
+    }
+    for(int u=0; u<MAX_CLIENTS; u++) if(players[u].active && players[u].name[0] != '\0') {
+        if (IS_Q_VALID(players[u].state.q1, players[u].state.q2, players[u].state.q3)) {
+            QuadrantIndex *q = &spatial_index[players[u].state.q1][players[u].state.q2][players[u].state.q3];
+            if (q->player_count < MAX_Q_PLAYERS) q->players[q->player_count++] = &players[u];
+        }
+    }
+
+    /* Step 4: Refresh BPNBS Grid for LRS Display */
     for(int i=1; i<=10; i++)
         for(int j=1; j<=10; j++)
             for(int l=1; l<=10; l++) {
                 QuadrantIndex *q = &spatial_index[i][j][l];
-                q->npc_count = 0;
-                q->player_count = 0;
-                q->comet_count = 0;
-                /* Static objects are preserved */
-                q->planet_count = q->static_planet_count;
-                q->base_count = q->static_base_count;
-                q->star_count = q->static_star_count;
-                q->bh_count = q->static_bh_count;
-                q->nebula_count = q->static_nebula_count;
-                q->pulsar_count = q->static_pulsar_count;
-                q->asteroid_count = 0;
-                q->derelict_count = 0;
-                q->mine_count = 0;
-                q->buoy_count = 0;
-                q->platform_count = 0;
-                q->rift_count = 0;
-                q->monster_count = 0;
-
-                /* Re-initialize BPNBS based on static objects (base 7-digit) */
-                int c_bh = q->bh_count > 9 ? 9 : q->bh_count;
-                int c_p = q->planet_count > 9 ? 9 : q->planet_count;
-                int c_b = q->base_count > 9 ? 9 : q->base_count;
-                int c_s = q->star_count > 9 ? 9 : q->star_count;
-                int c_neb = q->nebula_count > 9 ? 9 : q->nebula_count;
-                int c_pul = q->pulsar_count > 9 ? 9 : q->pulsar_count;
-                galaxy_master.g[i][j][l] = (long long)c_pul * 1000000 + c_neb * 100000 + c_bh * 10000 + c_p * 1000 + c_b * 10 + c_s;
+                int c_mon = (q->monster_count > 9) ? 9 : q->monster_count;
+                int c_rift = (q->rift_count > 9) ? 9 : q->rift_count;
+                int c_plat = (q->platform_count > 9) ? 9 : q->platform_count;
+                int c_buoy = (q->buoy_count > 9) ? 9 : q->buoy_count;
+                int c_mine = (q->mine_count > 9) ? 9 : q->mine_count;
+                int c_der = (q->derelict_count > 9) ? 9 : q->derelict_count;
+                int c_ast = (q->asteroid_count > 9) ? 9 : q->asteroid_count;
+                int c_com = (q->comet_count > 9) ? 9 : q->comet_count;
+                int c_pul = (q->pulsar_count > 9) ? 9 : q->pulsar_count;
+                int c_neb = (q->nebula_count > 9) ? 9 : q->nebula_count;
+                int c_bh = (q->bh_count > 9) ? 9 : q->bh_count;
+                int c_p = (q->planet_count > 9) ? 9 : q->planet_count;
+                int c_k = (q->npc_count + q->player_count) > 9 ? 9 : (q->npc_count + q->player_count);
+                int c_b = (q->base_count > 9) ? 9 : q->base_count;
+                int c_s = (q->star_count > 9) ? 9 : q->star_count;
+                
+                galaxy_master.g[i][j][l] = (long long)c_mon * 10000000000000000LL + (long long)c_rift * 100000000000000LL + (long long)c_plat * 10000000000000LL + (long long)c_buoy * 1000000000000LL + (long long)c_mine * 100000000000LL + (long long)c_der * 10000000000LL + (long long)c_ast * 1000000000LL + (long long)c_com * 100000000LL + c_pul * 1000000 + c_neb * 100000 + c_bh * 10000 + c_p * 1000 + c_k * 100 + c_b * 10 + c_s;
             }
-
-    for(int n=0; n<MAX_NPC; n++) if(npcs[n].active) {
-        if (!IS_Q_VALID(npcs[n].q1, npcs[n].q2, npcs[n].q3)) continue;
-        QuadrantIndex *q = &spatial_index[npcs[n].q1][npcs[n].q2][npcs[n].q3];
-        if (q->npc_count < MAX_Q_NPC) { 
-            q->npcs[q->npc_count++] = &npcs[n]; 
-            /* Update BPNBS with current NPC count (Klingon/Enemy slot) */
-            int k_count = (q->npc_count > 9) ? 9 : q->npc_count;
-            int v = galaxy_master.g[npcs[n].q1][npcs[n].q2][npcs[n].q3];
-            /* Replace the 100s digit (K count) */
-            galaxy_master.g[npcs[n].q1][npcs[n].q2][npcs[n].q3] = (v / 1000 * 1000) + (k_count * 100) + (v % 100);
-        }
-    }
-    for(int c=0; c<MAX_COMETS; c++) if(comets[c].active) {
-        if (!IS_Q_VALID(comets[c].q1, comets[c].q2, comets[c].q3)) continue;
-        QuadrantIndex *q = &spatial_index[comets[c].q1][comets[c].q2][comets[c].q3];
-        if (q->comet_count < MAX_Q_COMETS) { 
-            q->comets[q->comet_count++] = &comets[c]; 
-            int v = galaxy_master.g[comets[c].q1][comets[c].q2][comets[c].q3];
-            galaxy_master.g[comets[c].q1][comets[c].q2][comets[c].q3] = 100000000 + v; /* 9th digit for comets */
-        }
-    }
-    for(int a=0; a<MAX_ASTEROIDS; a++) if(asteroids[a].active) {
-        if (!IS_Q_VALID(asteroids[a].q1, asteroids[a].q2, asteroids[a].q3)) continue;
-        QuadrantIndex *q = &spatial_index[asteroids[a].q1][asteroids[a].q2][asteroids[a].q3];
-        if (q->asteroid_count < MAX_Q_ASTEROIDS) { 
-            q->asteroids[q->asteroid_count++] = &asteroids[a]; 
-            long long v = galaxy_master.g[asteroids[a].q1][asteroids[a].q2][asteroids[a].q3];
-            if (v < 1000000000) galaxy_master.g[asteroids[a].q1][asteroids[a].q2][asteroids[a].q3] += 1000000000;
-        }
-    }
-    for(int d=0; d<MAX_DERELICTS; d++) if(derelicts[d].active) {
-        if (!IS_Q_VALID(derelicts[d].q1, derelicts[d].q2, derelicts[d].q3)) continue;
-        QuadrantIndex *q = &spatial_index[derelicts[d].q1][derelicts[d].q2][derelicts[d].q3];
-        if (q->derelict_count < MAX_Q_DERELICTS) { 
-            q->derelicts[q->derelict_count++] = &derelicts[d]; 
-            long long v = galaxy_master.g[derelicts[d].q1][derelicts[d].q2][derelicts[d].q3];
-            if (v < 10000000000LL) galaxy_master.g[derelicts[d].q1][derelicts[d].q2][derelicts[d].q3] += 10000000000LL;
-        }
-    }
-    for(int m=0; m<MAX_MINES; m++) if(mines[m].active) {
-        if (!IS_Q_VALID(mines[m].q1, mines[m].q2, mines[m].q3)) continue;
-        QuadrantIndex *q = &spatial_index[mines[m].q1][mines[m].q2][mines[m].q3];
-        if (q->mine_count < MAX_Q_MINES) { 
-            q->mines[q->mine_count++] = &mines[m]; 
-            long long v = galaxy_master.g[mines[m].q1][mines[m].q2][mines[m].q3];
-            if (v < 100000000000LL) galaxy_master.g[mines[m].q1][mines[m].q2][mines[m].q3] += 100000000000LL;
-        }
-    }
-    for(int b=0; b<MAX_BUOYS; b++) if(buoys[b].active) {
-        if (!IS_Q_VALID(buoys[b].q1, buoys[b].q2, buoys[b].q3)) continue;
-        QuadrantIndex *q = &spatial_index[buoys[b].q1][buoys[b].q2][buoys[b].q3];
-        if (q->buoy_count < MAX_Q_BUOYS) { 
-            q->buoys[q->buoy_count++] = &buoys[b]; 
-            long long v = galaxy_master.g[buoys[b].q1][buoys[b].q2][buoys[b].q3];
-            if (v < 1000000000000LL) galaxy_master.g[buoys[b].q1][buoys[b].q2][buoys[b].q3] += 1000000000000LL;
-        }
-    }
-    for(int pl=0; pl<MAX_PLATFORMS; pl++) if(platforms[pl].active) {
-        if (!IS_Q_VALID(platforms[pl].q1, platforms[pl].q2, platforms[pl].q3)) continue;
-        QuadrantIndex *q = &spatial_index[platforms[pl].q1][platforms[pl].q2][platforms[pl].q3];
-        if (q->platform_count < MAX_Q_PLATFORMS) { 
-            q->platforms[q->platform_count++] = &platforms[pl]; 
-            long long v = galaxy_master.g[platforms[pl].q1][platforms[pl].q2][platforms[pl].q3];
-            if (v < 10000000000000LL) galaxy_master.g[platforms[pl].q1][platforms[pl].q2][platforms[pl].q3] += 10000000000000LL;
-        }
-    }
-    for(int r=0; r<MAX_RIFTS; r++) if(rifts[r].active) {
-        if (!IS_Q_VALID(rifts[r].q1, rifts[r].q2, rifts[r].q3)) continue;
-        QuadrantIndex *q = &spatial_index[rifts[r].q1][rifts[r].q2][rifts[r].q3];
-        if (q->rift_count < MAX_Q_RIFTS) { 
-            q->rifts[q->rift_count++] = &rifts[r]; 
-            long long v = galaxy_master.g[rifts[r].q1][rifts[r].q2][rifts[r].q3];
-            if (v < 100000000000000LL) galaxy_master.g[rifts[r].q1][rifts[r].q2][rifts[r].q3] += 100000000000000LL;
-        }
-    }
-    for(int m=0; m<MAX_MONSTERS; m++) if(monsters[m].active) {
-        if (!IS_Q_VALID(monsters[m].q1, monsters[m].q2, monsters[m].q3)) continue;
-        QuadrantIndex *q = &spatial_index[monsters[m].q1][monsters[m].q2][monsters[m].q3];
-        if (q->monster_count < MAX_Q_MONSTERS) { 
-            q->monsters[q->monster_count++] = &monsters[m]; 
-            long long v = galaxy_master.g[monsters[m].q1][monsters[m].q2][monsters[m].q3];
-            /* 17th digit for Monsters */
-            if (v < 10000000000000000LL) galaxy_master.g[monsters[m].q1][monsters[m].q2][monsters[m].q3] += 10000000000000000LL;
-        }
-    }
-    for(int u=0; u<MAX_CLIENTS; u++) if(players[u].active && players[u].name[0] != '\0') {
-        if (!IS_Q_VALID(players[u].state.q1, players[u].state.q2, players[u].state.q3)) continue;
-        QuadrantIndex *q = &spatial_index[players[u].state.q1][players[u].state.q2][players[u].state.q3];
-        if (q->player_count < MAX_Q_PLAYERS) { 
-            q->players[q->player_count++] = &players[u]; 
-            /* Players also count as 'objects' in the K/NPC slot for simple LRS/BPNBS */
-            int total_k = (q->npc_count + q->player_count);
-            if (total_k > 9) total_k = 9;
-            int v = galaxy_master.g[players[u].state.q1][players[u].state.q2][players[u].state.q3];
-            galaxy_master.g[players[u].state.q1][players[u].state.q2][players[u].state.q3] = (v / 1000 * 1000) + (total_k * 100) + (v % 100);
-        }
-    }
 }
 
 void save_galaxy() {
@@ -462,7 +461,15 @@ void generate_galaxy() {
                     com_count++; actual_com++;
                 }
                 for(int a=0; a<ast_field && ast_count < MAX_ASTEROIDS; a++) {
-                    asteroids[ast_count] = (NPCAsteroid){.id=ast_count, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .size=0.1f+(rand()%20)/100.0f, .active=1}; ast_count++; actual_ast++;
+                    asteroids[ast_count] = (NPCAsteroid){
+                        .id=ast_count, .q1=i, .q2=j, .q3=l, 
+                        .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, 
+                        .size=0.1f+(rand()%20)/100.0f, 
+                        .resource_type=(rand()%10 < 7) ? 2 : 4, /* 70% Tritanium, 30% Monotanium */
+                        .amount=100 + rand()%401,
+                        .active=1
+                    }; 
+                    ast_count++; actual_ast++;
                 }
                 for(int d=0; d<der && der_count < MAX_DERELICTS; d++) {
                     derelicts[der_count] = (NPCDerelict){.id=der_count, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .ship_class=rand()%13, .active=1}; der_count++; actual_der++;

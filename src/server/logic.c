@@ -110,7 +110,6 @@ void update_npc_ai(int n) {
 }
 
 void update_game_logic() {
-    static int global_tick = 0;
     global_tick++;
 
     pthread_mutex_lock(&game_mutex);
@@ -178,14 +177,14 @@ void update_game_logic() {
         if (gz < 0) { gz = 0; } if (gz > 100) { gz = 100; }
         
         /* 5. Update local quadrant and sector */
-        int nq1 = (int)(gx / 10.0) + 1; if(nq1>10) nq1=10;
-        int nq2 = (int)(gy / 10.0) + 1; if(nq2>10) nq2=10;
-        int nq3 = (int)(gz / 10.0) + 1; if(nq3>10) nq3=10;
+        int nq1 = (int)(gx / 10.0) + 1; if(nq1>10) nq1=10; if(nq1<1) nq1=1;
+        int nq2 = (int)(gy / 10.0) + 1; if(nq2>10) nq2=10; if(nq2<1) nq2=1;
+        int nq3 = (int)(gz / 10.0) + 1; if(nq3>10) nq3=10; if(nq3<1) nq3=1;
         
         comets[c].q1 = nq1; comets[c].q2 = nq2; comets[c].q3 = nq3;
-        comets[c].x = fmod(gx, 10.0);
-        comets[c].y = fmod(gy, 10.0);
-        comets[c].z = fmod(gz, 10.0);
+        comets[c].x = gx - (nq1-1)*10.0;
+        comets[c].y = gy - (nq2-1)*10.0;
+        comets[c].z = gz - (nq3-1)*10.0;
     }
 
     /* Phase 1.6: Supernova Event Logic */
@@ -244,12 +243,13 @@ void update_game_logic() {
                 }
             }
 
+            supernova_event.supernova_timer = 0; /* EXPLICITLY CLEAR EVENT */
             rebuild_spatial_index();
             save_galaxy();
         }
     } else {
         /* Small chance to trigger a new supernova if none active */
-        if (global_tick % 3600 == 0 && (rand() % 1000 < 2)) { /* Check every 2 mins, 0.2% chance */
+        if (global_tick > 100 && supernova_event.supernova_timer <= 0 && (rand() % 10000 < 5)) {
             int rq1 = rand()%10+1, rq2 = rand()%10+1, rq3 = rand()%10+1;
             QuadrantIndex *qi = &spatial_index[rq1][rq2][rq3];
             if (qi->star_count > 0) {
@@ -542,6 +542,15 @@ void update_game_logic() {
             players[i].gx += players[i].dx * players[i].warp_speed;
             players[i].gy += players[i].dy * players[i].warp_speed;
             players[i].gz += players[i].dz * players[i].warp_speed;
+            
+            /* Recalculate local sector and quadrant for visualization */
+            players[i].state.q1 = get_q_from_g(players[i].gx);
+            players[i].state.q2 = get_q_from_g(players[i].gy);
+            players[i].state.q3 = get_q_from_g(players[i].gz);
+            players[i].state.s1 = players[i].gx - (players[i].state.q1 - 1) * 10.0;
+            players[i].state.s2 = players[i].gy - (players[i].state.q2 - 1) * 10.0;
+            players[i].state.s3 = players[i].gz - (players[i].state.q3 - 1) * 10.0;
+
             if (players[i].nav_timer <= 0) { players[i].nav_state = NAV_STATE_REALIGN; players[i].nav_timer = 60; players[i].start_h = players[i].state.ent_h; players[i].start_m = players[i].state.ent_m; }
         }
         else if (players[i].nav_state == NAV_STATE_REALIGN) {
@@ -557,9 +566,20 @@ void update_game_logic() {
         else if (players[i].nav_state == NAV_STATE_IMPULSE) {
             if (players[i].state.energy > 0) {
                 players[i].state.energy -= 1;
-                players[i].gx += players[i].dx * players[i].warp_speed;
-                players[i].gy += players[i].dy * players[i].warp_speed;
-                players[i].gz += players[i].dz * players[i].warp_speed;
+                /* Booster impulse speed 10x for better reactivity */
+                players[i].gx += players[i].dx * players[i].warp_speed * 10.0;
+                players[i].gy += players[i].dy * players[i].warp_speed * 10.0;
+                players[i].gz += players[i].dz * players[i].warp_speed * 10.0;
+                
+                players[i].state.q1 = get_q_from_g(players[i].gx);
+                players[i].state.q2 = get_q_from_g(players[i].gy);
+                players[i].state.q3 = get_q_from_g(players[i].gz);
+                players[i].state.s1 = players[i].gx - (players[i].state.q1 - 1) * 10.0;
+                players[i].state.s2 = players[i].gy - (players[i].state.q2 - 1) * 10.0;
+                players[i].state.s3 = players[i].gz - (players[i].state.q3 - 1) * 10.0;
+            } else {
+                players[i].nav_state = NAV_STATE_IDLE;
+                send_server_msg(i, "COMPUTER", "Impulse drive failure: Zero energy.");
             }
         }
         else if (players[i].nav_state == NAV_STATE_WORMHOLE) {
@@ -624,6 +644,19 @@ void update_game_logic() {
                 tx = npcs[tid-100].gx; ty = npcs[tid-100].gy; tz = npcs[tid-100].gz;
                 tvx = npcs[tid-100].dx * 0.03; tvy = npcs[tid-100].dy * 0.03; tvz = npcs[tid-100].dz * 0.03;
                 tq1 = npcs[tid-100].q1; tq2 = npcs[tid-100].q2; tq3 = npcs[tid-100].q3;
+                found = true;
+            } else if (tid >= 10000 && tid < 10000+MAX_COMETS && comets[tid-10000].active) {
+                int c = tid - 10000;
+                tx = (comets[c].q1-1)*10.0 + comets[c].x;
+                ty = (comets[c].q2-1)*10.0 + comets[c].y;
+                tz = (comets[c].q3-1)*10.0 + comets[c].z;
+                /* Approximate velocity from heading/mark */
+                double rad_h = comets[c].h * M_PI / 180.0;
+                double rad_m = comets[c].m * M_PI / 180.0;
+                tvx = cos(rad_m) * sin(rad_h) * 0.02; 
+                tvy = cos(rad_m) * -cos(rad_h) * 0.02;
+                tvz = sin(rad_m) * 0.02;
+                tq1 = comets[c].q1; tq2 = comets[c].q2; tq3 = comets[c].q3;
                 found = true;
             }
 
@@ -771,7 +804,7 @@ void update_game_logic() {
             } else if (tid >= 9000 && tid < 9000+MAX_PULSARS) {
                 if (pulsars[tid-9000].active && pulsars[tid-9000].q1 == pq1 && pulsars[tid-9000].q2 == pq2 && pulsars[tid-9000].q3 == pq3) valid = true;
             } else if (tid >= 10000 && tid < 10000+MAX_COMETS) {
-                if (comets[tid-10000].active && comets[tid-10000].q1 == pq1 && comets[tid-10000].q2 == pq2 && comets[tid-10000].q3 == pq3) valid = true;
+                if (comets[tid-10000].active) valid = true; /* Persistent across quadrants */
             } else if (tid >= 11000 && tid < 11000+MAX_DERELICTS) {
                 if (derelicts[tid-11000].active && derelicts[tid-11000].q1 == pq1 && derelicts[tid-11000].q2 == pq2 && derelicts[tid-11000].q3 == pq3) valid = true;
             } else if (tid >= 12000 && tid < 12000+MAX_ASTEROIDS) {
@@ -781,11 +814,11 @@ void update_game_logic() {
             } else if (tid >= 15000 && tid < 15000+MAX_BUOYS) {
                 if (buoys[tid-15000].active && buoys[tid-15000].q1 == pq1 && buoys[tid-15000].q2 == pq2 && buoys[tid-15000].q3 == pq3) valid = true;
             } else if (tid >= 16000 && tid < 16000+MAX_PLATFORMS) {
-                if (platforms[tid-16000].active && platforms[tid-16000].q1 == pq1 && platforms[tid-16000].q2 == pq2 && platforms[tid-16000].q3 == pq3) valid = true;
+                if (platforms[tid-16000].active) valid = true; /* Persistent */
             } else if (tid >= 17000 && tid < 17000+MAX_RIFTS) {
                 if (rifts[tid-17000].active && rifts[tid-17000].q1 == pq1 && rifts[tid-17000].q2 == pq2 && rifts[tid-17000].q3 == pq3) valid = true;
             } else if (tid >= 18000 && tid < 18000+MAX_MONSTERS) {
-                if (monsters[tid-18000].active && monsters[tid-18000].q1 == pq1 && monsters[tid-18000].q2 == pq2 && monsters[tid-18000].q3 == pq3) valid = true;
+                if (monsters[tid-18000].active) valid = true; /* Persistent */
             }
 
             if (!valid) {
@@ -814,24 +847,28 @@ void update_game_logic() {
                     double dx = target_x - players[i].tx, dy = target_y - players[i].ty, dz = target_z - players[i].tz;
                     double d = sqrt(dx*dx + dy*dy + dz*dz);
                     if (d > 0.01) {
-                        players[i].tdx = (players[i].tdx * 0.8) + ((dx/d) * 0.2);
-                        players[i].tdy = (players[i].tdy * 0.8) + ((dy/d) * 0.2);
-                        players[i].tdz = (players[i].tdz * 0.8) + ((dz/d) * 0.2);
+                        /* Aggressive guidance: 50% correction per tick */
+                        players[i].tdx = (players[i].tdx * 0.5) + ((dx/d) * 0.5);
+                        players[i].tdy = (players[i].tdy * 0.5) + ((dy/d) * 0.5);
+                        players[i].tdz = (players[i].tdz * 0.5) + ((dz/d) * 0.5);
                         double s = sqrt(players[i].tdx*players[i].tdx + players[i].tdy*players[i].tdy + players[i].tdz*players[i].tdz);
                         players[i].tdx /= s; players[i].tdy /= s; players[i].tdz /= s;
                     }
                 }
             }
-            players[i].tx += players[i].tdx * 0.16; players[i].ty += players[i].tdy * 0.16; players[i].tz += players[i].tdz * 0.16;
+            /* Increased velocity: 0.25 units per tick */
+            players[i].tx += players[i].tdx * 0.25; players[i].ty += players[i].tdy * 0.25; players[i].tz += players[i].tdz * 0.25;
             players[i].state.torp = (NetPoint){(float)players[i].tx, (float)players[i].ty, (float)players[i].tz, 1};
             
-            /* Collision Detection */
+            /* Collision Detection (Radius increased to 0.8 to prevent tunneling) */
             bool hit = false;
             QuadrantIndex *lq = &spatial_index[players[i].state.q1][players[i].state.q2][players[i].state.q3];
+            
+            /* 1. Players */
             for (int j=0; j<lq->player_count; j++) {
                 ConnectedPlayer *p = lq->players[j]; if (p == &players[i] || !p->active) continue;
                 double d = sqrt(pow(players[i].tx - p->state.s1, 2) + pow(players[i].ty - p->state.s2, 2) + pow(players[i].tz - p->state.s3, 2));
-                if (d < 0.5) {
+                if (d < 0.8) {
                     int dmg = 75000;
                     for(int s=0;s<6;s++) { int abs=(p->state.shields[s]>=dmg/6)?dmg/6:p->state.shields[s]; p->state.shields[s]-=abs; dmg-=abs; }
                     p->state.energy -= dmg; send_server_msg((int)(p-players), "WARNING", "HIT BY PHOTON TORPEDO!");
@@ -843,20 +880,35 @@ void update_game_logic() {
                     hit = true; break;
                 }
             }
+            /* 2. NPCs */
             if (!hit) for (int n=0; n<lq->npc_count; n++) {
                 NPCShip *npc = lq->npcs[n];
                 double d = sqrt(pow(players[i].tx - npc->x, 2) + pow(players[i].ty - npc->y, 2) + pow(players[i].tz - npc->z, 2));
-                if (d < 0.5) { npc->energy -= 75000; if(npc->energy <= 0) { npc->active = 0; players[i].state.boom = (NetPoint){(float)npc->x, (float)npc->y, (float)npc->z, 1}; } hit = true; break; }
+                if (d < 0.8) { npc->energy -= 75000; if(npc->energy <= 0) { npc->active = 0; players[i].state.boom = (NetPoint){(float)npc->x, (float)npc->y, (float)npc->z, 1}; } hit = true; break; }
             }
+            /* 3. Planets/Stars/Bases (Solid obstacles) */
+            if (!hit) for (int p=0; p<lq->planet_count; p++) {
+                double d = sqrt(pow(players[i].tx - lq->planets[p]->x, 2) + pow(players[i].ty - lq->planets[p]->y, 2) + pow(players[i].tz - lq->planets[p]->z, 2));
+                if (d < 1.2) { hit = true; break; } /* Planet hit (absorbed) */
+            }
+            if (!hit) for (int s=0; s<lq->star_count; s++) {
+                double d = sqrt(pow(players[i].tx - lq->stars[s]->x, 2) + pow(players[i].ty - lq->stars[s]->y, 2) + pow(players[i].tz - lq->stars[s]->z, 2));
+                if (d < 1.5) { hit = true; break; } /* Star hit (vaporized) */
+            }
+            if (!hit) for (int b=0; b<lq->base_count; b++) {
+                double d = sqrt(pow(players[i].tx - lq->bases[b]->x, 2) + pow(players[i].ty - lq->bases[b]->y, 2) + pow(players[i].tz - lq->bases[b]->z, 2));
+                if (d < 1.0) { hit = true; break; } /* Base hit (absorbed by planetary shields) */
+            }
+            /* 4. Platforms/Monsters */
             if (!hit) for (int pt=0; pt<lq->platform_count; pt++) {
                 NPCPlatform *plat = lq->platforms[pt];
                 double d = sqrt(pow(players[i].tx - plat->x, 2) + pow(players[i].ty - plat->y, 2) + pow(players[i].tz - plat->z, 2));
-                if (d < 0.5) { plat->energy -= 50000; if(plat->energy <= 0) { plat->active = 0; players[i].state.boom = (NetPoint){(float)plat->x, (float)plat->y, (float)plat->z, 1}; } hit = true; break; }
+                if (d < 0.8) { plat->energy -= 50000; if(plat->energy <= 0) { plat->active = 0; players[i].state.boom = (NetPoint){(float)plat->x, (float)plat->y, (float)plat->z, 1}; } hit = true; break; }
             }
             if (!hit) for (int mo=0; mo<lq->monster_count; mo++) {
                 NPCMonster *mon = lq->monsters[mo];
                 double d = sqrt(pow(players[i].tx - mon->x, 2) + pow(players[i].ty - mon->y, 2) + pow(players[i].tz - mon->z, 2));
-                if (d < 0.5) { mon->energy -= 100000; if(mon->energy <= 0) { mon->active = 0; players[i].state.boom = (NetPoint){(float)mon->x, (float)mon->y, (float)mon->z, 1}; } hit = true; break; }
+                if (d < 1.0) { mon->energy -= 100000; if(mon->energy <= 0) { mon->active = 0; players[i].state.boom = (NetPoint){(float)mon->x, (float)mon->y, (float)mon->z, 1}; } hit = true; break; }
             }
             if (hit || players[i].tx<0||players[i].tx>10||players[i].ty<0||players[i].ty>10||players[i].tz<0||players[i].tz>10) {
                 if (hit) { players[i].state.boom = (NetPoint){(float)players[i].tx, (float)players[i].ty, (float)players[i].tz, 1}; send_server_msg(i, "TACTICAL", "Torpedo impact confirmed."); }
@@ -867,12 +919,10 @@ void update_game_logic() {
 
     rebuild_spatial_index();
     if (global_tick % 1800 == 0) save_galaxy();
-    pthread_mutex_unlock(&game_mutex);
 
-    /* Phase 3: Network Updates */
+    /* Phase 3: Network Updates - Atomic Broadcast */
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (players[i].socket == 0) continue;
-        pthread_mutex_lock(&game_mutex);
         PacketUpdate upd; memset(&upd, 0, sizeof(PacketUpdate)); upd.type = PKT_UPDATE;
         upd.q1 = players[i].state.q1; upd.q2 = players[i].state.q2; upd.q3 = players[i].state.q3;
         upd.s1 = players[i].state.s1; upd.s2 = players[i].state.s2; upd.s3 = players[i].state.s3;
@@ -885,75 +935,59 @@ void update_game_logic() {
         for(int sys=0; sys<8; sys++) upd.system_health[sys] = players[i].state.system_health[sys];
         upd.lock_target = players[i].state.lock_target;
         upd.is_cloaked = players[i].state.is_cloaked;
+        upd.encryption_enabled = players[i].crypto_algo;
         int o_idx = 0;
         upd.objects[o_idx] = (NetObject){(float)players[i].state.s1,(float)players[i].state.s2,(float)players[i].state.s3,(float)players[i].state.ent_h,(float)players[i].state.ent_m,1,players[i].ship_class,1,(int)((players[i].state.energy/1000000.0)*100),i+1,""};
         strncpy(upd.objects[o_idx++].name, players[i].name, 63);
+        
+        /* 1. Prioritize Current Quadrant Objects (Critical for SRS/HUD) */
         if (IS_Q_VALID(upd.q1, upd.q2, upd.q3)) {
             QuadrantIndex *lq = &spatial_index[upd.q1][upd.q2][upd.q3];
+            /* Players in current quadrant */
             for(int j=0; j<lq->player_count; j++) {
-                ConnectedPlayer *p = lq->players[j]; if (p == &players[i] || !p->active || o_idx >= MAX_NET_OBJECTS) continue;
-                upd.objects[o_idx] = (NetObject){(float)p->state.s1,(float)p->state.s2,(float)p->state.s3,(float)p->state.ent_h,(float)p->state.ent_m,1,p->ship_class,1,(int)((p->state.energy/1000000.0)*100),(int)(p-players)+1,""};
-                strncpy(upd.objects[o_idx++].name, p->name, 63);
+                ConnectedPlayer *p = lq->players[j]; 
+                if (p == &players[i] || !p->active || o_idx >= MAX_NET_OBJECTS) continue;
+                if (p->state.is_cloaked && p->faction != players[i].faction) continue;
+                NetObject *no = &upd.objects[o_idx];
+                *no = (NetObject){(float)p->state.s1, (float)p->state.s2, (float)p->state.s3, (float)p->state.ent_h, (float)p->state.ent_m, 1, p->ship_class, 1, (int)((p->state.energy/1000000.0)*100), (int)(p-players)+1, ""};
+                strncpy(no->name, p->name, 63); o_idx++;
             }
+            /* NPCs in current quadrant */
             for(int n=0; n<lq->npc_count && o_idx < MAX_NET_OBJECTS; n++) {
-                NPCShip *npc = lq->npcs[n]; if(!npc->active) continue;
+                NPCShip *npc = lq->npcs[n]; if (!npc->active) continue;
                 int max_e = (npc->faction==FACTION_BORG)?100000:50000;
-                upd.objects[o_idx] = (NetObject){(float)npc->x,(float)npc->y,(float)npc->z,0,0,npc->faction,0,1,(int)((npc->energy/(float)max_e)*100),npc->id+1000,""};
-                strncpy(upd.objects[o_idx++].name, get_species_name(npc->faction), 63);
+                NetObject *no = &upd.objects[o_idx];
+                *no = (NetObject){(float)npc->x, (float)npc->y, (float)npc->z, (float)npc->h, (float)npc->m, npc->faction, 0, 1, (int)((npc->energy/(float)max_e)*100), npc->id+1000, ""};
+                strncpy(no->name, get_species_name(npc->faction), 63); o_idx++;
             }
-            for(int p=0; p<lq->planet_count && o_idx < MAX_NET_OBJECTS; p++) if(lq->planets[p]->active) upd.objects[o_idx++] = (NetObject){(float)lq->planets[p]->x,(float)lq->planets[p]->y,(float)lq->planets[p]->z,0,0,5,lq->planets[p]->resource_type,1,100,lq->planets[p]->id+3000,"Planet"};
-            for(int s=0; s<lq->star_count && o_idx < MAX_NET_OBJECTS; s++) if(lq->stars[s]->active) upd.objects[o_idx++] = (NetObject){(float)lq->stars[s]->x,(float)lq->stars[s]->y,(float)lq->stars[s]->z,0,0,4,lq->stars[s]->id % 7,1,100,lq->stars[s]->id+4000,"Star"};
-            for(int h=0; h<lq->bh_count && o_idx < MAX_NET_OBJECTS; h++) if(lq->black_holes[h]->active) upd.objects[o_idx++] = (NetObject){(float)lq->black_holes[h]->x,(float)lq->black_holes[h]->y,(float)lq->black_holes[h]->z,0,0,6,0,1,100,lq->black_holes[h]->id+7000,"Black Hole"};
-            for(int b=0; b<lq->base_count && o_idx < MAX_NET_OBJECTS; b++) if(lq->bases[b]->active) upd.objects[o_idx++] = (NetObject){(float)lq->bases[b]->x,(float)lq->bases[b]->y,(float)lq->bases[b]->z,0,0,3,0,1,100,lq->bases[b]->id+2000,"Starbase"};
-            for(int n=0; n<lq->nebula_count && o_idx < MAX_NET_OBJECTS; n++) upd.objects[o_idx++] = (NetObject){(float)lq->nebulas[n]->x,(float)lq->nebulas[n]->y,(float)lq->nebulas[n]->z,0,0,7,lq->nebulas[n]->id % 5,1,100,lq->nebulas[n]->id+8000,"Nebula"};
-            for(int p=0; p<lq->pulsar_count && o_idx < MAX_NET_OBJECTS; p++) upd.objects[o_idx++] = (NetObject){(float)lq->pulsars[p]->x,(float)lq->pulsars[p]->y,(float)lq->pulsars[p]->z,0,0,8,0,1,100,lq->pulsars[p]->id+9000,"Pulsar"};
-            for(int c=0; c<lq->comet_count && o_idx < MAX_NET_OBJECTS; c++) upd.objects[o_idx++] = (NetObject){(float)lq->comets[c]->x,(float)lq->comets[c]->y,(float)lq->comets[c]->z,0,0,9,0,1,100,lq->comets[c]->id+10000,"Comet"};
-            for(int a=0; a<lq->asteroid_count && o_idx < MAX_NET_OBJECTS; a++) upd.objects[o_idx++] = (NetObject){(float)lq->asteroids[a]->x,(float)lq->asteroids[a]->y,(float)lq->asteroids[a]->z,0,0,21,0,1,100,lq->asteroids[a]->id+12000,"Asteroid"};
-            for(int d=0; d<lq->derelict_count && o_idx < MAX_NET_OBJECTS; d++) upd.objects[o_idx++] = (NetObject){(float)lq->derelicts[d]->x,(float)lq->derelicts[d]->y,(float)lq->derelicts[d]->z,0,0,22,lq->derelicts[d]->ship_class,1,30,lq->derelicts[d]->id+11000,"Derelict"};
-            for(int m=0; m<lq->mine_count && o_idx < MAX_NET_OBJECTS; m++) {
-                double dx = lq->mines[m]->x - players[i].state.s1;
-                double dy = lq->mines[m]->y - players[i].state.s2;
-                double dz = lq->mines[m]->z - players[i].state.s3;
-                double dist = sqrt(dx*dx + dy*dy + dz*dz);
-                /* Mines are only visible if very close (Tactical warning) */
-                if (dist < 1.5) {
-                    upd.objects[o_idx++] = (NetObject){(float)lq->mines[m]->x,(float)lq->mines[m]->y,(float)lq->mines[m]->z,0,0,23,0,1,100,lq->mines[m]->id+14000,"Cloaked Mine"};
-                }
-            }
-            for(int b_idx=0; b_idx<lq->buoy_count && o_idx < MAX_NET_OBJECTS; b_idx++) {
-                upd.objects[o_idx++] = (NetObject){(float)lq->buoys[b_idx]->x,(float)lq->buoys[b_idx]->y,(float)lq->buoys[b_idx]->z,0,0,24,0,1,100,lq->buoys[b_idx]->id+15000,"Comm Buoy"};
-            }
-            for(int pt=0; pt<lq->platform_count && o_idx < MAX_NET_OBJECTS; pt++) {
-                upd.objects[o_idx++] = (NetObject){(float)lq->platforms[pt]->x,(float)lq->platforms[pt]->y,(float)lq->platforms[pt]->z,0,0,25,0,1,(int)((lq->platforms[pt]->energy/10000.0)*100),lq->platforms[pt]->id+16000,"Defense Platform"};
-            }
-            for(int rf=0; rf<lq->rift_count && o_idx < MAX_NET_OBJECTS; rf++) {
-                upd.objects[o_idx++] = (NetObject){(float)lq->rifts[rf]->x,(float)lq->rifts[rf]->y,(float)lq->rifts[rf]->z,0,0,26,0,1,100,lq->rifts[rf]->id+17000,"Spatial Rift"};
-            }
-            for(int mo=0; mo<lq->monster_count && o_idx < MAX_NET_OBJECTS; mo++) {
-                NetObject *no = &upd.objects[o_idx++];
-                *no = (NetObject){(float)lq->monsters[mo]->x,(float)lq->monsters[mo]->y,(float)lq->monsters[mo]->z,0,0,lq->monsters[mo]->type,0,1,100,lq->monsters[mo]->id+18000,""};
-                strncpy(no->name, (lq->monsters[mo]->type==30)?"Crystalline Entity":"Space Amoeba", 63);
-            }
+            /* Static objects in current quadrant */
+            for(int p=0; p<lq->planet_count && o_idx < MAX_NET_OBJECTS; p++) if(lq->planets[p]->active) upd.objects[o_idx++] = (NetObject){(float)lq->planets[p]->x, (float)lq->planets[p]->y, (float)lq->planets[p]->z, 0, 0, 5, lq->planets[p]->resource_type, 1, 100, lq->planets[p]->id+3000, "Planet"};
+            for(int s=0; s<lq->star_count && o_idx < MAX_NET_OBJECTS; s++) if(lq->stars[s]->active) upd.objects[o_idx++] = (NetObject){(float)lq->stars[s]->x, (float)lq->stars[s]->y, (float)lq->stars[s]->z, 0, 0, 4, lq->stars[s]->id % 7, 1, 100, lq->stars[s]->id+4000, "Star"};
+            for(int h=0; h<lq->bh_count && o_idx < MAX_NET_OBJECTS; h++) if(lq->black_holes[h]->active) upd.objects[o_idx++] = (NetObject){(float)lq->black_holes[h]->x, (float)lq->black_holes[h]->y, (float)lq->black_holes[h]->z, 0, 0, 6, 0, 1, 100, lq->black_holes[h]->id+7000, "Black Hole"};
+            for(int b=0; b<lq->base_count && o_idx < MAX_NET_OBJECTS; b++) if(lq->bases[b]->active) upd.objects[o_idx++] = (NetObject){(float)lq->bases[b]->x, (float)lq->bases[b]->y, (float)lq->bases[b]->z, 0, 0, 3, 0, 1, 100, lq->bases[b]->id+2000, "Starbase"};
+            for(int n=0; n<lq->nebula_count && o_idx < MAX_NET_OBJECTS; n++) upd.objects[o_idx++] = (NetObject){(float)lq->nebulas[n]->x, (float)lq->nebulas[n]->y, (float)lq->nebulas[n]->z, 0, 0, 7, lq->nebulas[n]->id % 5, 1, 100, lq->nebulas[n]->id+8000, "Nebula"};
+            for(int p=0; p<lq->pulsar_count && o_idx < MAX_NET_OBJECTS; p++) upd.objects[o_idx++] = (NetObject){(float)lq->pulsars[p]->x, (float)lq->pulsars[p]->y, (float)lq->pulsars[p]->z, 0, 0, 8, 0, 1, 100, lq->pulsars[p]->id+9000, "Pulsar"};
+            for(int c=0; c<lq->comet_count && o_idx < MAX_NET_OBJECTS; c++) upd.objects[o_idx++] = (NetObject){(float)lq->comets[c]->x, (float)lq->comets[c]->y, (float)lq->comets[c]->z, (float)lq->comets[c]->h, (float)lq->comets[c]->m, 9, 0, 1, 100, lq->comets[c]->id+10000, "Comet"};
+            for(int a=0; a<lq->asteroid_count && o_idx < MAX_NET_OBJECTS; a++) upd.objects[o_idx++] = (NetObject){(float)lq->asteroids[a]->x, (float)lq->asteroids[a]->y, (float)lq->asteroids[a]->z, 0, 0, 21, 0, 1, 100, lq->asteroids[a]->id+12000, "Asteroid"};
+            for(int d=0; d<lq->derelict_count && o_idx < MAX_NET_OBJECTS; d++) upd.objects[o_idx++] = (NetObject){(float)lq->derelicts[d]->x, (float)lq->derelicts[d]->y, (float)lq->derelicts[d]->z, 0, 0, 22, lq->derelicts[d]->ship_class, 1, 30, lq->derelicts[d]->id+11000, "Derelict"};
+            for(int pt=0; pt<lq->platform_count && o_idx < MAX_NET_OBJECTS; pt++) upd.objects[o_idx++] = (NetObject){(float)lq->platforms[pt]->x, (float)lq->platforms[pt]->y, (float)lq->platforms[pt]->z, 0, 0, 25, 0, 1, (int)((lq->platforms[pt]->energy/10000.0)*100), lq->platforms[pt]->id+16000, "Defense Platform"};
+            for(int mo=0; mo<lq->monster_count && o_idx < MAX_NET_OBJECTS; mo++) { NetObject *no = &upd.objects[o_idx++]; *no = (NetObject){(float)lq->monsters[mo]->x, (float)lq->monsters[mo]->y, (float)lq->monsters[mo]->z, 0, 0, lq->monsters[mo]->type, 0, 1, 100, lq->monsters[mo]->id+18000, ""}; strncpy(no->name, (lq->monsters[mo]->type==30)?"Crystalline Entity":"Space Amoeba", 63); }
         }
+
         upd.object_count = o_idx;
         upd.beam_count = players[i].state.beam_count; for(int b=0; b<upd.beam_count && b<MAX_NET_BEAMS; b++) upd.beams[b] = players[i].state.beams[b];
         
-        /* Map Synchronizer: Send current quadrant data to keep map updated with dynamic storms */
-        upd.map_update_val = galaxy_master.g[upd.q1][upd.q2][upd.q3];
-        upd.map_update_q[0] = upd.q1;
-        upd.map_update_q[1] = upd.q2;
-        upd.map_update_q[2] = upd.q3;
-
-        /* Override if Supernova is active (Broadcast supernova quadrant map data to everyone) */
+        /* Map Synchronizer: Always send supernova quadrant if active, otherwise send current */
         if (supernova_event.supernova_timer > 0) {
-            /* We alternate between sending current quadrant info and SN quadrant info */
-            static int sn_broadcast_alt = 0;
-            if (sn_broadcast_alt++ % 2 == 0) {
-                upd.map_update_q[0] = supernova_event.supernova_q1;
-                upd.map_update_q[1] = supernova_event.supernova_q2;
-                upd.map_update_q[2] = supernova_event.supernova_q3;
-                upd.map_update_val = -supernova_event.supernova_timer;
-            }
+            upd.map_update_q[0] = supernova_event.supernova_q1;
+            upd.map_update_q[1] = supernova_event.supernova_q2;
+            upd.map_update_q[2] = supernova_event.supernova_q3;
+            upd.map_update_val = -supernova_event.supernova_timer;
+        } else {
+            upd.map_update_q[0] = upd.q1;
+            upd.map_update_q[1] = upd.q2;
+            upd.map_update_q[2] = upd.q3;
+            upd.map_update_val = galaxy_master.g[upd.q1][upd.q2][upd.q3];
         }
 
         upd.torp = players[i].state.torp; upd.boom = players[i].state.boom; upd.dismantle = players[i].state.dismantle; 
@@ -972,7 +1006,8 @@ void update_game_logic() {
         players[i].state.beam_count = 0; players[i].state.boom.active = 0; players[i].state.dismantle.active = 0; players[i].state.wormhole.active = 0;
         players[i].state.jump_arrival.active = 0;
         int current_sock = players[i].socket;
-        pthread_mutex_unlock(&game_mutex);
-        if (current_sock != 0) { size_t p_size = sizeof(PacketUpdate) - sizeof(NetObject) * (MAX_NET_OBJECTS - upd.object_count); if (p_size < offsetof(PacketUpdate, objects)) p_size = offsetof(PacketUpdate, objects); write_all(current_sock, &upd, p_size); }
-    }
-}
+                if (current_sock != 0) { size_t p_size = sizeof(PacketUpdate) - sizeof(NetObject) * (MAX_NET_OBJECTS - upd.object_count); if (p_size < offsetof(PacketUpdate, objects)) p_size = offsetof(PacketUpdate, objects); write_all(current_sock, &upd, p_size); }
+            }
+            pthread_mutex_unlock(&game_mutex);
+        }
+        

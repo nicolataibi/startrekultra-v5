@@ -6,7 +6,7 @@
 CC = gcc
 CFLAGS = -Wall -Iinclude -lm -std=c2x -D_XOPEN_SOURCE=700
 GL_LIBS = -lglut -lGLU -lGL
-SHM_LIBS = -lrt -lpthread
+SHM_LIBS = -lrt -lpthread -lcrypto
 
 all: trek_server trek_client trek_3dview trek_galaxy_viewer
 

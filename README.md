@@ -192,11 +192,13 @@ Di seguito la lista completa dei comandi disponibili, raggruppati per funzione.
     *   `H`: Heading (0-359).
     *   `M`: Mark (-90 a +90).
     *   `W`: Warp Factor (0-8).
-*   `imp <H> <M> <S>`: **Impulse Drive**. Motori sub-luce.
+*   `imp <H> <M> <S>`: **Impulse Drive**. Motori sub-luce. `S` rappresenta la velocità da 0.0 a 1.0 (Full Impulse). A massima potenza (1.0), la nave percorre 1.5 unità di settore al secondo, attraversando un intero quadrante in circa 6.6 secondi.
     *   `S`: Speed (0.0 - 1.0).
     *   `imp 0 0 0`: Arresto motori (All Stop).
-*   `cal <QX> <QY> <QZ>`: **Navigation Calculator**. Calcola H, M, W per raggiungere un quadrante.
-*   `jum <QX> <QY> <QZ>`: **Wormhole Jump (Einstein-Rosen Bridge)**. Genera un wormhole per un salto istantaneo verso il quadrante di destinazione.
+    *   `cal <QX> <QY> <QZ>`: **Warp Calculator**. Calcola H, M, W per raggiungere un quadrante distante.
+    *   `ical <X> <Y> <Z>`: **Impulse Calculator**. Calcola H, M e Distanza per raggiungere coordinate precise (0.0-10.0) all'interno del quadrante attuale. Fondamentale per l'estrazione mineraria e l'attracco.
+    *   `jum <QX> <QY> <QZ>`: **Wormhole Jump (Einstein-Rosen Bridge)**.
+     Genera un wormhole per un salto istantaneo verso il quadrante di destinazione.
     *   **Requisiti**: 5000 unità di Energia e 1 Cristallo di Dilithio.
     *   **Procedura**: Richiede una sequenza di stabilizzazione della singolarità di circa 3 secondi.
 *   `apr <ID> <DIST>`: **Approach Autopilot**. Avvicinamento automatico al bersaglio ID fino a distanza DIST.
@@ -211,18 +213,24 @@ Di seguito la lista completa dei comandi disponibili, raggruppati per funzione.
     *   **Navi**: Rivela integrità scafo, livelli scudi per quadrante, energia residua, equipaggio e danni ai sottosistemi.
     *   **Anomalie**: Fornisce dati scientifici su Nebulose e Pulsar.
 *   `srs`: **Short Range Sensors**. Scansione dettagliata del quadrante attuale.
-*   `lrs`: **Long Range Sensors**. Scansione 3x3x3 dei quadranti circostanti.
+    *   **Neighborhood Scan**: Se la nave è vicino ai confini del settore (< 2.5 unità), i sensori rilevano automaticamente oggetti nei quadranti adiacenti, elencandoli in una sezione dedicata per prevenire imboscate.
+*   `lrs`: **Long Range Sensors**. Scansione 3x3x3 dei quadranti circostanti visualizzata tramite **Console Tattica LCARS** (Zone: Top, Center, Down).
+    *   **Soluzione di Navigazione**: Ogni quadrante include i parametri `H / M / W` calcolati per raggiungerlo immediatamente.
+    *   **Legenda Primaria**: `[ H P N B S ]` (Buchi Neri, Pianeti, Navi, Basi, Stelle).
+    *   **Simbologia Anomalie**: `~`:Nebulosa, `*`:Pulsar, `+`:Cometa, `#`:Asteroide, `M`:Mostro, `>`:Rift.
+    *   **Localizzazione**: Il proprio quadrante è evidenziato da uno sfondo blu.
 *   `aux probe <QX> <QY> <QZ>`: Lancia una sonda a lungo raggio verso un quadrante specifico.
 *   `sta`: **Status Report**. Rapporto completo stato nave, missione e monitoraggio dell'**Equipaggio**.
 *   `dam`: **Damage Report**. Dettaglio danni ai sistemi.
 *   `who`: Lista dei capitani attivi nella galassia.
 
 ### ⚔️ Combattimento Tattico
-*   `pha <E>`: **Fire Phasers**. Spara phaser con energia E. Danno basato sulla distanza.
-*   `tor <H> <M>`: **Fire Photon Torpedo**. Lancia un siluro.
-    *   Se `lock` attivo: Guida automatica (basta digitare `tor`).
-    *   Senza lock: Traiettoria balistica manuale.
-*   `lock <ID>`: **Target Lock**. Aggancia i sistemi di puntamento sul bersaglio ID (0 per sbloccare).
+*   `pha <E>`: **Fire Phasers**. Spara phaser sul bersaglio agganciato (`lock`) con energia E. 
+*   `pha <ID> <E>`: Spara phaser su uno specifico bersaglio ID. Il danno diminuisce con la distanza.
+*   `enc aes/chacha/off`: **Encryption Toggle**. Attiva o disattiva la crittografia in tempo reale. Supporta gli standard **AES-256-GCM** e **ChaCha20-Poly1305**. Fondamentale per proteggere le comunicazioni e leggere i messaggi sicuri degli altri capitani.
+*   `tor`: **Fire Photon Torpedo**. Lancia un siluro a guida automatica sul bersaglio agganciato.
+*   `tor <H> <M>`: Lancia un siluro in modalità balistica manuale (Heading/Mark).
+*   `lock <ID>`: **Target Lock**. Aggancia i sistemi di puntamento sul bersaglio ID (0 per sbloccare). Fondamentale per la guida automatica di phaser e siluri.
 
 ### 🆔 Schema Identificativi Galattici (Universal ID)
 Per interagire con gli oggetti della galassia tramite i comandi `lock`, `scan`, `pha`, `tor`, `bor` e `dis`, il sistema utilizza un sistema di ID univoci. Usa il comando `srs` per identificare gli ID degli oggetti nel tuo settore.
@@ -280,6 +288,28 @@ Distanze espresse in unità di settore (0.0 - 10.0). Se la distanza è superiore
 | **Crystalline E.** | (Risonanza) | **< 4.0** | Gittata del raggio a risonanza cristallina |
 | **Corpi Celesti** | (Collisione) | **< 1.0** | Danno strutturale e attivazione soccorso d'emergenza |
 
+### 🚀 Pilota Automatico (`apr`)
+Il comando `apr <ID> <DISTANZA>` permette di avvicinarsi automaticamente a qualsiasi oggetto rilevato dai sensori. Per le entità mobili, l'intercettazione funziona in tutta la galassia.
+
+| Categoria Oggetto | Range ID | Comandi Interazione | Distanza Min. | Note di Navigazione |
+| :--- | :--- | :--- | :--- | :--- |
+| **Capitani (Giocatori)** | 1 - 32 | `rad`, `pha`, `tor`, `bor` | **< 1.0** (`bor`) | Tracciamento Galattico |
+| **Navi NPC (Alieni)** | 1000 - 1999 | `pha`, `tor`, `bor`, `scan` | **< 1.0** (`bor`) | Tracciamento Galattico |
+| **Basi Stellari** | 2000 - 2199 | `doc`, `scan` | **< 2.0** | Solo quadrante attuale |
+| **Pianeti** | 3000 - 3999 | `min`, `scan` | **< 2.0** | Solo quadrante attuale |
+| **Stelle** | 4000 - 6999 | `sco`, `scan` | **< 2.0** | Solo quadrante attuale |
+| **Buchi Neri** | 7000 - 7199 | `har`, `scan` | **< 2.0** | Solo quadrante attuale |
+| **Nebulose** | 8000 - 8499 | `scan` | - | Solo quadrante attuale |
+| **Pulsar** | 9000 - 9199 | `scan` | - | Solo quadrante attuale |
+| **Comete** | 10000 - 10299 | `cha`, `scan` | **< 0.6** (Gas) | **Tracciamento Galattico** |
+| **Relitti (Derelict)** | 11000 - 11149 | `bor`, `dis`, `scan` | **< 1.5** | Solo quadrante attuale |
+| **Asteroidi** | 12000 - 13999 | `min`, `scan` | **< 1.0** | Solo quadrante attuale |
+| **Mine** | 14000 - 14999 | `scan` | - | Solo quadrante attuale |
+| **Boe di Comm.** | 15000 - 15099 | `scan` | **< 1.2** | Solo quadrante attuale |
+| **Piattaforme Difesa** | 16000 - 16199 | `pha`, `tor`, `scan` | - | Solo quadrante attuale |
+| **Rift Spaziali** | 17000 - 17049 | `scan` | - | Solo quadrante attuale |
+| **Mostri Spaziali** | 18000 - 18029 | `pha`, `tor`, `scan` | **< 1.5** | **Tracciamento Galattico** |
+
 *   `she <F> <R> <T> <B> <L> <RI>`: **Shield Configuration**. Distribuisce energia ai 6 scudi.
 *   `clo`: **Cloaking Device**. Attiva/Disattiva occultamento (consuma energia).
 *   `pow <E> <S> <W>`: **Power Distribution**. Ripartisce energia reattore (Motori, Scudi, Armi %).
@@ -310,9 +340,38 @@ Distanze espresse in unità di settore (0.0 - 10.0). Se la distanza è superiore
 *   `inv`: **Inventory**. Mostra il contenuto della stiva (Cargo Bay).
 *   `rep <ID>`: **Repair**. Ripara un sistema danneggiato usando risorse.
 
+### 🛡️ Crittografia e Guerra Elettronica (Subspace Security)
+Il sistema implementa un layer di sicurezza di grado militare per tutte le comunicazioni tra i vascelli e il comando di flotta.
+
+*   **Implementazione Tecnica**: La cifratura è gestita tramite la libreria **OpenSSL**, utilizzando algoritmi a 256-bit con autenticazione del pacchetto (GCM/Poly).
+*   **Rotating Frequency Codes**: Ogni messaggio ha una firma unica basata sul `frame_id` del server. Questo impedisce a un nemico di "registrare e riprodurre" i tuoi comandi.
+*   **Session Persistence & Handshake Safety**: Sebbene il server salvi il profilo del capitano, i protocolli di crittografia vengono resettati a `off` a ogni nuova connessione. Questo garantisce che i messaggi di benvenuto e la sincronizzazione iniziale siano sempre leggibili, evitando "lock-out" dovuti a protocolli dimenticati.
+*   **Dynamic Diagnostic Feedback**: In caso di discrepanza tra i protocolli dei capitani (es. uno usa AES e l'altro ChaCha), il computer di bordo analizza il rumore binario e fornisce suggerimenti contestuali (`[HINT]`) per aiutare il capitano a sincronizzare la frequenza.
+*   **Decrittazione Selettiva (Radio Frequencies)**: I diversi algoritmi agiscono come frequenze di comunicazione separate.
+    *   Se un capitano trasmette in `enc aes`, solo chi è sintonizzato su `enc aes` potrà leggere.
+    *   Se sei sintonizzato su un protocollo diverso (es. ascolti in AES ma ricevi ChaCha), vedrai il messaggio **<< SIGNAL DISTURBED: FREQUENCY MISMATCH >>**.
+    *   Questo obbliga gli alleati a coordinarsi preventivamente sulla "frequenza" di missione da utilizzare.
+*   **Sincronizzazione Deterministica**: Ogni pacchetto trasporta il proprio `origin_frame`, permettendo al ricevente di ricostruire l'esatta frequenza di cifratura originale, rendendo il sistema immune ai ritardi di rete (lag).
+*   **Comandi Operativi**:
+    *   `enc aes`: Attiva lo standard **AES-256-GCM** (Robusto, accelerato hardware).
+    *   `enc chacha`: Attiva lo standard **ChaCha20-Poly1305** (Moderno, ultra-veloce).
+    *   `enc off`: Disattiva i protocolli di sicurezza (Comunicazione RAW).
+
 ### 📡 Comunicazioni e Varie
 *   `rad <MSG>`: Invia messaggio radio a tutti (Canale aperto).
-*   `rad @Fac <MSG>`: Invia alla fazione (es. `@Romulan Avvistati nemici!`).
+    *   **Tabella Fazioni (@Fac)**:
+        | Fazione | Esteso | Abbreviato |
+        | :--- | :--- | :--- |
+        | **Federazione** | `@Federation` | `@Fed` |
+        | **Klingon** | `@Klingon` | `@Kli` |
+        | **Romulani** | `@Romulan` | `@Rom` |
+        | **Borg** | `@Borg` | `@Bor` |
+        | **Cardassiani** | `@Cardassian` | `@Car` |
+        | **Dominio** | `@JemHadar` | `@Jem` |
+        | **Tholiani** | `@Tholian` | `@Tho` |
+        | **Ferengi** | `@Ferengi` | `@Fer` |
+        | **Specie 8472** | `@Species8472`| `@8472` |
+        | **Gorn / Breen / Hirogen** | Nome Esteso | - |
 *   `rad #ID <MSG>`: Messaggio privato al giocatore ID.
 *   `psy`: **Psychological Warfare**. Tenta bluff (Manovra Corbomite).
 *   `axs` / `grd`: Attiva/Disattiva guide visive 3D (Assi / Griglia).
@@ -326,6 +385,7 @@ Il sistema utilizza algoritmi di proiezione spaziale per ancorare le informazion
 
 #### 🧭 Bussola Tattica 3D (`axs`)
 Attivando gli assi visivi (`axs`), il simulatore proietta un sistema di riferimento sferico centrato sulla propria nave:
+*   **Coordinate di Confine**: Al centro di ogni faccia del cubo tattico vengono proiettate le coordinate `[X,Y,Z]` dei quadranti adiacenti, permettendo di identificare istantaneamente la destinazione di un salto warp o di una manovra a impulso verso un settore confinante.
 *   **Anello del Heading**: Un disco orizzontale graduato che ruota con la nave, indicando i 360 gradi del piano galattico.
 *   **Arco del Mark**: Una guida verticale che visualizza l'inclinazione zenitale (-90/+90), fondamentale per inseguimenti tridimensionali complessi.
 *   **Assi Galattici**: Linee di riferimento per gli assi X (rosso), Y (verde) e Z (blu) che delimitano i confini del settore attuale.
@@ -335,6 +395,7 @@ L'interfaccia a schermo (Overlay) fornisce un monitoraggio costante dei parametr
 *   **Stato Reattore & Scudi**: Visualizzazione in tempo reale dell'energia disponibile e della potenza media della griglia difensiva.
 *   **Coordinate di Settore**: Conversione istantanea dei dati spaziali in coordinate relative `[S1, S2, S3]` (0.0 - 10.0), speculari a quelle utilizzate nei comandi `nav` e `imp`.
 *   **Rilevatore di Minacce**: Un contatore dinamico indica il numero di vascelli ostili rilevati dai sensori nel quadrante attuale.
+*   **Suite di Diagnostica del Sottospazio (Subspace Uplink)**: Un pannello diagnostico avanzato (basso a destra) che monitora la salute del collegamento neurale/dati. Mostra in tempo reale l'uptime del link, il **Pulse Jitter**, l'**Integrità del Segnale**, l'efficienza del protocollo e lo stato attivo della crittografia **AES-256-GCM**.
 
 #### 🛠️ Personalizzazione della Vista
 Il comandante può configurare la propria interfaccia tramite comandi CLI rapidi:
@@ -350,15 +411,16 @@ Il comandante può configurare la propria interfaccia tramite comandi CLI rapidi
 ### Capacità delle Navi NPC
 Le navi controllate dal computer (Klingon, Romulani, Borg, ecc.) operano con protocolli di combattimento standardizzati:
 *   **Armamento Primario**: Attualmente, le navi NPC sono equipaggiate esclusivamente con **Banchi Phaser**.
-*   **Potenza di Fuoco**: I phaser nemici infliggono un danno costante di **100 unità** di energia per colpo.
+*   **Potenza di Fuoco**: I phaser nemici infliggono un danno costante di **10 unità** di energia per colpo (ridotto per bilanciamento).
 *   **Portata d'Ingaggio**: Le navi ostili apriranno il fuoco automaticamente se un giocatore entra nel raggio di **6.0 unità** (Settore).
 *   **Cadenza di Tiro**: Circa un colpo ogni 5 secondi.
 *   **Tattica**: Le navi NPC non utilizzano siluri fotonici. La loro strategia principale consiste nell'avvicinamento diretto (Chase) o nella fuga se l'energia scende sotto livelli critici.
 
-### Dinamiche dei Siluri Fotonici
-I siluri (comando `tor`) sono armi fisiche simulate con precisione:
-*   **Collisione**: I siluri devono colpire fisicamente il bersaglio (distanza < 0.5) per esplodere.
-*   **Guida**: Se lanciati con un `lock` attivo, i siluri correggono la rotta del 20% per tick verso il bersaglio, permettendo di colpire navi in movimento.
+### ☄️ Dinamica dei Siluri Fotonici
+I siluri (comando `tor`) sono armi a simulazione fisica con precisione millimetrica:
+*   **Collisione**: I siluri devono colpire fisicamente il bersaglio (distanza **< 0.8**) per esplodere (raggio aumentato per evitare il tunneling).
+*   **Guida**: Se lanciati con un `lock` attivo, i siluri correggono la rotta del **35%** per ogni tick verso il bersaglio, permettendo di colpire navi agili.
+*   **Inseguimento Comete**: È possibile usare il comando `cha` (Chase) per seguire le comete lungo la loro orbita galattica, facilitando la raccolta di gas.
 *   **Ostacoli**: Corpi celesti come **Stelle, Pianeti e Buchi Neri** sono oggetti fisici solidi. Un siluro che impatta contro di essi verrà assorbito/distrutto senza colpire il bersaglio dietro di essi. Sfruttate il terreno galattico per coprirvi!
 *   **Basi Stellari**: Anche le basi stellari bloccano i siluri. Attenzione al fuoco amico o incidentale.
 
@@ -571,8 +633,9 @@ Per garantire la continuità della carriera anche nelle situazioni tattiche più
 *   **Azioni di Soccorso**: Il Comando della Flotta Stellare esegue le seguenti operazioni automatiche:
     *   **Rilocazione Spaziale**: La nave viene teletrasportata in un settore casuale e sicuro della galassia, lontano da ogni minaccia immediata.
     *   **Ripristino Sistemi**: Riparazione d'urgenza di tutti gli 8 sottosistemi core fino all'**80% di integrità**.
-    *   **Ricarica Energetica**: Fornitura di **50.000 unità** di energia di emergenza.
-    *   **Equipaggio di Soccorso**: Se il personale era a zero, viene assegnato un team di soccorso minimo di **100 membri**.
+*   **Ricarica Energia**: Fornitura di **500.000 unità** di energia di emergenza.
+*   **Rifornimento Siluri**: Dotazione di **1.000 siluri** standard.
+*   **Equipaggio di Soccorso**: Se il personale era a zero, viene assegnato un team di soccorso minimo di **100 membri**.
 
 Questa architettura garantisce che Star Trek Ultra non sia solo una sessione di gioco, ma una vera e propria carriera spaziale in evoluzione.
 
@@ -581,9 +644,12 @@ Questa architettura garantisce che Star Trek Ultra non sia solo una sessione di 
 Il progetto Star Trek Ultra è una dimostrazione di ingegneria del software orientata alle massime prestazioni, utilizzando le più recenti evoluzioni del linguaggio C e delle interfacce di sistema Linux/POSIX.
 
 ### 🏗️ Core Engine & Standard del Linguaggio
-*   **C23 (ISO/IEC 9899:2024)**: Il simulatore adotta l'ultimo standard del linguaggio C. L'uso di `-std=c2x` permette l'impiego di funzionalità moderne come le costanti `true/false` native, gli attributi di standardizzazione e un supporto più rigoroso ai tipi, garantendo un codice robusto e a prova di futuro.
-*   **High-Performance Event Loop (`epoll`)**: Il server abbandona il modello tradizionale `select` in favore di **Linux epoll**. Grazie alla modalità **Edge-Triggered (EPOLLET)**, il kernel notifica il server solo quando i dati sono effettivamente pronti sul socket, riducendo drasticamente le chiamate di sistema e permettendo la gestione di centinaia di client con un overhead della CPU prossimo allo zero.
+*   **C23 (ISO/IEC 9899:2024)**: Il simulatore adotta l'ultimo standard del linguaggio C.
+*   **Subspace Security (OpenSSL)**: Tutte le comunicazioni testuali e i rapporti LCARS sono protetti da crittografia di grado militare tramite la libreria OpenSSL. Il sistema supporta algoritmi multipli (**AES-256-GCM** e **ChaCha20-Poly1305**) e implementa **Rotating Frequency Codes**: l'IV di ogni messaggio viene sincronizzato con il `frame_id` del server, garantendo firme crittografiche uniche per ogni tick ed eliminando i rischi di replay-attack.
+*   **High-Performance Event Loop (`epoll`)**: Il server utilizza Linux epoll per gestire centinaia di connessioni simultanee con latenza minima.
 *   **Binary Protocol Efficiency**: La comunicazione nel *Subspace Channel* è ottimizzata tramite `pragma pack(1)`. Questo forza il compilatore a eliminare ogni byte di padding tra i membri delle strutture, garantendo che i pacchetti binari siano i più piccoli possibili e portabili tra diverse architetture.
+*   **Buffer di Messaggistica Estesi**: Il protocollo supporta payload di testo fino a **64KB** per pacchetto, permettendo la trasmissione di rapporti sensoriali (`srs`) completi anche in quadranti ad alta densità di oggetti.
+*   **Gestione Memoria Ibrida**: Mentre il core engine utilizza memoria statica per la velocità, il client adotta l'**allocazione dinamica (Heap)** per la gestione dei messaggi asincroni di grandi dimensioni, prevenendo rischi di stack overflow e garantendo la massima stabilità del thread di ascolto.
 
 ### 🧵 Concorrenza e Real-Time IPC
 *   **Zero-Copy Shared Memory**: L'architettura *Direct Bridge* sfrutta **POSIX Shared Memory (`shm_open`)** e **mmap**. Questo permette di condividere l'intero stato galattico tra il Client e il Visualizzatore senza alcuna operazione di copia in memoria (Zero-Copy), riducendo la latenza IPC a livelli nanosecondari.
@@ -605,14 +671,46 @@ Per compilare il progetto, è necessario un ambiente di sviluppo Unix-like (pref
 
 #### Ubuntu / Debian
 ```bash
-sudo apt-get install build-essential freeglut3-dev libglu1-mesa-dev libglew-dev
+sudo apt-get install build-essential freeglut3-dev libglu1-mesa-dev libglew-dev libssl-dev
 ```
 
 #### Fedora / Red Hat / AlmaLinux / CentOS
 ```bash
 sudo dnf groupinstall "Development Tools"
-sudo dnf install freeglut-devel mesa-libGLU-devel glew-devel
+sudo dnf install freeglut-devel mesa-libGLU-devel glew-devel openssl-devel
 ```
 
 ---
+
+
+
+## 🛠️ Software Engineering Deep Dive
+
+
+
+### 📐 Architettura del sistema e Pattern Progettuali
+
+Il progetto implementa diverse soluzioni ingegneristiche avanzate per gestire la simulazione in tempo reale:
+
+
+
+*   **O(1) Spatial Indexing**: La galassia è gestita tramite una griglia di partizionamento spaziale 3D a "bucket". Ogni quadrante è indicizzato in una struttura `spatial_index[11][11][11]`, permettendo lookup istantanei degli oggetti vicini e riducendo la complessità computazionale del calcolo delle collisioni da $O(N^2)$ a $O(1)$ per settore.
+
+*   **Memory Safety & Allocation**: Il core engine adotta una politica di **Zero-Allocation** durante il loop di gioco. Tutti i buffer (NPC, proiettili, particelle) sono pre-allocati al boot. Questo elimina totalmente i rischi di memory leak e i "frame drop" causati dal memory management durante le sessioni intensive.
+
+*   **Bit-Packed State Encoding (BPNBS)**: Per ottimizzare il traffico di rete, lo stato sintetico di ogni quadrante è codificato in un intero a 64-bit (`long long`). Ogni cifra o bit rappresenta una categoria di oggetti (BlackHole, Planet, NPC, Base, Star), permettendo di aggiornare la mappa galattica globale con un overhead di pochi byte.
+
+*   **Atomic Broadcast Pattern**: Per garantire la coerenza multi-giocatore, il server implementa un invio atomico degli aggiornamenti. Durante il broadcast, lo stato della galassia viene bloccato globalmente, assicurando che ogni client riceva un frame di dati identico e sincronizzato, eliminando "ghosting" o discrepanze tra i capitani.
+
+*   **Real-Time Network Diagnostics**: Il sistema non si limita a ricevere dati, ma analizza la qualità del segnale calcolando il **Pulse Jitter** (deviazione standard dell'intervallo tra i frame) e l'**Integrità del Segnale**. Queste metriche permettono di monitorare la fluidità della simulazione e la salute del protocollo binario in tempo reale.
+*   **Sincronizzazione Autoritaria Multi-Canale**: Per eventi cataclismatici come le Supernove, il client implementa una logica di fallback che incrocia i dati della mappa globale con i pacchetti di evento specifici. Questo garantisce che gli allarmi visivi e i timer siano sempre coerenti e attivi, anche in presenza di latenza o perdita parziale di dati.
+*   **Filtro Euristico dell'Integrità Dati**: Il visore implementa algoritmi di validazione in tempo reale per distinguere tra dati strutturali (BPNBS) e segnali temporali di emergenza. Questo previene anomalie di visualizzazione (come timer a 8 cifre) filtrando i dati corrotti o fuori range prima che raggiungano l'HUD.
+*   **Zero-Latency Protocol Switching**: Il sistema di crittografia supporta il cambio di stato istantaneo.
+ Il client sincronizza il proprio stato di decifratura una frazione di secondo prima dell'invio del comando al server, garantendo che anche i messaggi di risposta immediata (Handshake) siano correttamente processati senza "glitch" informativi.
+*   **Fixed Timestep Logic**: Il server processa la fisica a un tick-rate fisso di 30Hz (`clock_nanosleep`), mentre il client renderizza a 60Hz+ con interpolazione lineare.
+
+
+
+---
+
 *STARTREK ULTRA - 3D LOGIC ENGINE. Sviluppato con eccellenza tecnica da Nicola Taibi.*

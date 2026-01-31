@@ -67,12 +67,20 @@ typedef struct {
     int shm_show_grid;
     int shm_show_map;
     int is_cloaked;
-    int shm_q[3]; /* Current Quadrant [x,y,z] */
+    int shm_crypto_algo;
+    int shm_q[3];
+    int shm_galaxy[11][11][11];
+    
+    /* Subspace Telemetry Metrics */
+    float net_kbps;
+    float net_efficiency;
+    float net_jitter;
+    float net_integrity;
+    int net_last_packet_size;
+    int net_avg_packet_size;
+    int net_packet_count;
+    long net_uptime;
 
-    /* Full Galaxy Data for Map Mode - Using long long for 17-digit encoding */
-    long long shm_galaxy[11][11][11];
-
-    /* Object List */
     int object_count;
     SharedObject objects[MAX_OBJECTS];
 

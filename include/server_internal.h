@@ -29,25 +29,30 @@ typedef struct {
     int faction;
     int ship_class;
     int active;
-    double gx, gy, gz; /* Absolute Galactic Position */
+    int crypto_algo; /* 0: None, 1: AES, 2: ChaCha */
+    uint8_t session_key[32]; /* Derived via ECDH */
     
-    /* Navigation State */
-    NavState nav_state;
-    int nav_timer; 
-    double start_h, start_m;
-    double target_h, target_m;
+    /* Navigation & Physics State */
+    double gx, gy, gz;      /* Absolute Galactic Coordinates */
     double target_gx, target_gy, target_gz;
-    double dx, dy, dz;
-    double wx, wy, wz; /* Wormhole Entrance Coordinates */
+    double dx, dy, dz;      /* Movement Vector */
+    double target_h, target_m;
+    double start_h, start_m;
+    int nav_state;
+    int nav_timer;
     double warp_speed;
     double approach_dist;
-
-    /* Combat State */
+    
+    /* Torpedo State */
     bool torp_active;
-    int torp_target;
-    double tx, ty, tz;
-    double tdx, tdy, tdz;
-    StarTrekGame state; 
+    double tx, ty, tz;      /* Torpedo Current Position */
+    double tdx, tdy, tdz;   /* Torpedo Vector */
+    int torp_target;        /* ID of target */
+    
+    /* Jump Visuals */
+    double wx, wy, wz;      /* Wormhole entrance coords */
+
+    StarTrekGame state;
 } ConnectedPlayer;
 
 typedef enum {
@@ -62,8 +67,8 @@ typedef struct { int id, faction, q1, q2, q3; double x, y, z; int active; } NPCS
 typedef struct { int id, q1, q2, q3; double x, y, z; int active; } NPCBlackHole;
 typedef struct { int id, q1, q2, q3; double x, y, z; int active; } NPCNebula;
 typedef struct { int id, q1, q2, q3; double x, y, z; int active; } NPCPulsar;
-typedef struct { int id, q1, q2, q3; double x, y, z; double a, b, angle, speed, inc; double cx, cy, cz; int active; } NPCComet;
-typedef struct { int id, q1, q2, q3; double x, y, z; float size; int active; } NPCAsteroid;
+typedef struct { int id, q1, q2, q3; double x, y, z, h, m; double a, b, angle, speed, inc; double cx, cy, cz; int active; } NPCComet;
+typedef struct { int id, q1, q2, q3; double x, y, z; float size; int resource_type, amount, active; } NPCAsteroid;
 typedef struct { int id, q1, q2, q3; double x, y, z; int ship_class; int active; } NPCDerelict;
 typedef struct { int id, q1, q2, q3; double x, y, z; int faction; int active; } NPCMine;
 typedef struct { int id, q1, q2, q3; double x, y, z; int active; } NPCBuoy;
@@ -143,6 +148,7 @@ extern ConnectedPlayer players[MAX_CLIENTS];
 extern StarTrekGame galaxy_master;
 extern pthread_mutex_t game_mutex;
 extern int g_debug;
+extern int global_tick;
 
 typedef struct {
     int supernova_q1, supernova_q2, supernova_q3;
