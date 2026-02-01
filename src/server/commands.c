@@ -50,11 +50,42 @@ void handle_enc(int i, const char *params) {
     } else if (strstr(params, "chacha")) {
         players[i].crypto_algo = CRYPTO_CHACHA;
         send_server_msg(i, "COMPUTER", "Subspace encryption: CHACHA20-POLY1305 ACTIVE.");
+    } else if (strstr(params, "aria")) {
+        players[i].crypto_algo = CRYPTO_ARIA;
+        send_server_msg(i, "COMPUTER", "Subspace encryption: ARIA-256-GCM ACTIVE.");
+    } else if (strstr(params, "camellia")) {
+        players[i].crypto_algo = CRYPTO_CAMELLIA;
+        send_server_msg(i, "COMPUTER", "Subspace encryption: CAMELLIA-256-CTR (ROMULAN) ACTIVE.");
+    } else if (strstr(params, "seed")) {
+        players[i].crypto_algo = CRYPTO_SEED;
+        send_server_msg(i, "COMPUTER", "Subspace encryption: SEED-CBC (ORION) ACTIVE.");
+    } else if (strstr(params, "cast")) {
+        players[i].crypto_algo = CRYPTO_CAST5;
+        send_server_msg(i, "COMPUTER", "Subspace encryption: CAST5-CBC (OLD REPUBLIC) ACTIVE.");
+    } else if (strstr(params, "idea")) {
+        players[i].crypto_algo = CRYPTO_IDEA;
+        send_server_msg(i, "COMPUTER", "Subspace encryption: IDEA-CBC (MAQUIS) ACTIVE.");
+    } else if (strstr(params, "3des")) {
+        players[i].crypto_algo = CRYPTO_3DES;
+        send_server_msg(i, "COMPUTER", "Subspace encryption: DES-EDE3-CBC (ANCIENT) ACTIVE.");
+    } else if (strstr(params, "bf") || strstr(params, "blowfish")) {
+        players[i].crypto_algo = CRYPTO_BLOWFISH;
+        send_server_msg(i, "COMPUTER", "Subspace encryption: BLOWFISH-CBC (FERENGI) ACTIVE.");
+    } else if (strstr(params, "rc4")) {
+        players[i].crypto_algo = CRYPTO_RC4;
+        send_server_msg(i, "COMPUTER", "Subspace encryption: RC4-STREAM (TACTICAL) ACTIVE.");
+    } else if (strstr(params, "des") && !strstr(params, "3des")) {
+        players[i].crypto_algo = CRYPTO_DES;
+        send_server_msg(i, "COMPUTER", "Subspace encryption: DES-CBC (PRE-WARP) ACTIVE.");
+    } else if (strstr(params, "pqc") || strstr(params, "kyber")) {
+        players[i].crypto_algo = CRYPTO_PQC;
+        send_server_msg(i, "COMPUTER", "Subspace encryption: ML-KEM-1024 (POST-QUANTUM) ACTIVE.");
+        send_server_msg(i, "SCIENCE", "Quantum Tunnel established. Communications are now immune to Shor's algorithm.");
     } else if (strstr(params, "off")) {
         players[i].crypto_algo = CRYPTO_NONE;
         send_server_msg(i, "COMPUTER", "WARNING: Encryption DISABLED. Signal is now RAW.");
     } else {
-        send_server_msg(i, "COMPUTER", "Usage: enc aes | chacha | off");
+        send_server_msg(i, "COMPUTER", "Usage: enc aes | chacha | aria | camellia | seed | cast | idea | 3des | bf | rc4 | des | pqc | off");
     }
 }
 

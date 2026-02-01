@@ -227,7 +227,7 @@ Di seguito la lista completa dei comandi disponibili, raggruppati per funzione.
 ### ⚔️ Combattimento Tattico
 *   `pha <E>`: **Fire Phasers**. Spara phaser sul bersaglio agganciato (`lock`) con energia E. 
 *   `pha <ID> <E>`: Spara phaser su uno specifico bersaglio ID. Il danno diminuisce con la distanza.
-*   `enc aes/chacha/off`: **Encryption Toggle**. Attiva o disattiva la crittografia in tempo reale. Supporta gli standard **AES-256-GCM** e **ChaCha20-Poly1305**. Fondamentale per proteggere le comunicazioni e leggere i messaggi sicuri degli altri capitani.
+*   `enc <algo>`: **Encryption Toggle**. Attiva o disattiva la crittografia in tempo reale. Supporta gli standard **AES-256-GCM**, **ChaCha20**, **ARIA**, **Camellia**, **Blowfish**, **RC4**, **CAST5**, **IDEA**, **3DES** e **PQC (ML-KEM)**. Fondamentale per proteggere le comunicazioni e leggere i messaggi sicuri degli altri capitani.
 *   `tor`: **Fire Photon Torpedo**. Lancia un siluro a guida automatica sul bersaglio agganciato.
 *   `tor <H> <M>`: Lancia un siluro in modalità balistica manuale (Heading/Mark).
 *   `lock <ID>`: **Target Lock**. Aggancia i sistemi di puntamento sul bersaglio ID (0 per sbloccare). Fondamentale per la guida automatica di phaser e siluri.
@@ -344,6 +344,7 @@ Il comando `apr <ID> <DISTANZA>` permette di avvicinarsi automaticamente a quals
 Il sistema implementa un layer di sicurezza di grado militare per tutte le comunicazioni tra i vascelli e il comando di flotta.
 
 *   **Implementazione Tecnica**: La cifratura è gestita tramite la libreria **OpenSSL**, utilizzando algoritmi a 256-bit con autenticazione del pacchetto (GCM/Poly).
+*   **Firma Digitale (Ed25519)**: Oltre alla cifratura, ogni messaggio radio include una firma crittografica generata tramite curve ellittiche (**Ed25519**). Questo garantisce **Autenticità** (solo il vero capitano può firmare) e **Integrità** (il messaggio non è stato alterato). I messaggi verificati appaiono con il tag `[VERIFIED]`.
 *   **Rotating Frequency Codes**: Ogni messaggio ha una firma unica basata sul `frame_id` del server. Questo impedisce a un nemico di "registrare e riprodurre" i tuoi comandi.
 *   **Session Persistence & Handshake Safety**: Sebbene il server salvi il profilo del capitano, i protocolli di crittografia vengono resettati a `off` a ogni nuova connessione. Questo garantisce che i messaggi di benvenuto e la sincronizzazione iniziale siano sempre leggibili, evitando "lock-out" dovuti a protocolli dimenticati.
 *   **Dynamic Diagnostic Feedback**: In caso di discrepanza tra i protocolli dei capitani (es. uno usa AES e l'altro ChaCha), il computer di bordo analizza il rumore binario e fornisce suggerimenti contestuali (`[HINT]`) per aiutare il capitano a sincronizzare la frequenza.
@@ -355,9 +356,15 @@ Il sistema implementa un layer di sicurezza di grado militare per tutte le comun
 *   **Comandi Operativi**:
     *   `enc aes`: Attiva lo standard **AES-256-GCM** (Robusto, accelerato hardware).
     *   `enc chacha`: Attiva lo standard **ChaCha20-Poly1305** (Moderno, ultra-veloce).
-    *   `enc off`: Disattiva i protocolli di sicurezza (Comunicazione RAW).
-
-### 📡 Comunicazioni e Varie
+    *   `enc aria`: Attiva lo standard **ARIA-256-GCM** (Standard Sudcoreano).
+    *   `enc camellia`: Attiva **Camellia-256-CTR** (Standard Romulano ad alta sicurezza).
+    *   `enc bf`: Attiva **Blowfish-CBC** (Protocollo commerciale Ferengi).
+    *   `enc rc4`: Attiva **RC4 Stream** (Link tattico a bassa latenza).
+    *   `enc cast`: Attiva **CAST5-CBC** (Standard della Vecchia Repubblica).
+    *   `enc idea`: Attiva **IDEA-CBC** (Protocollo Maquis/Resistenza).
+    *   `enc 3des`: Attiva **Triple DES-CBC** (Standard antico delle sonde terrestri).
+    *   `enc pqc`: Attiva **ML-KEM-1024** (Crittografia Post-Quantistica). Standardizzato dal NIST per resistere agli attacchi dei futuri computer quantistici.
+    *   `enc off`: Disattiva i protocolli di sicurezza (Comunicazione RAW).### 📡 Comunicazioni e Varie
 *   `rad <MSG>`: Invia messaggio radio a tutti (Canale aperto).
     *   **Tabella Fazioni (@Fac)**:
         | Fazione | Esteso | Abbreviato |
@@ -639,13 +646,56 @@ Per garantire la continuità della carriera anche nelle situazioni tattiche più
 
 Questa architettura garantisce che Star Trek Ultra non sia solo una sessione di gioco, ma una vera e propria carriera spaziale in evoluzione.
 
+## 🔐 Crittografia Subspaziale: Approfondimento Tattico
+
+Star Trek Ultra implementa una suite crittografica multi-livello, mappando standard del mondo reale sul panorama geopolitico dei Quadranti Alfa e Beta.
+
+### ⚛️ Standard Moderni e Post-Quantistici (Core della Federazione)
+*   **ML-KEM-1024 (Kyber)**: `enc pqc`. L'apice della sicurezza subspaziale. Standardizzato dal NIST per resistere all'algoritmo di Shor, questo protocollo garantisce che le comunicazioni rimangano private anche contro i futuri computer quantistici. *Usato da: Sezione 31 e Ricerca Avanzata della Flotta Stellare.*
+*   **AES-256-GCM**: `enc aes`. Lo standard ufficiale del Comando della Flotta Stellare. Fornisce crittografia ad alta velocità accelerata in hardware con integrità del messaggio integrata (Authenticated Encryption).
+*   **ChaCha20-Poly1305**: `enc chacha`. Un moderno cifrario a flusso ad alte prestazioni. Ideale per navi scout e collegamenti tattici dove la velocità lato software è critica.
+*   **ARIA-256-GCM**: `enc aria`. Un robusto cifrario a blocchi (standard sudcoreano). Nel gioco, rappresenta lo standard di crittografia congiunto utilizzato dall'Alleanza Federazione-Klingon.
+
+### 🏛️ Standard Imperiali e Regionali (Grandi Potenze)
+*   **Camellia-256-CTR**: `enc camellia`. Un cifrario ad alta sicurezza certificato ISO. All'interno del simulatore, funge da **Standard Imperiale dell'Impero Stellare Romulano**, noto per la sua eleganza e resistenza alla decrittazione brute-force.
+*   **Blowfish-CBC**: `enc bf`. Progettato da Bruce Schneier, questo algoritmo è veloce e non presenta debolezze note. Mappato al **Protocollo Commerciale Ferengi**, ottimizzato per proteggere transazioni finanziarie e rotte commerciali di latinum.
+*   **RC4 Stream**: `enc rc4`. Un cifrario a flusso leggero. Usato come **Link Tattico a Bassa Latenza**, perfetto per manovre di combattimento ad alta velocità dove ogni millisecondo conta.
+
+### 🏺 Protocolli Legacy e della Resistenza (Storia e Sottobosco)
+*   **CAST5-CBC**: `enc cast`. Un solido standard canadese. Rappresenta la crittografia dell'**Era della Vecchia Repubblica** (XXII secolo), ancora presente in alcune basi stellari remote e mercantili civili.
+*   **IDEA-CBC**: `enc idea`. Famoso per il suo ruolo nel primo PGP (Pretty Good Privacy). Mappato alla **Resistenza Maquis**, usato dai ribelli e dalle colonie indipendenti per sfuggire alla sorveglianza cardassiana e della Federazione.
+*   **Triple DES (3DES-CBC)**: `enc 3des`. Un'evoluzione dell'originale DES. Funge da protocollo degli **Archivi Antichi della Federazione**, usato per decrittare log di dati del XXIII secolo.
+*   **DES-CBC**: `enc des`. Lo standard terrestre degli anni '70. Mappato ai **Segnali Umani Pre-Warp**, usato da antiche navi dormienti e sonde (come la Voyager 6 o le missioni Pioneer).
+
+---
+
+### 🌐 Analisi Tecnica Reale (Cybersecurity)
+
+Per gli ingegneri interessati, ecco la scomposizione tecnica degli algoritmi utilizzati nel progetto e la loro rilevanza nel mondo reale:
+
+| Algoritmo | Tipo | Chiave | Modalità | Profilo Tecnico |
+| :--- | :--- | :--- | :--- | :--- |
+| **ML-KEM (Kyber)** | Lattice-based (KEM) | 1024 (equiv) | Handshake | **Standard Post-Quantistico NIST**. Progettato per resistere agli attacchi dei futuri computer quantistici risolvendo il problema matematico Module-Learning with Errors (M-LWE). |
+| **AES-256** | Block Cipher (SPN) | 256-bit | GCM | **Lo Standard Globale**. Implementa una rete di Sostituzione-Permutazione. La modalità GCM fornisce AEAD, garantendo sia la segretezza che l'integrità dei dati. |
+| **ChaCha20** | Stream Cipher (ARX) | 256-bit | Poly1305 | **Streamer ad Alte Prestazioni**. Sviluppato da Daniel J. Bernstein, utilizza operazioni Add-Rotate-XOR. È immune agli attacchi di temporizzazione (timing attacks). |
+| **ARIA** | Block Cipher (SPN) | 256-bit | GCM | **Standard Nazionale Coreano**. Struttura simile ad AES ma con un design differente della matrice MDS. Offre un'eccellente diversità crittografica. |
+| **Camellia** | Block Cipher (Feistel) | 256-bit | CTR | **Standard ISO/IEC Giapponese**. Sviluppato da Mitsubishi e NTT. È uno dei pochi cifrari approvati per l'uso governativo ad alto livello oltre ad AES. |
+| **Blowfish** | Block Cipher (Feistel) | 32-448 bit | CBC | **Classico Legacy**. Creato da Bruce Schneier nel 1993. Sebbene veloce, il suo blocco da 64-bit lo rende suscettibile ad attacchi di collisione su volumi di dati enormi. |
+| **RC4** | Stream Cipher | Variabile | Stream | **Rilevanza Storica**. Un tempo il cifrario a flusso più usato (SSL/WEP), oggi è deprecato a causa di bias statistici nei primi byte del keystream. |
+| **CAST5** | Block Cipher (Feistel) | 128-bit | CBC | **Standard PGP**. Noto per la sua resistenza alla crittoanalisi differenziale e lineare. Molto usato in strumenti di sicurezza open-source. |
+| **IDEA** | Block Cipher | 128-bit | CBC | **Design Svizzero**. Basato sul concetto di mescolare operazioni da diversi gruppi algebrici (XOR, Addizione, Moltiplicazione). Molto popolare negli anni '90. |
+| **3DES** | Block Cipher | 168-bit | CBC | **Transizione Legacy**. Applica l'algoritmo DES tre volte. Sebbene aumenti la lunghezza della chiave, è significativamente più lento delle alternative moderne. |
+| **DES** | Block Cipher | 56-bit | CBC | **La Leggenda del 1977**. Il primo standard di crittografia globale. Oggi è considerato insicuro perché la sua chiave può essere forzata in poche ore. |
+
+---
+
 ## 🛠️ Tecnologie e Requisiti di Sistema
 
 Il progetto Star Trek Ultra è una dimostrazione di ingegneria del software orientata alle massime prestazioni, utilizzando le più recenti evoluzioni del linguaggio C e delle interfacce di sistema Linux/POSIX.
 
 ### 🏗️ Core Engine & Standard del Linguaggio
 *   **C23 (ISO/IEC 9899:2024)**: Il simulatore adotta l'ultimo standard del linguaggio C.
-*   **Subspace Security (OpenSSL)**: Tutte le comunicazioni testuali e i rapporti LCARS sono protetti da crittografia di grado militare tramite la libreria OpenSSL. Il sistema supporta algoritmi multipli (**AES-256-GCM** e **ChaCha20-Poly1305**) e implementa **Rotating Frequency Codes**: l'IV di ogni messaggio viene sincronizzato con il `frame_id` del server, garantendo firme crittografiche uniche per ogni tick ed eliminando i rischi di replay-attack.
+*   **Subspace Security (OpenSSL)**: Tutte le comunicazioni testuali e i rapporti LCARS sono protetti da crittografia di grado militare tramite la libreria OpenSSL. Il sistema supporta una vasta gamma di algoritmi (**AES-256-GCM**, **ChaCha20**, **ARIA**, **Camellia**, **Blowfish**, **RC4**, **CAST5**, **IDEA**, **3DES** e **ML-KEM-1024**) e implementa **Rotating Frequency Codes****: l'IV di ogni messaggio viene sincronizzato con il `frame_id` del server, garantendo firme crittografiche uniche per ogni tick ed eliminando i rischi di replay-attack.
 *   **High-Performance Event Loop (`epoll`)**: Il server utilizza Linux epoll per gestire centinaia di connessioni simultanee con latenza minima.
 *   **Binary Protocol Efficiency**: La comunicazione nel *Subspace Channel* è ottimizzata tramite `pragma pack(1)`. Questo forza il compilatore a eliminare ogni byte di padding tra i membri delle strutture, garantendo che i pacchetti binari siano i più piccoli possibili e portabili tra diverse architetture.
 *   **Buffer di Messaggistica Estesi**: Il protocollo supporta payload di testo fino a **64KB** per pacchetto, permettendo la trasmissione di rapporti sensoriali (`srs`) completi anche in quadranti ad alta densità di oggetti.

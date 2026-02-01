@@ -26,7 +26,21 @@ void encrypt_payload(PacketMessage *msg, const char *plaintext, const uint8_t *k
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     RAND_bytes(msg->iv, 12); 
     
-    const EVP_CIPHER *cipher = (msg->crypto_algo == CRYPTO_CHACHA) ? EVP_chacha20_poly1305() : EVP_aes_256_gcm();
+    const EVP_CIPHER *cipher;
+    int is_gcm = 0;
+
+    if (msg->crypto_algo == CRYPTO_CHACHA) { cipher = EVP_chacha20_poly1305(); is_gcm = 1; }
+    else if (msg->crypto_algo == CRYPTO_ARIA) { cipher = EVP_aria_256_gcm(); is_gcm = 1; }
+    else if (msg->crypto_algo == CRYPTO_CAMELLIA) { cipher = EVP_camellia_256_ctr(); is_gcm = 0; }
+    else if (msg->crypto_algo == CRYPTO_SEED) { cipher = EVP_seed_cbc(); is_gcm = 0; }
+    else if (msg->crypto_algo == CRYPTO_CAST5) { cipher = EVP_cast5_cbc(); is_gcm = 0; }
+    else if (msg->crypto_algo == CRYPTO_IDEA) { cipher = EVP_idea_cbc(); is_gcm = 0; }
+    else if (msg->crypto_algo == CRYPTO_3DES) { cipher = EVP_des_ede3_cbc(); is_gcm = 0; }
+    else if (msg->crypto_algo == CRYPTO_BLOWFISH) { cipher = EVP_bf_cbc(); is_gcm = 0; }
+    else if (msg->crypto_algo == CRYPTO_RC4) { cipher = EVP_rc4(); is_gcm = 0; }
+    else if (msg->crypto_algo == CRYPTO_DES) { cipher = EVP_des_cbc(); is_gcm = 0; }
+    else if (msg->crypto_algo == CRYPTO_PQC) { cipher = EVP_aes_256_gcm(); is_gcm = 1; }
+    else { cipher = EVP_aes_256_gcm(); is_gcm = 1; }
     
     /* We use the random IV for encryption. 
        THEN we will XOR the IV in the packet for transmission. */
@@ -37,8 +51,12 @@ void encrypt_payload(PacketMessage *msg, const char *plaintext, const uint8_t *k
     int final_len;
     EVP_EncryptFinal_ex(ctx, (uint8_t*)msg->text + outlen, &final_len);
     
-    /* Get Auth Tag */
-    EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, msg->tag);
+    /* Get Auth Tag if GCM */
+    if (is_gcm) {
+        EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, 16, msg->tag);
+    } else {
+        memset(msg->tag, 0, 16);
+    }
     
     /* Rotating Frequency Integration: XOR the packet's IV field with frame_id for transmission.
        The client MUST reverse this BEFORE calling DecryptInit using the embedded origin_frame. */

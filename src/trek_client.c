@@ -22,12 +22,61 @@
 #include <stddef.h>
 #include <math.h>
 #include <openssl/evp.h>
+#include <openssl/pem.h>
 #include "network.h"
 
 /* Pre-Shared Subspace Encryption Key (Must match server) */
 const uint8_t SUBSPACE_KEY[32] = "TREK-ULTRA-SECURE-CRYPTO-2026-!!";
 #include "shared_state.h"
 #include "ui.h"
+
+EVP_PKEY *my_ed25519_key = NULL;
+uint8_t my_pubkey_bytes[32];
+
+void generate_keys() {
+    EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_ED25519, NULL);
+    if (EVP_PKEY_keygen_init(pctx) <= 0) {
+        perror("EVP_PKEY_keygen_init");
+        return;
+    }
+    if (EVP_PKEY_keygen(pctx, &my_ed25519_key) <= 0) {
+        perror("EVP_PKEY_keygen");
+        return;
+    }
+    EVP_PKEY_CTX_free(pctx);
+
+    size_t len = 32;
+    if (EVP_PKEY_get_raw_public_key(my_ed25519_key, my_pubkey_bytes, &len) <= 0) {
+        perror("EVP_PKEY_get_raw_public_key");
+    }
+    printf(B_GREEN "Identity Secured: Ed25519 Keypair Generated.\n" RESET);
+}
+
+void sign_packet_message(PacketMessage *msg) {
+    if (!my_ed25519_key) return;
+    
+    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
+    if (EVP_DigestSignInit(mdctx, NULL, NULL, NULL, my_ed25519_key) <= 0) {
+        EVP_MD_CTX_free(mdctx);
+        return;
+    }
+    
+    /* Sign the text content */
+    if (EVP_DigestSignUpdate(mdctx, msg->text, msg->length) <= 0) {
+        EVP_MD_CTX_free(mdctx);
+        return;
+    }
+    
+    size_t sig_len = 64;
+    if (EVP_DigestSignFinal(mdctx, msg->signature, &sig_len) <= 0) {
+        EVP_MD_CTX_free(mdctx);
+        return;
+    }
+    EVP_MD_CTX_free(mdctx);
+    
+    msg->has_signature = 1;
+    memcpy(msg->sender_pubkey, my_pubkey_bytes, 32);
+}
 
 /* Colori per l'interfaccia CLI */
 #define RESET   "\033[0m"
@@ -198,14 +247,31 @@ void *network_listener(void *arg) {
                         char decrypted[65536];
                         EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
                         
-                        const EVP_CIPHER *cipher = (msg->crypto_algo == CRYPTO_CHACHA) ? EVP_chacha20_poly1305() : EVP_aes_256_gcm();
+                        const EVP_CIPHER *cipher;
+                        int is_gcm = 0;
+                        if (msg->crypto_algo == CRYPTO_CHACHA) { cipher = EVP_chacha20_poly1305(); is_gcm = 1; }
+                        else if (msg->crypto_algo == CRYPTO_ARIA) { cipher = EVP_aria_256_gcm(); is_gcm = 1; }
+                        else if (msg->crypto_algo == CRYPTO_CAMELLIA) { cipher = EVP_camellia_256_ctr(); is_gcm = 0; }
+                        else if (msg->crypto_algo == CRYPTO_SEED) { cipher = EVP_seed_cbc(); is_gcm = 0; }
+                        else if (msg->crypto_algo == CRYPTO_CAST5) { cipher = EVP_cast5_cbc(); is_gcm = 0; }
+                        else if (msg->crypto_algo == CRYPTO_IDEA) { cipher = EVP_idea_cbc(); is_gcm = 0; }
+                        else if (msg->crypto_algo == CRYPTO_3DES) { cipher = EVP_des_ede3_cbc(); is_gcm = 0; }
+                        else if (msg->crypto_algo == CRYPTO_BLOWFISH) { cipher = EVP_bf_cbc(); is_gcm = 0; }
+                        else if (msg->crypto_algo == CRYPTO_RC4) { cipher = EVP_rc4(); is_gcm = 0; }
+                        else if (msg->crypto_algo == CRYPTO_DES) { cipher = EVP_des_cbc(); is_gcm = 0; }
+                        else if (msg->crypto_algo == CRYPTO_PQC) { cipher = EVP_aes_256_gcm(); is_gcm = 1; }
+                        else { cipher = EVP_aes_256_gcm(); is_gcm = 1; }
+                        
                         const uint8_t *k = SUBSPACE_KEY; /* Client currently uses Master Key */
                         
                         EVP_DecryptInit_ex(ctx, cipher, NULL, k, msg->iv);
                         
                         int outlen;
                         EVP_DecryptUpdate(ctx, (uint8_t*)decrypted, &outlen, (const uint8_t*)msg->text, msg->length);
-                        EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, msg->tag);
+                        
+                        if (is_gcm) {
+                            EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, 16, msg->tag);
+                        }
                         
                         int final_len;
                         if (EVP_DecryptFinal_ex(ctx, (uint8_t*)decrypted + outlen, &final_len) > 0) {
@@ -224,7 +290,7 @@ void *network_listener(void *arg) {
                             noise[n] = (c_raw % 94) + 33; 
                         }
                         noise[noise_len] = '\0';
-                        snprintf(msg->text, 65535, B_RED "<< SIGNAL DISTURBED: FREQUENCY MISMATCH >>" RESET "\n [HINT]: Try 'enc aes' or 'enc chacha' to match the incoming frequency.\n [RAW_DATA]: %s...", noise);
+                        snprintf(msg->text, 65535, B_RED "<< SIGNAL DISTURBED: FREQUENCY MISMATCH >>" RESET "\n [HINT]: Try 'enc aes', 'enc chacha' or 'enc aria' to match the incoming frequency.\n [RAW_DATA]: %s...", noise);
                     } else {
                         /* Encryption protocol mismatch - Show simulated binary noise */
                         char noise[128];
@@ -234,7 +300,7 @@ void *network_listener(void *arg) {
                             noise[n] = (c_raw % 94) + 33; 
                         }
                         noise[noise_len] = '\0';
-                        snprintf(msg->text, 65535, B_RED "<< SIGNAL GARBLED: ENCRYPTION PROTOCOL MISMATCH >>" RESET "\n [HINT]: Try 'enc aes' or 'enc chacha' to match the incoming frequency.\n [RAW_DATA]: %s...", noise);
+                        snprintf(msg->text, 65535, B_RED "<< SIGNAL GARBLED: ENCRYPTION PROTOCOL MISMATCH >>" RESET "\n [HINT]: Try 'enc aes', 'enc chacha' or 'enc aria' to match the incoming frequency.\n [RAW_DATA]: %s...", noise);
                     }
                 } else {
                     /* Plaintext message, just null terminate */
@@ -242,6 +308,23 @@ void *network_listener(void *arg) {
                 }
             } else msg->text[0] = '\0';
             
+            int verified = 0;
+            if (msg->has_signature) {
+                EVP_PKEY *peer_key = EVP_PKEY_new_raw_public_key(EVP_PKEY_ED25519, NULL, msg->sender_pubkey, 32);
+                if (peer_key) {
+                    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
+                    if (EVP_DigestVerifyInit(mdctx, NULL, NULL, NULL, peer_key) > 0) {
+                        if (EVP_DigestVerifyUpdate(mdctx, msg->text, msg->length) > 0) {
+                            if (EVP_DigestVerifyFinal(mdctx, msg->signature, 64) == 1) {
+                                verified = 1;
+                            }
+                        }
+                    }
+                    EVP_MD_CTX_free(mdctx);
+                    EVP_PKEY_free(peer_key);
+                }
+            }
+
             printf("\r\033[K"); /* Pulisce la riga di input attuale */
             if (strcmp(msg->from, "SERVER") == 0 || strcmp(msg->from, "COMPUTER") == 0 || 
                 strcmp(msg->from, "SCIENCE") == 0 || strcmp(msg->from, "TACTICAL") == 0 ||
@@ -249,7 +332,9 @@ void *network_listener(void *arg) {
                 strcmp(msg->from, "WARNING") == 0 || strcmp(msg->from, "DAMAGE CONTROL") == 0) {
                 printf("%s\n", msg->text);
             } else {
-                printf(B_CYAN "[RADIO] %s (%s): %s\n" RESET, msg->from, 
+                printf(B_CYAN "[RADIO] %s%s (%s): %s\n" RESET, 
+                       verified ? B_GREEN "[VERIFIED] " B_CYAN : (msg->has_signature ? B_RED "[UNVERIFIED] " B_CYAN : ""),
+                       msg->from, 
                        (msg->faction == FACTION_FEDERATION) ? "Starfleet" : "Alien", msg->text);
             }
             free(msg);
@@ -450,6 +535,9 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in serv_addr;
     char server_ip[64];
     int my_ship_class = SHIP_CLASS_GENERIC_ALIEN;
+    
+    generate_keys();
+    
     signal(SIGPIPE, SIG_IGN);
 
     for (int i = 1; i < argc; i++) {
@@ -654,7 +742,7 @@ int main(int argc, char *argv[]) {
                         printf("tor <H> <M> : Launch Photon Torpedo at specific Heading/Mark\n");
                         printf("she F R T B L RI : Configure 6 Shield Quadrants\n");
                         printf("lock ID     : Lock-on Target (0:Self, 1+:Nearby vessels)\n");
-                        printf("enc aes/chacha/off : Toggle Subspace Encryption (Standard/Experimental)\n");
+                        printf("enc aes/chacha/aria/camellia/seed/cast/idea/3des/bf/rc4/des/pqc/off : Toggle Encryption\n");
                         printf("scan ID     : Detailed analysis of vessel or anomaly\n");
                         printf("pow E S W   : Power Distribution (Engines, Shields, Weapons %%)\n");
                         printf("psy         : Psychological Warfare (Corbomite Bluff)\n");
@@ -719,6 +807,86 @@ int main(int argc, char *argv[]) {
                         }
                         PacketCommand cpkt = {PKT_COMMAND, "enc chacha"};
                         send(sock, &cpkt, sizeof(cpkt), 0);
+                    } else if (strcmp(g_input_buf, "enc aria") == 0) {
+                        if (g_shared_state) {
+                            pthread_mutex_lock(&g_shared_state->mutex);
+                            g_shared_state->shm_crypto_algo = CRYPTO_ARIA;
+                            pthread_mutex_unlock(&g_shared_state->mutex);
+                        }
+                        PacketCommand cpkt = {PKT_COMMAND, "enc aria"};
+                        send(sock, &cpkt, sizeof(cpkt), 0);
+                    } else if (strcmp(g_input_buf, "enc camellia") == 0) {
+                        if (g_shared_state) {
+                            pthread_mutex_lock(&g_shared_state->mutex);
+                            g_shared_state->shm_crypto_algo = CRYPTO_CAMELLIA;
+                            pthread_mutex_unlock(&g_shared_state->mutex);
+                        }
+                        PacketCommand cpkt = {PKT_COMMAND, "enc camellia"};
+                        send(sock, &cpkt, sizeof(cpkt), 0);
+                    } else if (strcmp(g_input_buf, "enc seed") == 0) {
+                        if (g_shared_state) {
+                            pthread_mutex_lock(&g_shared_state->mutex);
+                            g_shared_state->shm_crypto_algo = CRYPTO_SEED;
+                            pthread_mutex_unlock(&g_shared_state->mutex);
+                        }
+                        PacketCommand cpkt = {PKT_COMMAND, "enc seed"};
+                        send(sock, &cpkt, sizeof(cpkt), 0);
+                    } else if (strcmp(g_input_buf, "enc cast") == 0) {
+                        if (g_shared_state) {
+                            pthread_mutex_lock(&g_shared_state->mutex);
+                            g_shared_state->shm_crypto_algo = CRYPTO_CAST5;
+                            pthread_mutex_unlock(&g_shared_state->mutex);
+                        }
+                        PacketCommand cpkt = {PKT_COMMAND, "enc cast"};
+                        send(sock, &cpkt, sizeof(cpkt), 0);
+                    } else if (strcmp(g_input_buf, "enc idea") == 0) {
+                        if (g_shared_state) {
+                            pthread_mutex_lock(&g_shared_state->mutex);
+                            g_shared_state->shm_crypto_algo = CRYPTO_IDEA;
+                            pthread_mutex_unlock(&g_shared_state->mutex);
+                        }
+                        PacketCommand cpkt = {PKT_COMMAND, "enc idea"};
+                        send(sock, &cpkt, sizeof(cpkt), 0);
+                    } else if (strcmp(g_input_buf, "enc 3des") == 0) {
+                        if (g_shared_state) {
+                            pthread_mutex_lock(&g_shared_state->mutex);
+                            g_shared_state->shm_crypto_algo = CRYPTO_3DES;
+                            pthread_mutex_unlock(&g_shared_state->mutex);
+                        }
+                        PacketCommand cpkt = {PKT_COMMAND, "enc 3des"};
+                        send(sock, &cpkt, sizeof(cpkt), 0);
+                    } else if (strcmp(g_input_buf, "enc bf") == 0 || strcmp(g_input_buf, "enc blowfish") == 0) {
+                        if (g_shared_state) {
+                            pthread_mutex_lock(&g_shared_state->mutex);
+                            g_shared_state->shm_crypto_algo = CRYPTO_BLOWFISH;
+                            pthread_mutex_unlock(&g_shared_state->mutex);
+                        }
+                        PacketCommand cpkt = {PKT_COMMAND, "enc bf"};
+                        send(sock, &cpkt, sizeof(cpkt), 0);
+                    } else if (strcmp(g_input_buf, "enc rc4") == 0) {
+                        if (g_shared_state) {
+                            pthread_mutex_lock(&g_shared_state->mutex);
+                            g_shared_state->shm_crypto_algo = CRYPTO_RC4;
+                            pthread_mutex_unlock(&g_shared_state->mutex);
+                        }
+                        PacketCommand cpkt = {PKT_COMMAND, "enc rc4"};
+                        send(sock, &cpkt, sizeof(cpkt), 0);
+                    } else if (strcmp(g_input_buf, "enc des") == 0) {
+                        if (g_shared_state) {
+                            pthread_mutex_lock(&g_shared_state->mutex);
+                            g_shared_state->shm_crypto_algo = CRYPTO_DES;
+                            pthread_mutex_unlock(&g_shared_state->mutex);
+                        }
+                        PacketCommand cpkt = {PKT_COMMAND, "enc des"};
+                        send(sock, &cpkt, sizeof(cpkt), 0);
+                    } else if (strcmp(g_input_buf, "enc pqc") == 0) {
+                        if (g_shared_state) {
+                            pthread_mutex_lock(&g_shared_state->mutex);
+                            g_shared_state->shm_crypto_algo = CRYPTO_PQC;
+                            pthread_mutex_unlock(&g_shared_state->mutex);
+                        }
+                        PacketCommand cpkt = {PKT_COMMAND, "enc pqc"};
+                        send(sock, &cpkt, sizeof(cpkt), 0);
                     } else if (strcmp(g_input_buf, "enc off") == 0) {
                         if (g_shared_state) {
                             pthread_mutex_lock(&g_shared_state->mutex);
@@ -778,6 +946,8 @@ int main(int argc, char *argv[]) {
                         }
                         
                         mpkt.length = strlen(mpkt.text);
+                        sign_packet_message(&mpkt);
+                        
                         size_t pkt_size = offsetof(PacketMessage, text) + mpkt.length + 1;
                         if (pkt_size > sizeof(PacketMessage)) pkt_size = sizeof(PacketMessage);
                         

@@ -227,7 +227,7 @@ Below is the complete list of available commands, grouped by function.
 ### ⚔️ Tactical Combat
 *   `pha <E>`: **Fire Phasers**. Fires phasers at the locked target (`lock`) using energy E. 
 *   `pha <ID> <E>`: Fires phasers at a specific target ID. Damage decreases with distance.
-*   `enc aes/chacha/off`: **Encryption Toggle**. Enables or disables encryption in real-time. Supports **AES-256-GCM** and **ChaCha20-Poly1305** standards. Essential for protecting communications and reading secure messages from other captains.
+*   `enc <algo>`: **Encryption Toggle**. Enables or disables encryption in real-time. Supports **AES-256-GCM**, **ChaCha20**, **ARIA**, **Camellia**, **Blowfish**, **RC4**, **CAST5**, **IDEA**, **3DES**, and **PQC (ML-KEM)**. Essential for protecting communications and reading secure messages from other captains.
 *   `tor`: **Fire Photon Torpedo**. Launches an auto-guided torpedo at the locked target.
 *   `tor <H> <M>`: Launches a torpedo in manual ballistic mode (Heading/Mark).
 *   `lock <ID>`: **Target Lock**. Locks targeting systems onto target ID (0 to unlock). Essential for automated phaser and torpedo guidance.
@@ -340,6 +340,7 @@ The `apr <ID> <DIST>` command allows you to automatically approach any object de
 The system implements a military-grade security layer for all communications between vessels and fleet command.
 
 *   **Technical Implementation**: Encryption is managed via the **OpenSSL** library, using 256-bit algorithms with packet authentication (GCM/Poly).
+*   **Digital Signature (Ed25519)**: In addition to encryption, every radio message includes a cryptographic signature generated via elliptic curves (**Ed25519**). This ensures **Authenticity** (only the real captain can sign) and **Integrity** (the message has not been altered). Verified messages appear with the `[VERIFIED]` tag.
 *   **Rotating Frequency Codes**: Each message has a unique signature based on the server's `frame_id`. This prevents an enemy from "recording and replaying" your commands.
 *   **Session Persistence & Handshake Safety**: While the server saves the captain's profile, encryption protocols are reset to `off` upon every new connection. This ensures that welcome messages and initial synchronization are always readable, preventing "lock-outs" due to forgotten protocol settings.
 *   **Dynamic Diagnostic Feedback**: In case of a protocol mismatch (e.g., one captain using AES and another using ChaCha), the bridge computer analyzes the binary noise and provides contextual hints (`[HINT]`) to help the captain synchronize the frequency.
@@ -351,9 +352,15 @@ The system implements a military-grade security layer for all communications bet
 *   **Operational Commands**:
     *   `enc aes`: Enables the **AES-256-GCM** standard (Robust, hardware accelerated).
     *   `enc chacha`: Enables the **ChaCha20-Poly1305** standard (Modern, ultra-fast).
-    *   `enc off`: Disables security protocols (RAW communication).
-
-### 📡 Communications and Miscellaneous
+    *   `enc aria`: Enables the **ARIA-256-GCM** standard (South Korean standard).
+    *   `enc camellia`: Enables **Camellia-256-CTR** (Romulan high-security standard).
+    *   `enc bf`: Enables **Blowfish-CBC** (Ferengi Commerce Protocol).
+    *   `enc rc4`: Enables **RC4 Stream** (Tactical Low-Latency Link).
+    *   `enc cast`: Enables **CAST5-CBC** (Old Republic standard).
+    *   `enc idea`: Enables **IDEA-CBC** (Maquis/Resistance protocol).
+    *   `enc 3des`: Enables **Triple DES-CBC** (Ancient Earth probe standard).
+    *   `enc pqc`: Enables **ML-KEM-1024** (Post-Quantum Encryption). Standardized by NIST to resist attacks from future quantum computers.
+    *   `enc off`: Disables security protocols (RAW communication).### 📡 Communications and Miscellaneous
 *   `rad <MSG>`: Sends radio message to all (Open channel).
     *   **Faction Table (@Fac)**:
         | Faction | Full Name | Abbreviated |
@@ -634,13 +641,56 @@ To guarantee career continuity even in the most disastrous tactical situations, 
     *   **Rescue Crew**: If personnel was at zero, a minimum rescue team of **100 members** is assigned.
     This architecture guarantees that Star Trek Ultra is not just a game session, but a true evolving space career.
 
+## 🔐 Subspace Encryption: Tactical Deep Dive
+
+Star Trek Ultra implements a multi-layered cryptographic suite, mapping real-world standards to the geopolitical landscape of the Alpha and Beta Quadrants.
+
+### ⚛️ Post-Quantum & Modern Standards (Federation Core)
+*   **ML-KEM-1024 (Kyber)**: `enc pqc`. The pinnacle of subspace security. Standardized by NIST to resist Shor's algorithm, this protocol ensures that communications remain private even against future Quantum Computers. *Used by: Section 31 and Advanced Starfleet Research.*
+*   **AES-256-GCM**: `enc aes`. The official Starfleet Command standard. Provides high-speed hardware-accelerated encryption with built-in message integrity (Authenticated Encryption).
+*   **ChaCha20-Poly1305**: `enc chacha`. A modern, high-performance stream cipher. Ideal for scout ships and tactical links where software-side speed is critical.
+*   **ARIA-256-GCM**: `enc aria`. A robust block cipher (South Korean standard). In-game, it represents the joint encryption standard used by the Federation-Klingon Alliance during large-scale operations.
+
+### 🏛️ Imperial & Regional Standards (Great Powers)
+*   **Camellia-256-CTR**: `enc camellia`. A high-security ISO-certified cipher from Earth's past. Within the simulator, it acts as the **Romulan Star Empire Imperial Standard**, known for its elegance and resistance to brute-force decryption.
+*   **Blowfish-CBC**: `enc bf`. Designed by Bruce Schneier, this algorithm is fast and has no known major weaknesses. Mapped to the **Ferengi Commerce Protocol**, optimized for protecting financial transactions and latinum trade routes.
+*   **RC4 Stream**: `enc rc4`. A lightweight, variable-key-size stream cipher. Used as the **Tactical Low-Latency Link**, perfect for high-speed combat maneuvers where every millisecond counts.
+
+### 🏺 Legacy & Resistance Protocols (History & Underworld)
+*   **CAST5-CBC**: `enc cast`. A solid Canadian standard. Represents the **Old Republic Era** (22nd Century) encryption, still found in some remote starbases and civilian freighters.
+*   **IDEA-CBC**: `enc idea`. Famous for its role in early PGP (Pretty Good Privacy). Mapped to the **Maquis Resistance**, used by rebels and independent colonies to evade Cardassian and Federation surveillance.
+*   **Triple DES (3DES-CBC)**: `enc 3des`. An evolution of the original DES. Acts as the **Ancient Federation Archive** protocol, used for decrypting legacy 23rd-century data logs.
+*   **DES-CBC**: `enc des`. The 1970s Earth standard. Mapped to **Pre-Warp Human Signals**, used by ancient sleeper ships and probes (like Voyager 6 or the Pioneer missions).
+
+---
+
+### 🌐 Real-World Cryptographic Analysis
+
+For the interested engineer, here is the technical breakdown of the algorithms utilized in the project:
+
+| Algorithm | Type | Key Size | Mode | Technical Profile |
+| :--- | :--- | :--- | :--- | :--- |
+| **ML-KEM (Kyber)** | Lattice-based (KEM) | 1024 (equiv) | Handshake | **NIST Post-Quantum Standard**. Designed to resist attacks from future quantum computers using the Module-Learning with Errors (M-LWE) mathematical problem. |
+| **AES-256** | Block Cipher (SPN) | 256-bit | GCM | **The Global Standard**. Implements a Substitution-Permutation Network. GCM mode provides AEAD (Authenticated Encryption with Associated Data), ensuring both secrecy and integrity. |
+| **ChaCha20** | Stream Cipher (ARX) | 256-bit | Poly1305 | **High-Performance Streamer**. Developed by Daniel J. Bernstein, it uses Add-Rotate-XOR operations. It is immune to timing attacks common in software-based AES implementations. |
+| **ARIA** | Block Cipher (SPN) | 256-bit | GCM | **South Korean Standard**. Similar to AES but uses a different MDS matrix and S-box design. Provides excellent security diversity. |
+| **Camellia** | Block Cipher (Feistel) | 256-bit | CTR | **Japanese ISO/IEC Standard**. Jointly developed by Mitsubishi and NTT. It is one of the few ciphers besides AES approved for high-level government use in several countries. |
+| **Blowfish** | Block Cipher (Feistel) | 32-448 bit | CBC | **Legacy Classic**. Created by Bruce Schneier in 1993. While fast, its 64-bit block size makes it susceptible to birthday attacks on large data volumes (terabytes). |
+| **RC4** | Stream Cipher | Variable | Stream | **Historically Significant**. Once the most widely used stream cipher (SSL/WEP), it is now deprecated due to statistical biases in the initial bytes of the keystream. |
+| **CAST5** | Block Cipher (Feistel) | 128-bit | CBC | **PGP Standard**. Known for its resistance to differential and linear cryptanalysis. Widely used in open-source security tools. |
+| **IDEA** | Block Cipher | 128-bit | CBC | **Swiss Design**. Based on the concept of mixing operations from different algebraic groups (XOR, Addition, Multiplication). Very popular in the early 1990s. |
+| **3DES** | Block Cipher | 168-bit | CBC | **Legacy Transition**. Applies the DES algorithm three times. While it effectively increases key length, it is significantly slower than modern alternatives. |
+| **DES** | Block Cipher | 56-bit | CBC | **The 1977 Legend**. The first global encryption standard. It is now considered insecure because its 56-bit key can be brute-forced in hours by modern hardware. |
+
+---
+
 ## 🛠️ Technologies and System Requirements
 
 The Star Trek Ultra project is a demonstration of performance-oriented software engineering, utilizing the latest evolutions of the C language and Linux/POSIX system interfaces.
 
 ### 🏗️ Core Engine & Language Standards
 *   **C23 (ISO/IEC 9899:2024)**: The simulator adopts the latest C language standard.
-*   **Subspace Security (OpenSSL)**: All text communications and LCARS reports are protected by military-grade encryption via the OpenSSL library. The system supports multiple algorithms (**AES-256-GCM** and **ChaCha20-Poly1305**) and implements **Rotating Frequency Codes**: each message's IV is synchronized with the server's `frame_id`, ensuring unique cryptographic signatures per tick and eliminating replay-attack risks.
+*   **Subspace Security (OpenSSL)**: All text communications and LCARS reports are protected by military-grade encryption via the OpenSSL library. The system supports a vast array of algorithms (**AES-256-GCM**, **ChaCha20**, **ARIA**, **Camellia**, **Blowfish**, **RC4**, **CAST5**, **IDEA**, **3DES**, and **ML-KEM-1024**) and implements **Rotating Frequency Codes****: each message's IV is synchronized with the server's `frame_id`, ensuring unique cryptographic signatures per tick and eliminating replay-attack risks.
 *   **High-Performance Event Loop (`epoll`)**: The server uses Linux epoll to handle hundreds of simultaneous connections with minimal latency.
 *   **Binary Protocol Efficiency**: Communication in the *Subspace Channel* is optimized via `pragma pack(1)`. This forces the compiler to eliminate any padding bytes between structure members, ensuring binary packets are as small as possible and portable across different architectures.
 *   **Extended Messaging Buffers**: The protocol supports text payloads up to **64KB** per packet, allowing the transmission of full sensor reports (`srs`) even in very high-density quadrants.

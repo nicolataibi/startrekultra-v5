@@ -2278,6 +2278,36 @@ void display() {
         } else if (g_shared_state->shm_crypto_algo == CRYPTO_CHACHA) {
             glColor3f(0.0f, 1.0f, 0.5f);
             drawText3D(750, ty, 0, "ENCRYPTION: CHACHA20-POLY ACTIVE");
+        } else if (g_shared_state->shm_crypto_algo == CRYPTO_ARIA) {
+            glColor3f(0.0f, 0.7f, 1.0f);
+            drawText3D(750, ty, 0, "ENCRYPTION: ARIA-256-GCM ACTIVE");
+        } else if (g_shared_state->shm_crypto_algo == CRYPTO_CAMELLIA) {
+            glColor3f(0.0f, 1.0f, 0.0f);
+            drawText3D(750, ty, 0, "ENCRYPTION: CAMELLIA-256 (ROMULAN)");
+        } else if (g_shared_state->shm_crypto_algo == CRYPTO_SEED) {
+            glColor3f(1.0f, 0.5f, 0.0f);
+            drawText3D(750, ty, 0, "ENCRYPTION: SEED-CBC (ORION)");
+        } else if (g_shared_state->shm_crypto_algo == CRYPTO_CAST5) {
+            glColor3f(1.0f, 1.0f, 0.0f);
+            drawText3D(750, ty, 0, "ENCRYPTION: CAST5-CBC (REPUBLIC)");
+        } else if (g_shared_state->shm_crypto_algo == CRYPTO_IDEA) {
+            glColor3f(1.0f, 0.0f, 1.0f);
+            drawText3D(750, ty, 0, "ENCRYPTION: IDEA-CBC (MAQUIS)");
+        } else if (g_shared_state->shm_crypto_algo == CRYPTO_3DES) {
+            glColor3f(0.5f, 0.5f, 0.5f);
+            drawText3D(750, ty, 0, "ENCRYPTION: 3DES-CBC (ANCIENT)");
+        } else if (g_shared_state->shm_crypto_algo == CRYPTO_BLOWFISH) {
+            glColor3f(0.7f, 0.4f, 0.0f);
+            drawText3D(750, ty, 0, "ENCRYPTION: BLOWFISH-CBC (FERENGI)");
+        } else if (g_shared_state->shm_crypto_algo == CRYPTO_RC4) {
+            glColor3f(0.0f, 0.5f, 0.7f);
+            drawText3D(750, ty, 0, "ENCRYPTION: RC4-STREAM (TACTICAL)");
+        } else if (g_shared_state->shm_crypto_algo == CRYPTO_DES) {
+            glColor3f(0.4f, 0.4f, 0.4f);
+            drawText3D(750, ty, 0, "ENCRYPTION: DES-CBC (PRE-WARP)");
+        } else if (g_shared_state->shm_crypto_algo == CRYPTO_PQC) {
+            glColor3f(1.0f, 1.0f, 1.0f);
+            drawText3D(750, ty, 0, "ENCRYPTION: ML-KEM-1024 (QUANTUM-SECURE)");
         } else {
             glColor3f(1.0f, 0.0f, 0.0f);
             drawText3D(750, ty, 0, "ENCRYPTION: DISABLED / RAW");

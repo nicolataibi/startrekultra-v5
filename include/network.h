@@ -24,6 +24,16 @@
 #define CRYPTO_NONE 0
 #define CRYPTO_AES  1
 #define CRYPTO_CHACHA 2
+#define CRYPTO_ARIA 3
+#define CRYPTO_CAMELLIA 4
+#define CRYPTO_SEED     5
+#define CRYPTO_CAST5    6
+#define CRYPTO_IDEA     7
+#define CRYPTO_3DES     8
+#define CRYPTO_BLOWFISH 9
+#define CRYPTO_RC4      10
+#define CRYPTO_DES      11
+#define CRYPTO_PQC      12
 
 #define SCOPE_GLOBAL 0
 #define SCOPE_FACTION 1
@@ -88,9 +98,12 @@ typedef struct {
     int length;
     long long origin_frame; /* Server frame used for frequency scrambling */
     uint8_t is_encrypted;
-    uint8_t crypto_algo; /* 1: AES, 2: ChaCha */
-    uint8_t iv[12];      /* GCM/Poly Standard IV */
+    uint8_t crypto_algo; /* 1:AES... 11:DES, 12:PQC (ML-KEM/Kyber) */
+    uint8_t iv[12];      /* GCM/Poly/CTR/CBC IV */
     uint8_t tag[16];     /* Auth Tag */
+    uint8_t has_signature;
+    uint8_t signature[64]; /* Ed25519 Signature */
+    uint8_t sender_pubkey[32]; 
     char text[65536];
 } PacketMessage;
 

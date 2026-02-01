@@ -29,8 +29,8 @@ typedef struct {
     int faction;
     int ship_class;
     int active;
-    int crypto_algo; /* 0: None, 1: AES, 2: ChaCha */
-    uint8_t session_key[32]; /* Derived via ECDH */
+    int crypto_algo; /* 0:None, 1-11:Legacy, 12:PQC (Quantum Secure) */
+    uint8_t session_key[32]; /* Derived via ECDH/ML-KEM */
     
     /* Navigation & Physics State */
     double gx, gy, gz;      /* Absolute Galactic Coordinates */
