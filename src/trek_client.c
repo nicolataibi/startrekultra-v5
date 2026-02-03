@@ -25,8 +25,8 @@
 #include <openssl/pem.h>
 #include "network.h"
 
-/* Pre-Shared Subspace Encryption Key (Must match server) */
-const uint8_t SUBSPACE_KEY[32] = "TREK-ULTRA-SECURE-CRYPTO-2026-!!";
+/* Pre-Shared Subspace Encryption Key (Loaded from ENV) */
+uint8_t SUBSPACE_KEY[32];
 #include "shared_state.h"
 #include "ui.h"
 
@@ -61,14 +61,9 @@ void sign_packet_message(PacketMessage *msg) {
         return;
     }
     
-    /* Sign the text content */
-    if (EVP_DigestSignUpdate(mdctx, msg->text, msg->length) <= 0) {
-        EVP_MD_CTX_free(mdctx);
-        return;
-    }
-    
     size_t sig_len = 64;
-    if (EVP_DigestSignFinal(mdctx, msg->signature, &sig_len) <= 0) {
+    /* Ed25519 requires one-shot EVP_DigestSign */
+    if (EVP_DigestSign(mdctx, msg->signature, &sig_len, (uint8_t*)msg->text, msg->length) <= 0) {
         EVP_MD_CTX_free(mdctx);
         return;
     }
@@ -169,6 +164,11 @@ void init_shm() {
     pthread_mutex_init(&g_shared_state->mutex, &attr);
     
     sem_init(&g_shared_state->data_ready, 1, 0);
+    
+    /* Initial Sector Position: Center (5,5,5) */
+    g_shared_state->shm_s[0] = 5.0f;
+    g_shared_state->shm_s[1] = 5.0f;
+    g_shared_state->shm_s[2] = 5.0f;
 }
 
 void cleanup() {
@@ -277,6 +277,7 @@ void *network_listener(void *arg) {
                         if (EVP_DecryptFinal_ex(ctx, (uint8_t*)decrypted + outlen, &final_len) > 0) {
                             decrypted[outlen + final_len] = '\0';
                             strncpy(msg->text, decrypted, 65535);
+                            msg->length = outlen + final_len;
                         } else {
                             strcpy(msg->text, B_RED "<< ERROR: SUBSPACE DECRYPTION FAILED - FREQUENCY MISMATCH OR INVALID KEY >>" RESET);
                         }
@@ -314,10 +315,9 @@ void *network_listener(void *arg) {
                 if (peer_key) {
                     EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
                     if (EVP_DigestVerifyInit(mdctx, NULL, NULL, NULL, peer_key) > 0) {
-                        if (EVP_DigestVerifyUpdate(mdctx, msg->text, msg->length) > 0) {
-                            if (EVP_DigestVerifyFinal(mdctx, msg->signature, 64) == 1) {
-                                verified = 1;
-                            }
+                        /* Ed25519 requires one-shot EVP_DigestVerify */
+                        if (EVP_DigestVerify(mdctx, msg->signature, 64, (uint8_t*)msg->text, msg->length) == 1) {
+                            verified = 1;
                         }
                     }
                     EVP_MD_CTX_free(mdctx);
@@ -341,16 +341,25 @@ void *network_listener(void *arg) {
             reprint_prompt();
         } else if (type == PKT_UPDATE) {
             PacketUpdate upd;
+            memset(&upd, 0, sizeof(PacketUpdate));
             upd.type = type;
             
             /* Read fixed part up to object_count field */
             size_t fixed_size = offsetof(PacketUpdate, objects);
-            int r_fixed = read_all(sock, ((char*)&upd) + sizeof(int), fixed_size - sizeof(int));
-            if (r_fixed <= 0) break;
+            int r_fixed = read_all(sock, ((char*)&upd) + sizeof(int32_t), fixed_size - sizeof(int32_t));
+            
+            if (r_fixed <= 0) {
+                LOG_DEBUG("Failed to read PacketUpdate header. Read: %d, Expected: %zu\n", r_fixed, fixed_size - sizeof(int32_t));
+                break;
+            }
             
             /* Safety check for object count to prevent buffer overflow */
             if (upd.object_count < 0 || upd.object_count > MAX_NET_OBJECTS) {
-                printf("Warning: Invalid object_count received: %d\n", upd.object_count);
+                printf("Warning: Invalid object_count received: %d (at offset %zu)\n", upd.object_count, fixed_size);
+                /* DUMP next 16 bytes for debugging */
+                unsigned char dump[16];
+                read(sock, dump, 16);
+                LOG_DEBUG("Next bytes: %02x %02x %02x %02x...\n", dump[0], dump[1], dump[2], dump[3]);
                 break;
             }
 
@@ -423,19 +432,23 @@ void *network_listener(void *arg) {
                 g_shared_state->shm_torpedoes = upd.torpedoes;
                 g_shared_state->shm_cargo_energy = upd.cargo_energy;
                 g_shared_state->shm_cargo_torpedoes = upd.cargo_torpedoes;
-                int total_s = 0;
-                for(int s=0; s<6; s++) {
-                    g_shared_state->shm_shields[s] = upd.shields[s];
-                    total_s += upd.shields[s];
-                }
-                for(int inv=0; inv<7; inv++) g_shared_state->inventory[inv] = upd.inventory[inv];
-                for(int sys=0; sys<8; sys++) g_shared_state->shm_system_health[sys] = upd.system_health[sys];
+                for(int s=0; s<6; s++) g_shared_state->shm_shields[s] = upd.shields[s];
+                for(int sys=0; sys<10; sys++) g_shared_state->shm_system_health[sys] = upd.system_health[sys];
+                for(int p=0; p<3; p++) g_shared_state->shm_power_dist[p] = upd.power_dist[p];
+                g_shared_state->shm_life_support = upd.life_support;
+                g_shared_state->shm_phaser_charge = upd.phaser_charge;
+                g_shared_state->shm_tube_state = upd.tube_state;
+                g_shared_state->shm_corbomite = upd.corbomite_count;
+                for(int inv=0; inv<8; inv++) g_shared_state->inventory[inv] = upd.inventory[inv];
                 g_shared_state->shm_lock_target = upd.lock_target;
                 
                 g_shared_state->is_cloaked = upd.is_cloaked;
                 g_shared_state->shm_q[0] = upd.q1;
                 g_shared_state->shm_q[1] = upd.q2;
                 g_shared_state->shm_q[2] = upd.q3;
+                g_shared_state->shm_s[0] = (float)upd.s1;
+                g_shared_state->shm_s[1] = (float)upd.s2;
+                g_shared_state->shm_s[2] = (float)upd.s3;
                 sprintf(g_shared_state->quadrant, "Q-%d-%d-%d", upd.q1, upd.q2, upd.q3);
 
                 /* Update dynamic galaxy data (e.g. Ion Storms, Supernovas) */
@@ -454,6 +467,8 @@ void *network_listener(void *arg) {
                     g_shared_state->objects[o].type = upd.objects[o].type;
                     g_shared_state->objects[o].ship_class = upd.objects[o].ship_class;
                     g_shared_state->objects[o].health_pct = upd.objects[o].health_pct;
+                    g_shared_state->objects[o].energy = upd.objects[o].energy;
+                    g_shared_state->objects[o].faction = upd.objects[o].faction;
                     g_shared_state->objects[o].id = upd.objects[o].id;
                     strncpy(g_shared_state->objects[o].shm_name, upd.objects[o].name, 63);
                     g_shared_state->objects[o].active = 1;
@@ -479,12 +494,14 @@ void *network_listener(void *arg) {
                 g_shared_state->torp.shm_z = upd.torp.net_z;
                 g_shared_state->torp.active = upd.torp.active;
                 
-                /* Event Latching (Visualizer will clear these) */
+                /* Event Latching */
                 if (upd.boom.active) {
                     g_shared_state->boom.shm_x = upd.boom.net_x;
                     g_shared_state->boom.shm_y = upd.boom.net_y;
                     g_shared_state->boom.shm_z = upd.boom.net_z;
                     g_shared_state->boom.active = 1;
+                } else {
+                    g_shared_state->boom.active = 0;
                 }
                 
                 if (upd.dismantle.active) {
@@ -493,6 +510,8 @@ void *network_listener(void *arg) {
                     g_shared_state->dismantle.shm_z = upd.dismantle.net_z;
                     g_shared_state->dismantle.species = upd.dismantle.species;
                     g_shared_state->dismantle.active = 1;
+                } else {
+                    g_shared_state->dismantle.active = 0;
                 }
                 
                 /* Wormhole Event */
@@ -507,6 +526,8 @@ void *network_listener(void *arg) {
                     g_shared_state->jump_arrival.shm_y = upd.jump_arrival.net_y;
                     g_shared_state->jump_arrival.shm_z = upd.jump_arrival.net_z;
                     g_shared_state->jump_arrival.active = 1;
+                    /* Reset local copy to prevent repeated triggering */
+                    upd.jump_arrival.active = 0;
                 }
 
                 /* Supernova Event */
@@ -535,6 +556,15 @@ int main(int argc, char *argv[]) {
     struct sockaddr_in serv_addr;
     char server_ip[64];
     int my_ship_class = SHIP_CLASS_GENERIC_ALIEN;
+    
+    /* Security Initialization */
+    char *env_key = getenv("TREK_SUB_KEY");
+    if (!env_key) {
+        fprintf(stderr, B_RED "SECURITY ERROR: Subspace Key not found in environment.\n" RESET);
+        fprintf(stderr, "Please set TREK_SUB_KEY environment variable before launching.\n");
+        exit(1);
+    }
+    strncpy((char*)SUBSPACE_KEY, env_key, 32);
     
     generate_keys();
     
@@ -592,7 +622,6 @@ int main(int argc, char *argv[]) {
     LOG_DEBUG("sizeof(StarTrekGame) = %zu\n", sizeof(StarTrekGame));
     LOG_DEBUG("sizeof(PacketUpdate) = %zu\n", sizeof(PacketUpdate));
     printf("Server IP: "); scanf("%s", server_ip);
-    printf("Commander Name: "); scanf("%s", captain_name);
     clear_stdin();
 
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -612,6 +641,49 @@ int main(int argc, char *argv[]) {
         printf("\nConnection Failed \n");
         return -1;
     }
+
+    /* Handshake: Negotiate Unique Session Key */
+    PacketHandshake h_pkt;
+    memset(&h_pkt, 0, sizeof(PacketHandshake));
+    h_pkt.type = PKT_HANDSHAKE;
+    h_pkt.pubkey_len = 32 + 32; /* 32 bytes Key + 32 bytes Signature */
+    
+    /* Generate Random Session Key */
+    FILE *f_rand = fopen("/dev/urandom", "rb");
+    if (f_rand) {
+        fread(h_pkt.pubkey, 1, 32, f_rand);
+        fclose(f_rand);
+    } else {
+        for(int k=0; k<32; k++) h_pkt.pubkey[k] = rand() % 255;
+    }
+    
+    /* Add Magic Signature for Server-side verification */
+    memcpy(h_pkt.pubkey + 32, HANDSHAKE_MAGIC_STRING, 32);
+
+    /* Store it locally as our new key */
+    uint8_t MY_SESSION_KEY[32];
+    memcpy(MY_SESSION_KEY, h_pkt.pubkey, 32);
+    
+    /* Obfuscate EVERYTHING (Key + Signature) using the Master Key (XOR) */
+    for(int k=0; k<64; k++) h_pkt.pubkey[k] ^= SUBSPACE_KEY[k % 32];
+    
+    write_all(sock, &h_pkt, sizeof(PacketHandshake));
+    
+    /* Wait for server ACK to verify Master Key */
+    int ack_type = 0;
+    if (read_all(sock, &ack_type, sizeof(int)) <= 0 || ack_type != PKT_HANDSHAKE) {
+        fprintf(stderr, B_RED "SECURITY ERROR: Master Key mismatch or Handshake rejected by server.\n" RESET);
+        close(sock);
+        exit(1);
+    }
+    
+    /* Switch to the new Session Key */
+    memcpy(SUBSPACE_KEY, MY_SESSION_KEY, 32);
+    printf(B_BLUE "Subspace Link Secured. Unique Frequency active.\n" RESET);
+
+    /* Identification happens ONLY after secure link is established */
+    printf("Commander Name: "); scanf("%s", captain_name);
+    clear_stdin();
 
     /* Identity Check */
     PacketLogin qpkt;
@@ -652,8 +724,11 @@ int main(int argc, char *argv[]) {
 
     /* Ricezione Galassia Master (Sincronizzazione iniziale) */
     StarTrekGame master_sync;
+    memset(&master_sync, 0, sizeof(StarTrekGame));
     printf("Synchronizing with Galaxy Server...\n");
-    LOG_DEBUG("Waiting for Galaxy Master (%zu bytes)...\n", sizeof(StarTrekGame));
+    LOG_DEBUG("Client StarTrekGame size: %zu bytes\n", sizeof(StarTrekGame));
+    LOG_DEBUG("Client PacketUpdate size: %zu bytes\n", sizeof(PacketUpdate));
+    LOG_DEBUG("Waiting for Galaxy Master...\n");
     if (read_all(sock, &master_sync, sizeof(StarTrekGame)) == sizeof(StarTrekGame)) {
         printf(B_GREEN "Galaxy Map synchronized.\n" RESET);
     } else {
@@ -748,7 +823,8 @@ int main(int argc, char *argv[]) {
                         printf("psy         : Psychological Warfare (Corbomite Bluff)\n");
                         printf("aux probe QX QY QZ: Launch long-range probe\n");
                         printf("aux jettison: Eject Warp Core (Suicide maneuver)\n");
-                        printf("bor         : Boarding party operation (Dist < 1.0)\n");
+                        printf("dis ID      : Dismantle enemy wreck/derelict (Dist < 1.5)\n");
+                        printf("bor ID      : Boarding party operation (Dist < 1.0). Works on Lock.\n");
                         printf("min         : Planetary Mining (Must be in orbit dist < 2.0)\n");
                         printf("doc         : Dock with Starbase (Replenish/Repair, same faction)\n");
                         printf("con T A     : Convert Resources (1:Dilithium->E, 3:Verterium->Torps)\n");
@@ -758,7 +834,7 @@ int main(int argc, char *argv[]) {
                         printf("who         : List active captains in galaxy\n");
                         printf("cal Q1 Q2 Q3: Warp Calculator (Inter-quadrant)\n");
                         printf("ical X Y Z  : Impulse Calculator (Local sector coordinates)\n");
-                        printf("apr ID DIST : Approach target autopilot\n");
+                        printf("apr ID DIST : Approach target autopilot. Works on Lock.\n");
                         printf("cha         : Chase locked target (Inter-sector aware)\n");
                         printf("sco         : Solar scooping for energy\n");
                         printf("har         : Antimatter harvest from Black Hole\n");
@@ -770,6 +846,10 @@ int main(int argc, char *argv[]) {
                         printf("clo         : Toggle Cloaking Device (Consumes constant Energy)\n");
                         printf("axs / grd   : Toggle 3D Visual Guides\n");
                         printf("xxx         : Self-Destruct\n");
+                    } else if (strncmp(g_input_buf, "dis ", 4) == 0 || strcmp(g_input_buf, "dis") == 0) {
+                        PacketCommand cpkt = {PKT_COMMAND, ""};
+                        strncpy(cpkt.cmd, g_input_buf, 255);
+                        send(sock, &cpkt, sizeof(cpkt), 0);
                     } else if (strcmp(g_input_buf, "axs") == 0) {
                         if (g_shared_state) {
                             pthread_mutex_lock(&g_shared_state->mutex);

@@ -129,21 +129,24 @@ float angleX = 20.0f;
 float zoom = -14.0f;
 float autoRotate = 0.075f;
 float pulse = 0.0f;
+float map_anim = 0.0f;
 
 int g_energy = 0, g_crew = 0, g_shields = 0, g_klingons = 0;
 int g_shields_val[6] = {0};
 int g_cargo_energy = 0, g_cargo_torps = 0, g_torpedoes_launcher = 0;
-float g_system_health[8] = {0};
-int g_inventory[7] = {0};
+float g_system_health[10] = {0};
+int g_inventory[8] = {0};
 int g_lock_target = 0;
 int g_show_axes = 0;
 int g_show_grid = 0;
 int g_show_map = 0;
 int g_my_q[3] = {1,1,1};
-int g_galaxy[11][11][11];
+int64_t g_galaxy[11][11][11];
 int g_show_hud = 1; /* Default HUD ON */
 char g_quadrant[128] = "Scanning...";
 char g_last_quadrant[128] = "";
+char g_player_name[64] = "Unknown";
+int g_player_class = 0;
 
 #define MAX_TRAIL 40
 typedef struct {
@@ -154,6 +157,8 @@ typedef struct {
     int type;
     int ship_class;
     int health_pct;   /* HUD */
+    int energy;       /* HUD */
+    int faction;      /* HUD */
     int id;           /* HUD */
     char name[64];    /* HUD Name */
     float trail[MAX_TRAIL][3];
@@ -192,7 +197,7 @@ typedef struct { float x, y, z, alpha; } PhaserBeam;
 PhaserBeam beams[10];
 int beamCount = 0;
 
-typedef struct { float x, y, z; int active; int timer; } ViewPoint;
+typedef struct { float x, y, z, h, m; int active; int timer; } ViewPoint;
 ViewPoint g_torp = {0,0,0,0,0};
 ViewPoint g_boom = {0,0,0,0,0};
 ViewPoint g_wormhole = {0,0,0,0,0};
@@ -200,7 +205,7 @@ ViewPoint g_jump_arrival = {0,0,0,0,0};
 ViewPoint g_sn_pos = {0,0,0,0,0};
 int g_sn_q[3] = {0,0,0};
 
-float enterpriseX = -100, enterpriseY = -100, enterpriseZ = -100;
+float enterpriseX = 0, enterpriseY = 0, enterpriseZ = 0;
 
 float stars[1000][3];
 
@@ -260,19 +265,19 @@ void initVBOs() {
     glGenBuffers(1, &vbo_stars);
     glBindBuffer(GL_ARRAY_BUFFER, vbo_stars);
     glBufferData(GL_ARRAY_BUFFER, sizeof(stars), stars, GL_STATIC_DRAW);
-    int max_verts = 12 * 12 * 3 * 2; 
+    int max_verts = 11 * 11 * 3 * 2; 
     float *grid_data = malloc(max_verts * 3 * sizeof(float));
     int idx = 0;
-    for(int i=0; i<=11; i++) {
-        float p = -5.5f + (float)i;
-        for(int j=0; j<=11; j++) {
-            float q = -5.5f + (float)j;
-            grid_data[idx++] = p; grid_data[idx++] = q; grid_data[idx++] = -5.5f;
-            grid_data[idx++] = p; grid_data[idx++] = q; grid_data[idx++] = 5.5f;
-            grid_data[idx++] = p; grid_data[idx++] = -5.5f; grid_data[idx++] = q;
-            grid_data[idx++] = p; grid_data[idx++] = 5.5f; grid_data[idx++] = q;
-            grid_data[idx++] = -5.5f; grid_data[idx++] = p; grid_data[idx++] = q;
-            grid_data[idx++] = 5.5f; grid_data[idx++] = p; grid_data[idx++] = q;
+    for(int i=0; i<=10; i++) {
+        float p = -5.0f + (float)i;
+        for(int j=0; j<=10; j++) {
+            float q = -5.0f + (float)j;
+            grid_data[idx++] = p; grid_data[idx++] = q; grid_data[idx++] = -5.0f;
+            grid_data[idx++] = p; grid_data[idx++] = q; grid_data[idx++] = 5.0f;
+            grid_data[idx++] = p; grid_data[idx++] = -5.0f; grid_data[idx++] = q;
+            grid_data[idx++] = p; grid_data[idx++] = 5.0f; grid_data[idx++] = q;
+            grid_data[idx++] = -5.0f; grid_data[idx++] = p; grid_data[idx++] = q;
+            grid_data[idx++] = 5.0f; grid_data[idx++] = p; grid_data[idx++] = q;
         }
     }
     grid_vertex_count = idx / 3;
@@ -296,19 +301,24 @@ void loadGameState() {
     g_torpedoes_launcher = g_shared_state->shm_torpedoes;
     g_cargo_energy = g_shared_state->shm_cargo_energy;
     g_cargo_torps = g_shared_state->shm_cargo_torpedoes;
-    for(int s=0; s<8; s++) g_system_health[s] = g_shared_state->shm_system_health[s];
-    for(int inv=0; inv<7; inv++) g_inventory[inv] = g_shared_state->inventory[inv];
+    for(int s=0; s<10; s++) g_system_health[s] = g_shared_state->shm_system_health[s];
+    for(int inv=0; inv<8; inv++) g_inventory[inv] = g_shared_state->inventory[inv];
     g_lock_target = g_shared_state->shm_lock_target;
     int total_s = 0;
     for(int s=0; s<6; s++) total_s += g_shared_state->shm_shields[s];
     g_shields = total_s / 6;
     for(int s=0; s<6; s++) g_shields_val[s] = g_shared_state->shm_shields[s];
     g_klingons = g_shared_state->klingons;
+    strncpy(g_player_name, g_shared_state->objects[0].shm_name, 63);
+    g_player_class = g_shared_state->objects[0].ship_class;
     
     int quadrant_changed = 0;
     if (strcmp(g_quadrant, g_shared_state->quadrant) != 0) {
         quadrant_changed = 1;
         strcpy(g_quadrant, g_shared_state->quadrant);
+        /* Cleanup local visual effects on sector jump */
+        g_wormhole.active = 0;
+        g_jump_arrival.timer = 0;
     }
     
     g_show_axes = g_shared_state->shm_show_axes;
@@ -317,6 +327,18 @@ void loadGameState() {
     g_my_q[0] = g_shared_state->shm_q[0];
     g_my_q[1] = g_shared_state->shm_q[1];
     g_my_q[2] = g_shared_state->shm_q[2];
+    
+    /* Center the camera/world on the player's explicit sector coordinates */
+    float s0 = g_shared_state->shm_s[0];
+    float s1 = g_shared_state->shm_s[1];
+    float s2 = g_shared_state->shm_s[2];
+    
+    if (!isnan(s0) && !isnan(s1) && !isnan(s2)) {
+        enterpriseX = s0 - 5.0f;
+        enterpriseY = s2 - 5.0f; /* Y in Trek is Z in Viewer */
+        enterpriseZ = 5.0f - s1; /* Z in Trek is -Y in Viewer */
+    }
+
     memcpy(g_galaxy, g_shared_state->shm_galaxy, sizeof(g_galaxy));
 
     int updated[200] = {0};
@@ -349,10 +371,15 @@ void loadGameState() {
         if (local_idx != -1) {
             updated[local_idx] = 1;
             GameObject *obj = &objects[local_idx];
-            float next_x = g_shared_state->objects[i].shm_x - 5.5f;
-            float next_y = g_shared_state->objects[i].shm_z - 5.5f;
-            float next_z = 5.5f - g_shared_state->objects[i].shm_y;
+            float next_x = g_shared_state->objects[i].shm_x - 5.0f;
+            float next_y = g_shared_state->objects[i].shm_z - 5.0f;
+            float next_z = 5.0f - g_shared_state->objects[i].shm_y;
             
+            if (isnan(next_x) || isnan(next_y) || isnan(next_z)) {
+                updated[local_idx] = 0; /* Ignore this object */
+                continue;
+            }
+
             float dx = next_x - obj->x;
             float dy = next_y - obj->y;
             float dz = next_z - obj->z;
@@ -377,6 +404,8 @@ void loadGameState() {
             obj->type = g_shared_state->objects[i].type;
             obj->ship_class = g_shared_state->objects[i].ship_class;
             obj->health_pct = g_shared_state->objects[i].health_pct;
+            obj->energy = g_shared_state->objects[i].energy;
+            obj->faction = g_shared_state->objects[i].faction;
             strncpy(obj->name, g_shared_state->objects[i].shm_name, 63);
         }
     }
@@ -388,84 +417,85 @@ void loadGameState() {
             objects[k].id = 0;
         }
     }
+
     if (g_shared_state->beam_count > 0) {
         for(int i=0; i<g_shared_state->beam_count; i++) {
             int slot = -1;
             for(int j=0; j<10; j++) if(beams[j].alpha <= 0) { slot = j; break; }
             if (slot == -1) slot = rand()%10;
-            beams[slot].x = g_shared_state->beams[i].shm_tx - 5.5f;
-            beams[slot].y = g_shared_state->beams[i].shm_tz - 5.5f;
-            beams[slot].z = 5.5f - g_shared_state->beams[i].shm_ty;
+            beams[slot].x = g_shared_state->beams[i].shm_tx - 5.0f;
+            beams[slot].y = g_shared_state->beams[i].shm_tz - 5.0f;
+            beams[slot].z = 5.0f - g_shared_state->beams[i].shm_ty;
             beams[slot].alpha = 1.5f;
         }
         /* Consume events */
         g_shared_state->beam_count = 0;
     }
     if (g_shared_state->torp.active) {
-        g_torp.x = g_shared_state->torp.shm_x - 5.5f;
-        g_torp.y = g_shared_state->torp.shm_z - 5.5f;
-        g_torp.z = 5.5f - g_shared_state->torp.shm_y;
+        g_torp.x = g_shared_state->torp.shm_x - 5.0f;
+        g_torp.y = g_shared_state->torp.shm_z - 5.0f;
+        g_torp.z = 5.0f - g_shared_state->torp.shm_y;
         g_torp.active = 1;
     } else g_torp.active = 0;
     if (g_shared_state->boom.active) {
-        g_boom.x = g_shared_state->boom.shm_x - 5.5f;
-        g_boom.y = g_shared_state->boom.shm_z - 5.5f;
-        g_boom.z = 5.5f - g_shared_state->boom.shm_y;
+        g_boom.x = g_shared_state->boom.shm_x - 5.0f;
+        g_boom.y = g_shared_state->boom.shm_z - 5.0f;
+        g_boom.z = 5.0f - g_shared_state->boom.shm_y;
         g_boom.active = 1;
         g_boom.timer = 40; /* 1.3 seconds approx */
         /* Consume event */
         g_shared_state->boom.active = 0;
     }
     if (g_shared_state->wormhole.active) {
-        g_wormhole.x = g_shared_state->wormhole.shm_x - 5.5f;
-        g_wormhole.y = g_shared_state->wormhole.shm_z - 5.5f;
-        g_wormhole.z = 5.5f - g_shared_state->wormhole.shm_y;
+        g_wormhole.x = g_shared_state->wormhole.shm_x - 5.0f;
+        g_wormhole.y = g_shared_state->wormhole.shm_z - 5.0f;
+        g_wormhole.z = 5.0f - g_shared_state->wormhole.shm_y;
+        g_wormhole.h = 0; g_wormhole.m = 0;
         g_wormhole.active = 1;
     } else {
         g_wormhole.active = 0;
     }
 
     if (g_shared_state->jump_arrival.active) {
-        g_jump_arrival.x = g_shared_state->jump_arrival.shm_x - 5.5f;
-        g_jump_arrival.y = g_shared_state->jump_arrival.shm_z - 5.5f;
-        g_jump_arrival.z = 5.5f - g_shared_state->jump_arrival.shm_y;
-        g_jump_arrival.active = 1;
-        g_jump_arrival.timer = 120; /* 2 seconds @ 60fps */
+        float jx = g_shared_state->jump_arrival.shm_x - 5.0f;
+        float jy = g_shared_state->jump_arrival.shm_z - 5.0f;
+        float jz = 5.0f - g_shared_state->jump_arrival.shm_y;
         
-        g_arrival_fx.x = g_jump_arrival.x;
-        g_arrival_fx.y = g_jump_arrival.y;
-        g_arrival_fx.z = g_jump_arrival.z;
-        g_arrival_fx.timer = 120;
-        
-        for(int i=0; i<150; i++) {
-            /* Random point on a sphere of radius 4.0 */
-            float theta = (rand() % 360) * M_PI / 180.0f;
-            float phi = (rand() % 180 - 90) * M_PI / 180.0f;
-            float dist = 3.0f + (rand() % 200) / 100.0f;
+        /* Sanity check: prevent invalid arrival triggers (large values indicate uninitialized state) */
+        if (fabs(jx) > 50.0f || fabs(jy) > 50.0f) {
+             g_shared_state->jump_arrival.active = 0;
+        } else {
+            g_jump_arrival.x = jx; g_jump_arrival.y = jy; g_jump_arrival.z = jz;
+            g_jump_arrival.h = 0; g_jump_arrival.m = 0;
+            g_jump_arrival.active = 1;
+            g_jump_arrival.timer = 300;
+            g_arrival_fx.x = jx; g_arrival_fx.y = jy; g_arrival_fx.z = jz;
+            g_arrival_fx.timer = 300;
             
-            g_arrival_fx.particles[i].x = g_arrival_fx.x + dist * cos(phi) * cos(theta);
-            g_arrival_fx.particles[i].y = g_arrival_fx.y + dist * sin(phi);
-            g_arrival_fx.particles[i].z = g_arrival_fx.z + dist * cos(phi) * sin(theta);
-            
-            /* Velocity to reach center in ~100 ticks */
-            g_arrival_fx.particles[i].vx = (g_arrival_fx.x - g_arrival_fx.particles[i].x) / 100.0f;
-            g_arrival_fx.particles[i].vy = (g_arrival_fx.y - g_arrival_fx.particles[i].y) / 100.0f;
-            g_arrival_fx.particles[i].vz = (g_arrival_fx.z - g_arrival_fx.particles[i].z) / 100.0f;
-            
-            g_arrival_fx.particles[i].r = (rand() % 100) / 100.0f;
-            g_arrival_fx.particles[i].g = (rand() % 100) / 100.0f;
-            g_arrival_fx.particles[i].b = (rand() % 100) / 100.0f;
-            g_arrival_fx.particles[i].active = 1;
+            for(int i=0; i<150; i++) {
+                float theta = (rand() % 360) * M_PI / 180.0f;
+                float phi = (rand() % 180 - 90) * M_PI / 180.0f;
+                float dist = 3.0f + (rand() % 200) / 100.0f;
+                g_arrival_fx.particles[i].x = g_arrival_fx.x + dist * cos(phi) * cos(theta);
+                g_arrival_fx.particles[i].y = g_arrival_fx.y + dist * sin(phi);
+                g_arrival_fx.particles[i].z = g_arrival_fx.z + dist * cos(phi) * sin(theta);
+                g_arrival_fx.particles[i].vx = (g_arrival_fx.x - g_arrival_fx.particles[i].x) / 100.0f;
+                g_arrival_fx.particles[i].vy = (g_arrival_fx.y - g_arrival_fx.particles[i].y) / 100.0f;
+                g_arrival_fx.particles[i].vz = (g_arrival_fx.z - g_arrival_fx.particles[i].z) / 100.0f;
+                g_arrival_fx.particles[i].r = (rand() % 100) / 100.0f;
+                g_arrival_fx.particles[i].g = (rand() % 100) / 100.0f;
+                g_arrival_fx.particles[i].b = (rand() % 100) / 100.0f;
+                g_arrival_fx.particles[i].active = 1;
+            }
+            g_shared_state->jump_arrival.active = 0;
         }
-
-        g_shared_state->jump_arrival.active = 0;
     }
 
     /* Supernova epicenter */
     if (g_shared_state->supernova_pos.active > 0) {
-        g_sn_pos.x = g_shared_state->supernova_pos.shm_x - 5.5f;
-        g_sn_pos.y = g_shared_state->supernova_pos.shm_z - 5.5f;
-        g_sn_pos.z = 5.5f - g_shared_state->supernova_pos.shm_y;
+        g_sn_pos.x = g_shared_state->supernova_pos.shm_x - 5.0f;
+        g_sn_pos.y = g_shared_state->supernova_pos.shm_z - 5.0f;
+        g_sn_pos.z = 5.0f - g_shared_state->supernova_pos.shm_y;
         g_sn_pos.active = 1;
         g_sn_pos.timer = g_shared_state->supernova_pos.active;
         g_sn_q[0] = g_shared_state->shm_sn_q[0];
@@ -478,9 +508,9 @@ void loadGameState() {
 
     /* Dismantle */
     if (g_shared_state->dismantle.active) {
-        g_dismantle.x = g_shared_state->dismantle.shm_x - 5.5f;
-        g_dismantle.y = g_shared_state->dismantle.shm_z - 5.5f;
-        g_dismantle.z = 5.5f - g_shared_state->dismantle.shm_y;
+        g_dismantle.x = g_shared_state->dismantle.shm_x - 5.0f;
+        g_dismantle.y = g_shared_state->dismantle.shm_z - 5.0f;
+        g_dismantle.z = 5.0f - g_shared_state->dismantle.shm_y;
         g_dismantle.species = g_shared_state->dismantle.species;
         g_dismantle.timer = 60;
         for(int i=0; i<100; i++) {
@@ -681,9 +711,11 @@ void drawCompass() {
     glColor3f(0, 0, 0.5); glVertex3f(0,0,-5.5); glVertex3f(0,0,5.5); /* Z - Bluish */
     glEnd();
 
-    /* Local Tactical Compass around the ship (enterpriseX, enterpriseY, enterpriseZ) */
+    /* Local Tactical Compass around the ship (origin in shifted space) */
     glPushMatrix();
-    glTranslatef(enterpriseX, enterpriseY, enterpriseZ);
+
+    /* Rotate Compass to align with Ship Heading (Augmented Reality) */
+    glRotatef(objects[0].h, 0, 1, 0);
     
     /* 1. Heading Ring (Horizontal plane XZ in OpenGL) */
     glColor4f(0.0f, 1.0f, 1.0f, 0.3f);
@@ -710,25 +742,21 @@ void drawCompass() {
     for(int i=-90; i<=90; i+=5) {
         float rad = i * M_PI / 180.0f;
         /* Using current enterprise heading to align the mark circle */
-        float h_rad = (objects[0].h) * M_PI / 180.0f;
-        float vx = sin(h_rad) * cos(rad) * 2.5f;
-        float vz = cos(h_rad) * cos(rad) * 2.5f;
         float vy = sin(rad) * 2.5f;
-        glVertex3f(vx, vy, vz);
+        float vz = cos(rad) * 2.5f;
+        glVertex3f(0, vy, vz);
     }
     glEnd();
 
     /* 4. Mark Labels (Only valid tactical range) */
     glColor3f(0.8f, 0.8f, 0.0f);
     int marks[] = {-90, -45, 0, 45, 90};
-    float h_rad_l = (objects[0].h) * M_PI / 180.0f;
     for(int i=0; i<5; i++) {
         float rad = marks[i] * M_PI / 180.0f;
-        float lx = sin(h_rad_l) * cos(rad) * 2.8f;
-        float lz = cos(h_rad_l) * cos(rad) * 2.8f;
         float ly = sin(rad) * 2.8f;
+        float lz = cos(rad) * 2.8f;
         char buf[16]; sprintf(buf, "M:%+d", marks[i]);
-        drawText3D(lx, ly, lz, buf);
+        drawText3D(0, ly, lz, buf);
     }
 
     glPopMatrix();
@@ -1188,38 +1216,72 @@ void drawPlanet(float x, float y, float z) {
     glDisable(GL_BLEND);
 }
 
-void drawWormhole(float x, float y, float z) {
+void drawWormhole(float x, float y, float z, float h, float m, int type) {
     glPushAttrib(GL_ALL_ATTRIB_BITS);
+    glPushMatrix();
+    glTranslatef(x, y, z);
+    glRotatef(h - 90.0f, 0, 1, 0);
+    glRotatef(m, 0, 0, 1);
+    glRotatef(90, 0, 1, 0); /* Align longitudinal axis with ship forward */
+
+    /* 1. Draw the central 3D sphere with material properties */
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_TEXTURE_2D);
+    
+    if (type == 0) {
+        /* DEPARTURE: Dark charcoal with metallic specularity */
+        float mat_amb[] = {0.0f, 0.0f, 0.0f, 1.0f};
+        float mat_diff[] = {0.02f, 0.02f, 0.02f, 1.0f};
+        float mat_spec[] = {0.6f, 0.6f, 0.6f, 1.0f};
+        glMaterialfv(GL_FRONT, GL_AMBIENT, mat_amb);
+        glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diff);
+        glMaterialfv(GL_FRONT, GL_SPECULAR, mat_spec);
+        glMaterialf(GL_FRONT, GL_SHININESS, 100.0f);
+        glColor3f(0.05f, 0.05f, 0.05f);
+    } else {
+        /* ARRIVAL: Golden White Star */
+        float mat_amb[] = {0.5f, 0.4f, 0.2f, 1.0f};
+        float mat_diff[] = {1.0f, 0.9f, 0.7f, 1.0f};
+        float mat_spec[] = {1.0f, 1.0f, 1.0f, 1.0f};
+        glMaterialfv(GL_FRONT, GL_AMBIENT, mat_amb);
+        glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diff);
+        glMaterialfv(GL_FRONT, GL_SPECULAR, mat_spec);
+        glMaterialf(GL_FRONT, GL_SHININESS, 128.0f);
+        glColor3f(1.0f, 1.0f, 1.0f);
+    }
+    
+    /* Using glutSolidSphere instead of GLUquadric to avoid memory issues */
+    glutSolidSphere(0.35f, 32, 32);
+    glDisable(GL_LIGHTING);
+
+    /* 2. Activate shader for the external energy cones */
     if (whShaderProgram) {
         glUseProgram(whShaderProgram);
         glUniform1f(glGetUniformLocation(whShaderProgram, "time"), pulse);
     }
-    glPushMatrix();
-    glTranslatef(x, y, z);
-    glRotatef(pulse * 20.0f, 0, 0, 1);
 
-    glDisable(GL_LIGHTING);
+    glRotatef(pulse * 25.0f, 0, 0, 1);
     glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glDisable(GL_TEXTURE_2D);
-    glDisable(GL_DEPTH_TEST); /* Draw on top or semi-transparent */
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE); 
+    glDisable(GL_DEPTH_TEST); 
     
-    float rs = 0.2f;
-    float rmax = 1.2f;
-    int Nr = 20;
+    float rs = 0.45f;
+    float rmax = 1.6f;
+    int Nr = 15;
     int Nt = 30;
-
     float dr = (rmax - rs) / (float)Nr;
     float dth = 2.0f * M_PI / (float)Nt;
 
     for (int side = -1; side <= 1; side += 2) {
-        /* Circles */
         for(int i=0; i<Nr; i++){
             float r = rs + (float)i * dr;
-            float zz = 2.0f * sqrt(rs * (r - rs));
-            float color_fade = 1.0f - (float)i/(float)Nr;
-            
-            glColor4f(0.0f, 0.6f * color_fade, 1.0f * color_fade, 0.8f * color_fade);
+            float zz = 0.6f + 2.0f * sqrt(rs * (r - rs));
+            if (type == 1) zz = 2.64f - zz; /* Invert orientation for arrival: Wide at center, tip away */
+            float fade = 1.0f - (float)i/(float)Nr;
+            if (type == 0) glColor4f(0.3f*fade, 0.0f, 1.0f*fade, 0.8f*fade); /* Blue/Purple Cones */
+            else glColor4f(1.0f*fade, 0.8f*fade, 0.2f*fade, 0.8f*fade);      /* Gold Cones */
             glBegin(GL_LINE_LOOP);
             for(int j=0; j<=Nt; j++){
                 float th = (float)j * dth;
@@ -1227,31 +1289,24 @@ void drawWormhole(float x, float y, float z) {
             }
             glEnd();
         }
-
-        /* Meridians */
         for(int j=0; j<Nt; j++){
             float th = (float)j * dth;
             glBegin(GL_LINE_STRIP);
             for(int i=0; i<Nr; i++){
                 float r = rs + (float)i * dr;
-                float zz = 2.0f * sqrt(rs * (r - rs));
-                float color_fade = 1.0f - (float)i/(float)Nr;
-                glColor4f(0.0f, 0.4f * color_fade, 0.8f * color_fade, 0.6f * color_fade);
+                float zz = 0.6f + 2.0f * sqrt(rs * (r - rs));
+                if (type == 1) zz = 2.64f - zz; /* Match inverted orientation */
+                float fade = 1.0f - (float)i/(float)Nr;
+                if (type == 0) glColor4f(0.2f*fade, 0.0f, 0.6f*fade, 0.6f*fade);
+                else glColor4f(0.8f*fade, 0.6f*fade, 0.2f*fade, 0.6f*fade);
                 glVertex3f(r * cos(th), r * sin(th), (float)side * zz);
             }
             glEnd();
         }
     }
-
-    /* Central Event Horizon Core */
-    glEnable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
-    glColor3f(0.0f, 0.0f, 0.1f);
-    glutSolidSphere(rs, 16, 16);
-
-    glPopMatrix();
-    if (whShaderProgram) glUseProgram(0);
     glPopAttrib();
+    glPopMatrix();
+    glUseProgram(0);
 }
 
 void drawBlackHole(float x, float y, float z) {
@@ -1632,7 +1687,7 @@ void drawGalaxyMap() {
     for(int z=1; z<=10; z++) {
         for(int y=1; y<=10; y++) {
             for(int x=1; x<=10; x++) {
-                int val = g_galaxy[x][y][z];
+                int64_t val = g_galaxy[x][y][z];
                 bool is_my_q = (x == g_my_q[0] && y == g_my_q[1] && z == g_my_q[2]);
                 if (val == 0 && !is_my_q) continue;
 
@@ -1773,59 +1828,26 @@ void drawExplosion() {
 
 void drawJumpArrival() {
     if (g_jump_arrival.timer <= 0) return;
-    glDisable(GL_LIGHTING);
     
-    /* 1. Converging Particles (Pixels) */
-    glPointSize(2.0f);
-    glBegin(GL_POINTS);
-    for (int i = 0; i < 150; i++) {
-        if (g_arrival_fx.particles[i].active) {
-            float p_alpha = (g_jump_arrival.timer > 20) ? 1.0f : (g_jump_arrival.timer / 20.0f);
-            glColor4f(g_arrival_fx.particles[i].r, g_arrival_fx.particles[i].g, g_arrival_fx.particles[i].b, p_alpha);
-            glVertex3f(g_arrival_fx.particles[i].x, g_arrival_fx.particles[i].y, g_arrival_fx.particles[i].z);
-        }
+    glPushMatrix();
+    glTranslatef(g_jump_arrival.x, g_jump_arrival.y, g_jump_arrival.z);
+    
+    /* Phase 1: Pure Golden Wormhole (Timer 300 -> 120 : 3 seconds @ 60fps) */
+    /* Phase 2: Ship materialization with Flash (Timer 120 -> 0) */
+    float wh_scale = (g_jump_arrival.timer < 60) ? (g_jump_arrival.timer / 60.0f) : 1.0f;
+    
+    glPushMatrix();
+    glScalef(wh_scale, wh_scale, wh_scale);
+    drawWormhole(0, 0, 0, g_jump_arrival.h, g_jump_arrival.m, 1); /* Type 1: Arrival (Gold) */
+    glPopMatrix();
+    
+    /* Delay the flash: only starts when timer < 120 (after 3 seconds @ 60fps) */
+    if (g_jump_arrival.timer < 120) {
+        float flash_t = 1.0f - (g_jump_arrival.timer / 120.0f);
+        drawGlow(0.5f + flash_t * 5.0f, 1.0f, 1.0f, 1.0f, (1.0f - flash_t) * 0.9f);
     }
-    glEnd();
 
-    glPushMatrix(); glTranslatef(g_jump_arrival.x, g_jump_arrival.y, g_jump_arrival.z);
-    
-    float total_duration = 120.0f;
-    float t = (total_duration - g_jump_arrival.timer) / total_duration;
-    float alpha = (g_jump_arrival.timer / total_duration);
-    
-    /* Central expanding glow */
-    drawGlow(0.2f + t * 1.2f, 1.0f, 1.0f, 1.0f, alpha * 0.7f);
-    
-    /* Sparkling multicolored points */
-    glPointSize(5.0f);
-    glBegin(GL_POINTS);
-    for (int i = 0; i < 50; i++) {
-        float angle = (float)i * (2.0f * M_PI / 50.0f) + pulse * 2.0f;
-        float r_dist = (0.2f + t * 2.0f) * (0.8f + 0.2f * sin(pulse * 12.0f + i));
-        
-        float r = 0.5f + 0.5f * sin(pulse * 6.0f + i);
-        float g = 0.5f + 0.5f * sin(pulse * 6.0f + i + 2.0f);
-        float b = 0.5f + 0.5f * sin(pulse * 6.0f + i + 4.0f);
-        
-        glColor4f(r, g, b, alpha);
-        glVertex3f(cos(angle) * r_dist, (sin(pulse * 4.0f + i) * 0.6f), sin(angle) * r_dist);
-    }
-    glEnd();
-    
-    /* Expanding rings */
-    for (int j = 0; j < 4; j++) {
-        float r_ring = (t * 3.5f) - (float)j * 0.4f;
-        if (r_ring < 0) continue;
-        glColor4f(0.6f, 0.9f, 1.0f, alpha * (0.5f - j * 0.1f));
-        glBegin(GL_LINE_LOOP);
-        for (int k = 0; k < 40; k++) {
-            float th = (float)k * (2.0f * M_PI / 40.0f);
-            glVertex3f(cos(th) * r_ring, sin(pulse + j) * 0.2f, sin(th) * r_ring);
-        }
-        glEnd();
-    }
-    
-    glPopMatrix(); glEnable(GL_LIGHTING);
+    glPopMatrix();
 }
 
 void drawTorpedo() {
@@ -1929,9 +1951,9 @@ void drawTacticalCube() {
     glDisable(GL_LIGHTING);
     glLineWidth(2.0f);
     
-    float min = -5.5f;
+    float min = -5.0f;
     float mid = 0.0f;
-    float max = 5.5f;
+    float max = 5.0f;
 
     /* 1. AFT PLANE (Anello Posteriore - Rosso) - Facing Z+ (Viewer) */
     glColor3f(1.0f, 0.0f, 0.0f);
@@ -1971,35 +1993,47 @@ void display() {
     
     /* RESET STACKS */
     glMatrixMode(GL_PROJECTION); glLoadIdentity();
-    gluPerspective(45, 1.33, 0.1, 500); /* Near plane lowered to 0.1 for close tactical view */
+    gluPerspective(45, 1.33, 0.1, 500); 
     glMatrixMode(GL_MODELVIEW); glLoadIdentity();
 
-    /* Sky color pulse if supernova imminent */
+    /* Cinematic Camera Transition */
+    float target_zoom = -35.0f; /* Map Zoom */
+    float current_zoom = zoom * (1.0f - map_anim) + target_zoom * map_anim;
+    
+    glTranslatef(0, 0, current_zoom);
+    glRotatef(angleX, 1, 0, 0); 
+    glRotatef(angleY, 0, 1, 0);
+
+    /* Sky color pulse */
     float sn_intensity = 0.0f;
     if (g_shared_state->shm_galaxy[g_shared_state->shm_q[0]][g_shared_state->shm_q[1]][g_shared_state->shm_q[2]] < 0) {
         int timer = -g_shared_state->shm_galaxy[g_shared_state->shm_q[0]][g_shared_state->shm_q[1]][g_shared_state->shm_q[2]];
         sn_intensity = 0.3f + sin(pulse*10.0f) * 0.2f;
-        if (timer < 300) sn_intensity += 0.3f; /* Fast blink at the end */
+        if (timer < 300) sn_intensity += 0.3f; 
     }
-    glClearColor(0.05f + sn_intensity, 0.05f, 0.05f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
-    if (g_show_map) {
-        /* Map Mode Camera */
+    /* Background fade to darker black in map mode */
+    float bg_level = 0.05f * (1.0f - map_anim);
+    glClearColor(bg_level + sn_intensity, bg_level, bg_level, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    /* --- RENDER GALAXY MAP (Fades In) --- */
+    if (map_anim > 0.01f) {
         glPushMatrix();
-        glTranslatef(0, 0, -25.0f);
-        glRotatef(angleX, 1, 0, 0); 
-        glRotatef(angleY, 0, 1, 0);
+        /* Holographic appearing effect: Scale up from center */
+        float map_scale = map_anim; 
+        glScalef(map_scale, map_scale, map_scale);
         drawGalaxyMap();
         glPopMatrix();
-    } else {
-        /* Tactical Mode Camera */
+    }
+
+    /* --- RENDER TACTICAL VIEW (Fades Out) --- */
+    if (map_anim < 0.99f) {
         glPushMatrix();
-        glTranslatef(0, 0, zoom); 
-        glRotatef(angleX, 1, 0, 0); 
-        glRotatef(angleY, 0, 1, 0);
-        
-        /* 1. BACKGROUND STARS: Render before ship translation (Infinity effect) */
+        float tact_scale = 1.0f - map_anim;
+        glScalef(tact_scale, tact_scale, tact_scale);
+
+        /* 1. BACKGROUND STARS */
         glDisable(GL_LIGHTING);
         if (vbo_stars != 0) { 
             glPointSize(1.0f);
@@ -2012,21 +2046,25 @@ void display() {
             glDisableClientState(GL_VERTEX_ARRAY); 
         }
 
-        /* 2. LOCAL OBJECTS: Follow the ship movement */
-        glTranslatef(-enterpriseX, -enterpriseY, -enterpriseZ);
-        
         drawTacticalCube();
-        if (g_show_axes) drawCompass();
+
+        /* 2. LOCAL OBJECTS */
+        if (g_show_axes) {
+            glPushMatrix();
+            glTranslatef(objects[0].x, objects[0].y, objects[0].z);
+            drawCompass();
+            glPopMatrix();
+        }
         if (g_show_grid) drawGrid();
         
         drawPhaserBeams();
         drawExplosion();
         drawJumpArrival();
         drawTorpedo();
-        if (g_wormhole.active) drawWormhole(g_wormhole.x, g_wormhole.y, g_wormhole.z);
+        if (g_wormhole.active && g_jump_arrival.timer <= 0) drawWormhole(g_wormhole.x, g_wormhole.y, g_wormhole.z, g_wormhole.h, g_wormhole.m, 0);
         drawDismantle();
 
-        /* Supernova Implosion Flash */
+        /* Supernova Flash */
         if (g_sn_pos.active && g_sn_q[0] == g_my_q[0] && g_sn_q[1] == g_my_q[1] && g_sn_q[2] == g_my_q[2] && g_sn_pos.timer < 30) {
             glDisable(GL_LIGHTING);
             glEnable(GL_BLEND);
@@ -2041,11 +2079,12 @@ void display() {
             glEnable(GL_LIGHTING);
         }
 
-        /* Render Trails */
+        /* Trails */
         for(int k=0; k<200; k++) {
             if (objects[k].type == 1 || objects[k].type >= 10) drawShipTrail(k);
         }
 
+        /* Objects */
         glEnable(GL_LIGHTING);
         for(int i=0; i<200; i++) {
             if (objects[i].type == 0) continue;
@@ -2091,19 +2130,21 @@ void display() {
 
         drawFaceLabels();
 
-        /* Draw Ship HUD Overlay (Tactical Mode) */
+        /* HUD Overlay (Tactical Mode) - Fade Alpha */
         if (g_show_hud) {
-            for(int i=0; i<200; i++) {
-                if (objects[i].type != 0 && !g_is_loading) {
-                    drawHUD(i);
+            if (map_anim < 0.5f) {
+                for(int i=0; i<200; i++) {
+                    if (objects[i].type != 0 && !g_is_loading) {
+                        drawHUD(i);
+                    }
                 }
             }
         }
-        glPopMatrix(); /* End of Tactical Mode camera */
+        glPopMatrix(); /* End of Tactical Mode scaling */
     }
     
     /* Draw HUD Overlay (Map Mode) */
-    if (g_show_hud && g_show_map) {
+    if (g_show_hud && map_anim > 0.5f) {
         /* Show Map specific text */
         glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1000, 0, 1000); glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
         glDisable(GL_LIGHTING); glColor3f(1, 1, 0);
@@ -2126,20 +2167,22 @@ void display() {
     else drawText3D(20, 50, 0, "Arrows: Rotate | W/S: Zoom | H: Toggle HUD | map (in CLI): Enter Map Mode | ESC: Exit");
 
     char buf[256]; 
-    if (g_show_hud && !g_show_map) {
+    if (g_show_hud && map_anim < 0.5f) {
         /* --- TOP LEFT: Comprehensive Ship Status --- */
         int x_off = 20;
         int y_pos = 970;
         
         /* 1. Command & Location */
         glColor3f(1.0f, 1.0f, 0.0f); /* Yellow */
-        sprintf(buf, "%s - CMDR: %s", getClassName(objects[0].ship_class), objects[0].name);
+        /* Use captain name and class from local variables copied under mutex */
+        sprintf(buf, "%s - CAPTAIN: %s", getClassName(g_player_class), g_player_name);
         drawText3D(x_off, y_pos, 0, buf); y_pos -= 20;
 
         glColor3f(0.0f, 1.0f, 1.0f); /* Cyan */
-        float disp_s1 = enterpriseX + 5.5f;
-        float disp_s2 = 5.5f - enterpriseZ;
-        float disp_s3 = enterpriseY + 5.5f;
+        /* Convert focal point coordinates back to Trek sector coordinates (0 to 10) */
+        float disp_s1 = enterpriseX + 5.0f;
+        float disp_s2 = 5.0f - enterpriseZ;
+        float disp_s3 = enterpriseY + 5.0f;
         sprintf(buf, "QUADRANT: %s  |  SECTOR: [%.2f, %.2f, %.2f]", g_quadrant, disp_s1, disp_s2, disp_s3); 
         drawText3D(x_off, y_pos, 0, buf); y_pos -= 25;
 
@@ -2168,10 +2211,10 @@ void display() {
         /* 3. System Health (2 columns) */
         glColor3f(0.0f, 0.8f, 0.0f);
         drawText3D(x_off, y_pos, 0, "--- SYSTEMS HEALTH ---"); y_pos -= 18;
-        const char* sys_names[] = {"Warp", "Impulse", "Sensors", "Transp", "Phasers", "Torps", "Computer", "Life"};
-        for(int i=0; i<4; i++) {
+        const char* sys_names[] = {"Warp", "Impulse", "Sensors", "Transp", "Phasers", "Torps", "Computer", "Life", "Shields", "Aux"};
+        for(int i=0; i<5; i++) {
             for(int col=0; col<2; col++) {
-                int idx = i + col*4;
+                int idx = i + col*5;
                 float h = g_system_health[idx];
                 if (h > 75) glColor3f(0, 1, 0); else if (h > 30) glColor3f(1, 1, 0); else glColor3f(1, 0, 0);
                 sprintf(buf, "%-8s: %3.0f%%", sys_names[idx], h);
@@ -2184,16 +2227,89 @@ void display() {
         /* 4. Cargo Inventory (2 columns) */
         glColor3f(0.8f, 0.5f, 0.0f);
         drawText3D(x_off, y_pos, 0, "--- CARGO INVENTORY ---"); y_pos -= 18;
-        const char* res_names[] = {"None", "Dilithium", "Tritanium", "Verterium", "Pergium", "Antimatter", "Xenon"};
-        for(int i=1; i<4; i++) {
+        const char* res_names[] = {"None", "Dilithium", "Tritanium", "Verterium", "Pergium", "Antimatter", "Xenon", "Prisoners"};
+        for(int i=1; i<5; i++) {
             for(int col=0; col<2; col++) {
-                int idx = i + col*3;
-                if (idx > 6) continue;
+                int idx = i + col*4;
+                if (idx > 7) continue;
                 glColor3f(0.7, 0.7, 0.7);
                 sprintf(buf, "%-10s: %-4d", res_names[idx], g_inventory[idx]);
                 drawText3D(x_off + col*150, y_pos, 0, buf);
             }
             y_pos -= 15;
+        }
+        y_pos -= 10;
+
+        /* 5. Reactor Power Distribution */
+        glColor3f(1.0f, 1.0f, 0.0f);
+        drawText3D(x_off, y_pos, 0, "--- REACTOR POWER ALLOCATION ---"); y_pos -= 18;
+        sprintf(buf, "ENGINES: %d%%  |  SHIELDS: %d%%  |  WEAPONS: %d%%", 
+                (int)(g_shared_state->shm_power_dist[0]*100), 
+                (int)(g_shared_state->shm_power_dist[1]*100), 
+                (int)(g_shared_state->shm_power_dist[2]*100));
+        drawText3D(x_off, y_pos, 0, buf); y_pos -= 25;
+
+        /* 6. Tactical Ordnance & Defense */
+        glColor3f(1.0f, 0.0f, 0.0f);
+        drawText3D(x_off, y_pos, 0, "--- TACTICAL ORDNANCE ---"); y_pos -= 18;
+        
+        /* Weapons Status */
+        glColor3f(1.0f, 0.5f, 0.5f);
+        const char* tube_labels[] = {"READY", "FIRING...", "LOADING...", "OFFLINE"};
+        int ts = g_shared_state->shm_tube_state; if(ts<0||ts>3) ts=3;
+        sprintf(buf, "PHASER CAPACITOR: %-3.0f%% | TUBES: %s", 
+                g_shared_state->shm_phaser_charge,
+                tube_labels[ts]);
+        drawText3D(x_off, y_pos, 0, buf); y_pos -= 15;
+        
+        sprintf(buf, "PHASER INTEGRITY: %-3.0f%%  | CORBOMITE: %d", 
+                g_system_health[4],
+                g_shared_state->shm_corbomite);
+        drawText3D(x_off, y_pos, 0, buf); y_pos -= 15;
+        
+        sprintf(buf, "LIFE SUPPORT: %.1f%%", g_shared_state->shm_life_support);
+        drawText3D(x_off, y_pos, 0, buf); y_pos -= 25;
+
+        /* 7. Target Tactical Overlay (Center Screen) */
+        if (g_lock_target > 0) {
+            int tx_pos = 400;
+            int ty_pos = 150;
+            glColor3f(1.0f, 0.0f, 0.0f);
+            drawText3D(tx_pos, ty_pos, 0, ">>> TARGET LOCKED <<<"); ty_pos -= 20;
+            
+            /* Find target data */
+            for(int i=0; i<200; i++) {
+                if (objects[i].id == g_lock_target) {
+                    glColor3f(1.0f, 1.0f, 1.0f);
+                    
+                    const char* f_name = "Neutral/Unknown";
+                    switch(objects[i].faction) {
+                        case 0:  f_name = "FEDERATION"; glColor3f(0, 1, 1); break;
+                        case 10: f_name = "KLINGON"; glColor3f(1, 0, 0); break;
+                        case 11: f_name = "ROMULAN"; glColor3f(0, 1, 0); break;
+                        case 12: f_name = "BORG"; glColor3f(1, 0, 1); break;
+                        case 13: f_name = "CARDASSIAN"; glColor3f(1, 0.5, 0); break;
+                        case 14: f_name = "DOMINION"; glColor3f(0.5, 0, 1); break;
+                        default: f_name = "INDEPENDENT"; glColor3f(0.8, 0.8, 0.8); break;
+                    }
+
+                    sprintf(buf, "NAME: %s (%s)", objects[i].name, f_name);
+                    drawText3D(tx_pos, ty_pos, 0, buf); ty_pos -= 15;
+                    
+                    float dx = objects[i].x - enterpriseX;
+                    float dy = objects[i].y - enterpriseY;
+                    float dz = objects[i].z - enterpriseZ;
+                    float dist = sqrt(dx*dx + dy*dy + dz*dz);
+                    
+                    glColor3f(1.0f, 1.0f, 1.0f);
+                    sprintf(buf, "ENERGY: %d (%d%%) | DIST: %.2f", objects[i].energy, objects[i].health_pct, dist);
+                    drawText3D(tx_pos, ty_pos, 0, buf); ty_pos -= 15;
+
+                    sprintf(buf, "HEADING: %.0f | MARK: %+.0f", objects[i].h, objects[i].m);
+                    drawText3D(tx_pos, ty_pos, 0, buf);
+                    break;
+                }
+            }
         }
 
         if (g_shared_state->is_cloaked) {
@@ -2269,6 +2385,14 @@ void display() {
         sprintf(buf, "SIGNAL INTEGRITY: %.1f%%", g_shared_state->net_integrity);
         drawText3D(750, ty, 0, buf); ty -= 15;
 
+        glColor3f(1.0f, 1.0f, 0.0f);
+        sprintf(buf, "POWER: E:%d%% S:%d%% W:%d%%", 
+                (int)(g_shared_state->shm_power_dist[0]*100), 
+                (int)(g_shared_state->shm_power_dist[1]*100), 
+                (int)(g_shared_state->shm_power_dist[2]*100));
+        drawText3D(750, ty, 0, buf); ty -= 15;
+
+        glColor3f(0.0f, 0.5f, 0.7f);
         sprintf(buf, "AVG FRAME: %d bytes (Opt: %.1f%%)", g_shared_state->net_avg_packet_size, g_shared_state->net_efficiency);
         drawText3D(750, ty, 0, buf); ty -= 15;
 
@@ -2315,29 +2439,41 @@ void display() {
     }
 
     long long sn_val = g_shared_state->shm_galaxy[g_my_q[0]][g_my_q[1]][g_my_q[2]];
-    if (g_show_hud && ((g_sn_pos.active && g_sn_pos.timer > 0) || sn_val < 0)) {
+    if (g_show_hud && (g_sn_pos.active || sn_val < 0)) {
         /* Supernova Overlay - Centered and prominently Red */
         glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity(); gluOrtho2D(0, 1000, 0, 1000); 
         glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
         glDisable(GL_LIGHTING); glDisable(GL_DEPTH_TEST);
         
         int sec = 0;
-        /* Sanity check: ensure we don't treat BPNBS encoded data as a timer */
-        if (sn_val < 0 && sn_val > -5000) {
-            sec = (int)(-sn_val / 30);
-        } else if (g_sn_pos.active && g_sn_pos.timer < 5000) {
+        /* Priority 1: Global event timer from server */
+        if (g_sn_pos.active && g_sn_pos.timer > 0) {
             sec = g_sn_pos.timer / 30;
+        } 
+        /* Priority 2: Fallback to grid-encoded timer (only if valid: 1-1800 ticks) */
+        else if (sn_val < 0 && sn_val > -5000) {
+            sec = (int)(-sn_val / 30);
         }
         
-        if (sec > 99) sec = 99; /* Cap display */
-        if (sec < 0) sec = 0;
+        if (sec > 60) sec = 60; /* Max supernova countdown is 60s */
+        if (sec < 1 && (g_sn_pos.active || (sn_val < 0 && sn_val > -5000))) sec = 1;
         
         char sn_buf[128];
         glColor3f(1.0f, 0.0f, 0.0f); /* Bright Red */
-        if (sn_val < 0 || (g_my_q[0] == g_sn_q[0] && g_my_q[1] == g_sn_q[1] && g_my_q[2] == g_sn_q[2])) {
+        /* Determine if the supernova is IN the current quadrant */
+        bool in_this_q = false;
+        if (sn_val < 0 && sn_val > -5000) in_this_q = true;
+        if (g_sn_pos.active && g_my_q[0] == g_sn_q[0] && g_my_q[1] == g_sn_q[1] && g_my_q[2] == g_sn_q[2]) in_this_q = true;
+
+        if (in_this_q) {
             sprintf(sn_buf, "!!! CRITICAL: SUPERNOVA IMMINENT IN THIS SECTOR: %d SEC !!!", sec);
-        } else {
+        } else if (g_sn_pos.active) {
             sprintf(sn_buf, "!!! WARNING: SUPERNOVA DETECTED IN Q-%d-%d-%d: %d SEC !!!", g_sn_q[0], g_sn_q[1], g_sn_q[2], sec);
+        } else {
+            /* Event likely cleared but grid not yet synced */
+            glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
+            glEnable(GL_DEPTH_TEST); glEnable(GL_LIGHTING);
+            return;
         }
         drawText3D(200, 500, 0, sn_buf);
         
@@ -2356,6 +2492,15 @@ void timer(int v) {
     if (angleY >= 360.0f) angleY -= 360.0f;
     pulse += 0.05; 
     
+    /* Cinematic Transition Logic */
+    if (g_show_map) {
+        if (map_anim < 1.0f) map_anim += 0.04f;
+        if (map_anim > 1.0f) map_anim = 1.0f;
+    } else {
+        if (map_anim > 0.0f) map_anim -= 0.04f;
+        if (map_anim < 0.0f) map_anim = 0.0f;
+    }
+
     /* Fade out beams */
     for (int i = 0; i < 10; i++) if (beams[i].alpha > 0) beams[i].alpha -= 0.05f;
 
@@ -2411,13 +2556,6 @@ void timer(int v) {
 
         objects[i].m += (objects[i].tm - objects[i].m) * 0.15f;
         
-        if (i == 0) { 
-            /* Camera follows the interpolated position of Enterprise */
-            enterpriseX = objects[i].x; 
-            enterpriseY = objects[i].y; 
-            enterpriseZ = objects[i].z; 
-        }
-
         if (objects[i].type == 1 || objects[i].type >= 10) {
             /* Check for jump only if we have a history */
             if (objects[i].trail_count > 0) {

@@ -15,8 +15,8 @@
 #include "server_internal.h"
 #include "ui.h"
 
-/* Master Key for Subspace Communications (Used when session key is not negotiated) */
-static const uint8_t MASTER_SESSION_KEY[32] = "TREK-ULTRA-SECURE-CRYPTO-2026-!!";
+/* Master Key for Subspace Communications (Loaded from ENV) */
+uint8_t MASTER_SESSION_KEY[32];
 
 /* Advanced Subspace Encryption Engine */
 void encrypt_payload(PacketMessage *msg, const char *plaintext, const uint8_t *key) {
@@ -127,7 +127,9 @@ void broadcast_message(PacketMessage *msg) {
             }
             
             size_t pkt_size = offsetof(PacketMessage, text) + individual_msg.length;
+            pthread_mutex_lock(&players[i].socket_mutex);
             write_all(players[i].socket, &individual_msg, pkt_size);
+            pthread_mutex_unlock(&players[i].socket_mutex);
         }
     }
     pthread_mutex_unlock(&game_mutex);
@@ -152,5 +154,7 @@ void send_server_msg(int p_idx, const char *from, const char *text) {
     }
     
     size_t pkt_size = offsetof(PacketMessage, text) + msg.length;
+    pthread_mutex_lock(&players[p_idx].socket_mutex);
     write_all(players[p_idx].socket, &msg, pkt_size);
+    pthread_mutex_unlock(&players[p_idx].socket_mutex);
 }

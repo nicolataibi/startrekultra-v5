@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include "network.h"
+#include "game_config.h"
 
 typedef enum { 
     NAV_STATE_IDLE, 
@@ -25,8 +26,9 @@ typedef enum {
 
 typedef struct {
     int socket;
+    pthread_mutex_t socket_mutex;
     char name[64];
-    int faction;
+    int32_t faction;
     int ship_class;
     int active;
     int crypto_algo; /* 0:None, 1-11:Legacy, 12:PQC (Quantum Secure) */
@@ -45,12 +47,19 @@ typedef struct {
     
     /* Torpedo State */
     bool torp_active;
+    int torp_load_timer;
+    int torp_timeout;
     double tx, ty, tz;      /* Torpedo Current Position */
     double tdx, tdy, tdz;   /* Torpedo Vector */
     int torp_target;        /* ID of target */
     
     /* Jump Visuals */
     double wx, wy, wz;      /* Wormhole entrance coords */
+    int shield_regen_delay;
+    
+    /* Boarding Interaction State */
+    int pending_bor_target; /* ID of target player */
+    int pending_bor_type;   /* 1: Ally, 2: Enemy */
 
     StarTrekGame state;
 } ConnectedPlayer;
@@ -58,7 +67,9 @@ typedef struct {
 typedef enum {
     AI_STATE_PATROL = 0,
     AI_STATE_CHASE,
-    AI_STATE_FLEE
+    AI_STATE_FLEE,
+    AI_STATE_ATTACK_RUN,
+    AI_STATE_ATTACK_POSITION
 } AIState;
 
 /* --- Celestial and Tactical Entities --- */
@@ -86,7 +97,8 @@ typedef struct {
     AIState ai_state; 
     int target_player_idx; 
     int nav_timer; 
-    double dx, dy, dz; 
+    double dx, dy, dz;
+    double tx, ty, tz; 
 } NPCShip;
 
 typedef struct { int id, q1, q2, q3; double x, y, z; int resource_type, amount, active; } NPCPlanet;
@@ -149,6 +161,7 @@ extern StarTrekGame galaxy_master;
 extern pthread_mutex_t game_mutex;
 extern int g_debug;
 extern int global_tick;
+extern uint8_t MASTER_SESSION_KEY[32];
 
 typedef struct {
     int supernova_q1, supernova_q2, supernova_q3;
@@ -208,6 +221,14 @@ void rebuild_spatial_index();
 void init_static_spatial_index();
 
 #define IS_Q_VALID(q1,q2,q3) ((q1)>=1 && (q1)<=10 && (q2)>=1 && (q2)<=10 && (q3)>=1 && (q3)<=10)
+
+/* Helper to safely calculate quadrant from absolute coordinate (0-100) */
+static inline int get_q_from_g(double g) {
+    int q = (int)(g / 10.0) + 1;
+    if (q < 1) q = 1;
+    if (q > 10) q = 10;
+    return q;
+}
 
 /* Function Prototypes */
 void normalize_upright(double *h, double *m);

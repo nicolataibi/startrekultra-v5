@@ -47,7 +47,17 @@ int main(int argc, char *argv[]) {
     for (int i = 1; i < argc; i++) if (strcmp(argv[i], "-d") == 0) g_debug = 1;
     signal(SIGPIPE, SIG_IGN);
     
+    /* Security Initialization */
+    char *env_key = getenv("TREK_SUB_KEY");
+    if (!env_key) {
+        fprintf(stderr, "\033[1;31mSECURITY ERROR: Subspace Key (TREK_SUB_KEY) not found in environment.\033[0m\n");
+        fprintf(stderr, "The server requires a shared secret key to secure communications.\n");
+        exit(1);
+    }
+    strncpy((char*)MASTER_SESSION_KEY, env_key, 32);
+    
     memset(players, 0, sizeof(players)); srand(time(NULL)); 
+    for(int i=0; i<MAX_CLIENTS; i++) pthread_mutex_init(&players[i].socket_mutex, NULL);
     
     /* Schermata di Benvenuto Server */
     printf("\033[2J\033[H"); /* Clear screen */
@@ -126,7 +136,53 @@ int main(int argc, char *argv[]) {
                 for (int i=0; i<MAX_CLIENTS; i++) if (players[i].socket == fd && players[i].active) { p_idx = i; break; }
                 pthread_mutex_unlock(&game_mutex);
 
-                if (type == PKT_QUERY || type == PKT_LOGIN) {
+                if (type == PKT_HANDSHAKE) {
+                    PacketHandshake h_pkt;
+                    if (read_all(fd, ((char*)&h_pkt) + sizeof(int), sizeof(PacketHandshake) - sizeof(int)) > 0) {
+                        pthread_mutex_lock(&game_mutex);
+                        /* Find empty slot or existing slot for this FD to store the key temporarily before login */
+                        int slot = -1;
+                        /* Check if already assigned */
+                        for(int i=0; i<MAX_CLIENTS; i++) if (players[i].socket == fd) { slot = i; break; }
+                        /* If not, find a free slot to reserve for this connection */
+                        if (slot == -1) {
+                            for(int i=0; i<MAX_CLIENTS; i++) if (players[i].socket == 0) { 
+                                slot = i; 
+                                players[i].socket = fd; 
+                                players[i].active = 0; /* Not logged in yet */
+                                break; 
+                            }
+                        }
+                        
+                        if (slot != -1) {
+                            /* De-obfuscate the Session Key and Signature using Master Key */
+                            for(int k=0; k<32; k++) {
+                                players[slot].session_key[k] = h_pkt.pubkey[k] ^ MASTER_SESSION_KEY[k];
+                            }
+                            
+                            /* Verify Signature Integrity (Full 32 bytes) */
+                            uint8_t sig[32];
+                            for(int k=0; k<32; k++) sig[k] = h_pkt.pubkey[32+k] ^ MASTER_SESSION_KEY[k];
+                            
+                            if (memcmp(sig, HANDSHAKE_MAGIC_STRING, 32) != 0) {
+                                fprintf(stderr, "\033[1;31m[SECURITY ALERT]\033[0m Handshake integrity failure on FD %d. Invalid Master Key.\n", fd);
+                                /* Kick the client */
+                                players[slot].socket = 0;
+                                pthread_mutex_unlock(&game_mutex);
+                                epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+                                close(fd);
+                                continue; /* Move to next epoll event */
+                            }
+                            
+                            LOG_DEBUG("Secure Session Key negotiated for Client FD %d (Slot %d)\n", fd, slot);
+                            
+                            /* Send ACK back to client to confirm Master Key is correct */
+                            int ack_type = PKT_HANDSHAKE;
+                            write_all(fd, &ack_type, sizeof(int));
+                        }
+                        pthread_mutex_unlock(&game_mutex);
+                    }
+                } else if (type == PKT_QUERY || type == PKT_LOGIN) {
                     PacketLogin pkt;
                     if (read_all(fd, ((char*)&pkt) + sizeof(int), sizeof(PacketLogin) - sizeof(int)) > 0) {
                         if (type == PKT_QUERY) {
@@ -150,7 +206,7 @@ int main(int argc, char *argv[]) {
                                 int is_new = (players[slot].name[0] == '\0');
                                 if (is_new) {
                                     strcpy(players[slot].name, pkt.name); players[slot].faction = pkt.faction; players[slot].ship_class = pkt.ship_class;
-                                    players[slot].state.energy = 1000000; players[slot].state.torpedoes = 1000;
+                                    players[slot].state.energy = 9999999; players[slot].state.torpedoes = 1000;
                                     int crew = 400;
                                     switch(pkt.ship_class) {
                                         case SHIP_CLASS_GALAXY:    crew = 1012; break;
@@ -173,7 +229,9 @@ int main(int argc, char *argv[]) {
                                                                         
                                                                         players[slot].state.inventory[1] = 10; /* Initial Dilithium for jumps */
 
-                                                                        for(int s=0; s<8; s++) players[slot].state.system_health[s] = 100.0f;
+                                                                        for(int s=0; s<10; s++) players[slot].state.system_health[s] = 100.0f;
+                                                                        players[slot].state.life_support = 100.0f;
+                                                                        players[slot].state.phaser_charge = 100.0f;
                                 }
                                 
                                 /* WELCOME PACKAGE: Ensure all captains (new or returning) have at least 10 Dilithium for Jumps */
@@ -181,10 +239,29 @@ int main(int argc, char *argv[]) {
                                     players[slot].state.inventory[1] = 10;
                                 }
 
+                                /* SESSION INITIALIZATION: Reset transient event flags */
+                                players[slot].state.boom.active = 0;
+                                players[slot].state.torp.active = 0;
+                                players[slot].state.dismantle.active = 0;
+                                players[slot].state.beam_count = 0;
+                                players[slot].torp_active = false;
+                                
+                                /* FORCE COORDINATE SYNC: Ensure HUD and Viewer align immediately */
+                                players[slot].state.q1 = get_q_from_g(players[slot].gx);
+                                players[slot].state.q2 = get_q_from_g(players[slot].gy);
+                                players[slot].state.q3 = get_q_from_g(players[slot].gz);
+                                players[slot].state.s1 = players[slot].gx - (players[slot].state.q1 - 1) * 10.0;
+                                players[slot].state.s2 = players[slot].gy - (players[slot].state.q2 - 1) * 10.0;
+                                players[slot].state.s3 = players[slot].gz - (players[slot].state.q3 - 1) * 10.0;
+
                                 pthread_mutex_unlock(&game_mutex);
 
                                 LOG_DEBUG("Synchronizing Galaxy Master (%zu bytes) to FD %d\n", sizeof(StarTrekGame), fd);
-                                if (write_all(fd, &galaxy_master, sizeof(StarTrekGame)) == sizeof(StarTrekGame)) {
+                                pthread_mutex_lock(&players[slot].socket_mutex);
+                                int w_res = write_all(fd, &galaxy_master, sizeof(StarTrekGame));
+                                pthread_mutex_unlock(&players[slot].socket_mutex);
+
+                                if (w_res == sizeof(StarTrekGame)) {
                                     pthread_mutex_lock(&game_mutex);
                                     LOG_DEBUG("Galaxy Master sent successfully to FD %d\n", fd);
                                     bool needs_rescue = false;
@@ -204,11 +281,21 @@ int main(int argc, char *argv[]) {
                                     }
 
                                     if (needs_rescue) {
-                                        players[slot].state.q1 = rand()%10 + 1; players[slot].state.q2 = rand()%10 + 1; players[slot].state.q3 = rand()%10 + 1;
+                                        int rq1, rq2, rq3;
+                                        /* Find a quadrant without a supernova */
+                                        do {
+                                            rq1 = rand()%10 + 1; rq2 = rand()%10 + 1; rq3 = rand()%10 + 1;
+                                        } while (supernova_event.supernova_timer > 0 && 
+                                                 rq1 == supernova_event.supernova_q1 && 
+                                                 rq2 == supernova_event.supernova_q2 && 
+                                                 rq3 == supernova_event.supernova_q3);
+
+                                        players[slot].state.q1 = rq1; players[slot].state.q2 = rq2; players[slot].state.q3 = rq3;
                                         players[slot].state.s1 = 5.0; players[slot].state.s2 = 5.0; players[slot].state.s3 = 5.0;
-                                        players[slot].state.energy = 500000;
+                                        players[slot].state.energy = 9999999;
+                                        players[slot].state.torpedoes = 1000;
                                         if (players[slot].state.crew_count <= 0) players[slot].state.crew_count = 100;
-                                        for(int s=0; s<8; s++) players[slot].state.system_health[s] = 80.0f;
+                                        for(int s=0; s<10; s++) players[slot].state.system_health[s] = 80.0f;
                                         players[slot].gx = (players[slot].state.q1-1)*10.0 + 5.0;
                                         players[slot].gy = (players[slot].state.q2-1)*10.0 + 5.0;
                                         players[slot].gz = (players[slot].state.q3-1)*10.0 + 5.0;
@@ -217,7 +304,7 @@ int main(int argc, char *argv[]) {
                                         players[slot].active = 1;
                                         players[slot].crypto_algo = CRYPTO_NONE; 
                                         pthread_mutex_unlock(&game_mutex);
-                                        send_server_msg(slot, "STARFLEET", "EMERGENCY RESCUE: Your ship was recovered from a collision zone and towed to a safe sector.");
+                                        send_server_msg(slot, "STARFLEET", "EMERGENCY RESCUE: Your ship was recovered and towed to a safe quadrant.");
                                     } else {
                                         players[slot].active = 1;
                                         players[slot].crypto_algo = CRYPTO_NONE; 

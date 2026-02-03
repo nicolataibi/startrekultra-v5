@@ -10,6 +10,9 @@
 
 #include <pthread.h>
 #include <semaphore.h>
+#include <stdint.h>
+
+#pragma pack(push, 1)
 
 #define MAX_OBJECTS 200
 #define MAX_BEAMS 10
@@ -27,6 +30,8 @@ typedef struct {
     int ship_class;
     int active;
     int health_pct;
+    int energy;
+    int faction;
     int id;
     char shm_name[64];
 } SharedObject;
@@ -58,8 +63,13 @@ typedef struct {
     int shm_shields[6];
     int shm_cargo_energy;
     int shm_cargo_torpedoes;
-    int inventory[7];
-    float shm_system_health[8];
+    int inventory[8];
+    float shm_system_health[10];
+    float shm_power_dist[3];
+    int shm_tube_state;
+    float shm_phaser_charge;
+    float shm_life_support;
+    int shm_corbomite;
     int shm_lock_target;
     int klingons;
     char quadrant[128];
@@ -69,7 +79,8 @@ typedef struct {
     int is_cloaked;
     int shm_crypto_algo;
     int shm_q[3];
-    int shm_galaxy[11][11][11];
+    float shm_s[3];
+    int64_t shm_galaxy[11][11][11];
     
     /* Subspace Telemetry Metrics */
     float net_kbps;
@@ -99,5 +110,7 @@ typedef struct {
     /* Synchronization counter */
     long long frame_id;
 } GameState;
+
+#pragma pack(pop)
 
 #endif

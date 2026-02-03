@@ -371,6 +371,7 @@ void generate_galaxy() {
     printf("Generating Master Galaxy...\n");
     memset(&galaxy_master, 0, sizeof(StarTrekGame));
     memset(npcs, 0, sizeof(npcs));
+    memset(players, 0, sizeof(players));
     memset(stars_data, 0, sizeof(stars_data));
     memset(planets, 0, sizeof(planets));
     memset(bases, 0, sizeof(bases));

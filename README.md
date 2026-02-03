@@ -11,9 +11,111 @@
     <td><img src="pulsar.jpg" alt="Pulsar" width="400"/></td>
     <td><img src="nebula.jpg" alt="Nebula" width="400"/></td>
   </tr>
+  <tr>
+    <td><img src="wormhole-enter.jpg" alt="Wormhole Entry" width="400"/></td>
+    <td><img src="wormhole-exit.jpg" alt="Wormhole Exit" width="400"/></td>
+  </tr>
 </table>
 
 Star Trek Ultra è un simulatore spaziale avanzato che unisce la profondità strategica dei classici giochi testuali "Trek" anni '70 con un'architettura moderna Client-Server e una visualizzazione 3D accelerata hardware.
+
+---
+
+## 🚀 Guida Rapida all'Avvio (Quick Start)
+
+### 1. Installazione Dipendenze (Linux)
+```bash
+# Ubuntu / Debian
+sudo apt-get install build-essential freeglut3-dev libglu1-mesa-dev libglew-dev libssl-dev
+
+# Fedora / Red Hat
+sudo dnf groupinstall "Development Tools"
+sudo dnf install freeglut-devel mesa-libGLU-devel glew-devel openssl-devel
+```
+
+### 2. Compilazione
+Compila il progetto per generare gli eseguibili aggiornati:
+```bash
+make
+```
+
+### 3. Avvio del Server
+Lancia lo script di avvio sicuro. Ti verrà chiesto di creare una **Master Key** (password segreta per il server):
+```bash
+./run_server.sh
+```
+
+### 4. Avvio del Client
+In un altro terminale, lancia il client:
+```bash
+./run_client.sh
+```
+**Flusso di accesso:**
+1.  **Server IP:** Inserisci l'indirizzo del server.
+2.  **Handshake:** Il client valida la Master Key. Se errata, esce immediatamente per sicurezza.
+3.  **Identificazione:** Solo se il link è sicuro, ti verrà chiesto il **Commander Name**.
+4.  **Configurazione:** Se è la tua prima volta, sceglierai Fazione e Classe della nave.
+
+---
+
+## ⚙️ Configurazione Avanzata e Modding
+
+Il gameplay è interamente personalizzabile tramite il file di configurazione centralizzato **`include/game_config.h`**.
+Modificando questo file e ricompilando con `make`, è possibile alterare le regole della fisica e del combattimento del proprio server.
+
+Parametri configurabili includono:
+*   **Limiti Risorse:** `MAX_ENERGY_CAPACITY`, `MAX_TORPEDO_CAPACITY`.
+*   **Bilanciamento Danni:** `DMG_PHASER_BASE` (potenza faser), `DMG_TORPEDO` (danno siluri).
+*   **Distanze di Interazione:** `DIST_MINING_MAX` (raggio minerario), `DIST_BOARDING_MAX` (raggio teletrasporto per arrembaggio).
+*   **Eventi:** `TIMER_SUPERNOVA` (durata del countdown catastrofico).
+
+Questo permette agli amministratori di creare varianti del gioco (es. *Hardcore Survival* con poche risorse o *Arcade Deathmatch* con armi potenziate).
+
+---
+
+### 🔐 Architettura di Sicurezza: Protocollo "Dual-Layer"
+
+Star Trek Ultra implementa un modello di sicurezza di livello militare, progettato per garantire la segretezza delle comunicazioni anche in ambienti multi-squadra ostili.
+
+#### 1. Il Concetto
+Il sistema utilizza due livelli di crittografia distinti per bilanciare accessibilità e isolamento tattico:
+
+1.  **Master Key (Shared Secret - KEK):**
+    *   **Ruolo:** Funziona come **Key Encryption Key (KEK)**. Non cifra direttamente i dati di gioco, ma protegge il tunnel in cui viene scambiata la chiave di sessione.
+    *   **Verifica di Integrità:** Il sistema utilizza una "Firma Magica" di 32 byte (`HANDSHAKE_MAGIC_STRING`). Durante l'aggancio, il server tenta di decifrare questa firma usando la Master Key fornita.
+    *   **Rigore Tattico:** Se anche un solo bit della Master Key differisce (es. "ciao" vs "ciao1"), la firma risulterà corrotta. Il server rileverà l'anomalia e **troncherà istantaneamente la connessione TCP**, emettendo un `[SECURITY ALERT]` nei log.
+    *   **Impostazione:** Viene richiesta all'avvio dagli script `run_server.sh` e `run_client.sh`.
+
+2.  **Session Key (Unique Ephemeral Key):**
+    *   **Ruolo:** Chiave crittografica casuale a 256-bit generata dal client per ogni sessione.
+    *   **Isolamento Totale:** Una volta convalidata la Master Key, il server e il client passano alla Session Key. Questo garantisce che **ogni giocatore/squadra sia sintonizzato su una frequenza crittografica diversa**, rendendo i dati di una squadra inaccessibili alle altre anche se condividono lo stesso server.
+
+#### 2. Guida all'Avvio Sicuro
+
+Per garantire che la sicurezza sia attiva, utilizzare sempre gli script bash forniti invece di lanciare direttamente gli eseguibili.
+
+**Avvio del Server:**
+```bash
+./run_server.sh
+# Ti verrà chiesto di inserire una Master Key segreta (es. "DeltaVega47").
+# Questa chiave dovrà essere comunicata a tutti i giocatori autorizzati.
+```
+
+**Avvio del Client:**
+```bash
+./run_client.sh
+# Inserisci la STESSA Master Key impostata sul server.
+# Il sistema confermerà: "Secure Link Established. Unique Frequency active."
+```
+
+#### 3. Comandi di Crittografia in Gioco
+Una volta connessi, la sicurezza è attiva ma trasparente. I capitani possono scegliere l'algoritmo di cifratura tattica (il "sapore" della crittografia) usando il comando `enc`:
+
+*   `enc aes`: Attiva AES-256-GCM (Standard della Flotta).
+*   `enc chacha`: Attiva ChaCha20-Poly1305 (Alta velocità).
+*   `enc off`: Disattiva la cifratura (Traffico in chiaro, sconsigliato).
+
+*Nota: Se due giocatori usano algoritmi diversi (es. uno AES e l'altro ChaCha), non potranno leggere i messaggi radio l'uno dell'altro, vedendo solo "rumore statico". Questo obbliga le squadre a coordinare le frequenze di comunicazione.*
 
 ---
 
@@ -68,8 +170,25 @@ Il visualizzatore 3D è un motore di rendering standalone basato su **OpenGL e G
 *   **Fluidità Cinematica (LERP)**: Per ovviare alla natura discreta dei pacchetti di rete, il motore implementa algoritmi di **Linear Interpolation (LERP)** sia per le posizioni che per gli orientamenti (Heading/Mark). Gli oggetti non "saltano" da un punto all'altro, ma scivolano fluidamente nello spazio, mantenendo i 60 FPS anche se il server aggiorna la logica a frequenza inferiore.
 *   **Rendering ad Alte Prestazioni**: Utilizza **Vertex Buffer Objects (VBO)** per gestire migliaia di stelle di sfondo e la griglia galattica, minimizzando le chiamate alla CPU e massimizzando il throughput della GPU.
 *   **Cartografia Stellare (Modalità Mappa)**:
-    *   Attivabile tramite il comando `map`, questa modalità trasforma la vista tattica in una mappa galattica globale 10x10x10.
-    *   Ogni quadrante è rappresentato da indicatori cromatici che mostrano la densità di basi (verde), nemici (rosso), pianeti (ciano), buchi neri (viola), **nebulose (grigio)** e **pulsar (arancione)**.
+    *   Attivabile tramite il comando `map`, questa modalità attiva una transizione cinematografica che "sgancia" la telecamera tattica dalla nave per offrire una **proiezione olografica tridimensionale** dell'intero settore.
+    *   **Rendering a 64-bit**: Grazie alla codifica BPNBS estesa, la mappa visualizza con precisione assoluta la densità e la tipologia di ogni corpo celeste, senza errori di arrotondamento.
+    *   **Legenda Olografica Oggetti**:
+        *   🚀 **Giocatore** (Ciano): La tua nave.
+        *   ☀️ **Stella** (Giallo): Classe spettrale variabile.
+        *   🪐 **Pianeta** (Ciano): Risorse minerarie o abitabili.
+        *   🛰️ **Base Stellare** (Verde): Porto sicuro per riparazioni.
+        *   🕳️ **Buco Nero** (Viola): Singolarità gravitazionale.
+        *   🌫️ **Nebulosa** (Grigio): Nube di gas (interferenza sensori).
+        *   ✴️ **Pulsar** (Arancione): Stella di neutroni (radiazioni).
+        *   ☄️ **Cometa** (Celeste): Corpo ghiacciato in orbita eccentrica.
+        *   🪨 **Asteroide** (Marrone): Campo detriti navigabile.
+        *   🛸 **Relitto** (Grigio Scuro): Nave abbandonata da smantellare.
+        *   💣 **Mina** (Rosso): Ordigno di prossimità.
+        *   📍 **Boa** (Blu): Transponder di navigazione.
+        *   🛡️ **Piattaforma** (Arancione Scuro): Difesa statica automatizzata.
+        *   🌀 **Rift** (Ciano): Anomalia spaziale instabile (teletrasporto).
+        *   👾 **Mostro Spaziale** (Bianco Pulsante): Minaccia di classe Omega.
+        *   ⚡ **Tempesta Ionica** (Bianco Wireframe): Perturbazione energetica locale.
     *   Le **tempeste ioniche** attive sono visualizzate come gusci energetici bianchi che avvolgono il quadrante.
     *   La posizione attuale del giocatore è evidenziata da un **indicatore bianco pulsante**, facilitando la navigazione a lungo raggio.
 *   **HUD Tattico Dinamico**: Implementa una proiezione 2D-su-3D (via `gluProject`) per ancorare etichette, barre della salute e identificativi direttamente sopra i vascelli. L'overlay include ora il monitoraggio in tempo reale dell'**Equipaggio (CREW)**, vitale per la sopravvivenza della missione.
@@ -122,7 +241,11 @@ Star Trek Ultra non è solo un simulatore tattico, ma un'architettura software c
 ### 1. Il Core Logic Engine (Tick-Based Simulation)
 Il server opera su un loop deterministico a **30 Tick Per Second (TPS)**. Ogni ciclo logico segue una pipeline rigorosa:
 *   **Input Reconciliation**: Processamento dei comandi atomici ricevuti dai client via epoll.
-*   **Predictive AI Update**: Calcolo dei vettori di movimento per gli NPC basato su matrici di inseguimento e pesi tattici (fazione, energia residua).
+*   **Skirmish AI (Tattica Avanzata)**: Gli NPC non si limitano più a un inseguimento lineare. Utilizzano una logica a stati "Attack Run":
+    *   **Corsa d'Attacco**: Selezionano un vettore casuale nel settore per disorientare i sensori.
+    *   **Posizionamento**: Raggiungono il punto di fuoco ottimale.
+    *   **Fuoco di Saturazione**: Ruotano la prua verso il giocatore e scaricano i phaser per 4 secondi.
+    *   **Riposizionamento**: Calcolano immediatamente una nuova traiettoria evasiva.
 *   **Spatial Indexing (Grid Partitioning)**: Gli oggetti non vengono iterati linearmente ($O(N)$), ma mappati in una griglia tridimensionale 10x10x10. Questo riduce la complessità delle collisioni e dei sensori a $O(1)$ per l'area locale del giocatore.
 *   **Physics Enforcement**: Applicazione del clamping galattico e risoluzione delle collisioni con corpi celesti statici.
 
@@ -131,12 +254,17 @@ Il sistema di tracciamento degli oggetti utilizza un'architettura a **Identifica
 *   **Server Side**: Ogni entità (nave, stella, pianeta) ha un ID univoco globale. Durante il tick, solo gli ID visibili al giocatore vengono serializzati.
 *   **Client/Viewer Side**: Il visualizzatore mantiene un buffer locale di 200 slot. Attraverso una **Hash Map implicita**, il client associa l'ID del server a uno slot SHM. Se un ID scompare dal pacchetto di rete, il sistema di *Stale Object Purge* invalida istantaneamente lo slot locale, garantendo la coerenza visiva senza latenza di timeout.
 
-### 3. Modello di Networking Ibrido (Binary stream su TCP)
-Per ovviare alla natura "stream" del TCP, il simulatore implementa un protocollo di **Framing Binario**:
-*   **Atomic Reassembly**: Le funzioni `read_all`/`write_all` garantiscono che i pacchetti non vengano mai processati parzialmente, prevenendo corruzioni di memoria nelle strutture `pragma pack(1)`.
-*   **Interest Management**: Il server tronca fisicamente il payload dei pacchetti UPDATE in base al numero di oggetti effettivamente presenti nel raggio d'azione del giocatore, minimizzando l'uso del bus di rete.
+### 3. Modello di Networking Avanzato (Atomic Binary Stream)
+Per garantire la stabilità su reti ad alta frequenza, il simulatore implementa:
+*   **Atomic Packet Delivery:** Ogni connessione client è protetta da un `socket_mutex` dedicato. Questo garantisce che i pacchetti di grandi dimensioni (come la Galassia Master) non vengano mai interrotti o mescolati con i pacchetti di aggiornamento logico, eliminando alla radice la corruzione del flusso binario (Race Conditions).
+*   **Binary Layout Consistency:** Tutte le strutture di rete utilizzano esclusivamente tipi a dimensione fissa (`int32_t`, `int64_t`, `float`). Combinato con `pragma pack(1)`, questo assicura che il protocollo sia identico tra diverse architetture CPU e versioni del compilatore.
+*   **Synchronous Security Handshake:** Il collegamento non viene stabilito "alla cieca". Il server esegue una validazione sincrona della firma a 32 byte prima di inviare dati sensibili, garantendo un firewall logico impenetrabile.
 
-### 4. Rendering Pipeline GLSL (Hardware-Accelerated Aesthetics)
+### 4. Gestione Memoria e Stabilità del Server
+*   **Heap-Based Command Processing:** Le funzioni di scansione sensoriale (`srs`, `lrs`) utilizzano allocazione dinamica nell'Heap (`calloc`/`free`) per gestire buffer di dati superiori a 64KB. Questo previene rischi di *Stack Overflow*, garantendo che il server rimanga stabile anche in quadranti ad altissima densità di oggetti.
+*   **Zero-Copy Shared Memory (Riallineata):** La SHM utilizza ora coordinate di settore esplicite (`shm_s`) per il posizionamento del giocatore, eliminando la latenza di ricerca ID nel visore 3D e garantendo un puntamento telecamera millimetrico.
+
+### 5. Rendering Pipeline GLSL (Hardware-Accelerated Aesthetics)
 Il visualizzatore 3D implementa una pipeline di ombreggiatura programmabile:
 *   **Vertex Stage**: Gestione delle trasformazioni di proiezione HUD e calcolo dei vettori di luce per-pixel.
 *   **Fragment Stage**: 
@@ -155,8 +283,12 @@ Il visualizzatore 3D implementa una pipeline di ombreggiatura programmabile:
 L'universo di Star Trek Ultra è un ecosistema dinamico popolato da 17 classi di entità, ognuna con proprietà fisiche, tattiche e visive uniche.
 
 ### 🌟 Corpi Celesti e Fenomeni Astronomici
-*   **Stelle (Stars)**: Classificate in 7 tipi spettrali (O, B, A, F, G, K, M). Forniscono energia tramite *Solar Scooping* (`sco`) ma possono diventare instabili e innescare una **Supernova**, distruggendo l'intero quadrante.
-*   **Pianeti (Planets)**: Corpi celesti ricchi di minerali. Possono essere scansionati e scavati (`min`) per ottenere Dilithio, Tritanio e altre risorse vitali.
+*   **Stelle (Stars)**: Classificate in 7 tipi spettrali (O, B, A, F, G, K, M). Forniscono energia tramite *Solar Scooping* (`sco`) ma possono diventare instabili e innescare una **Supernova**.
+    *   **Frequenza**: Eventi cataclismatici estremamente rari (circa l'1.8% di probabilità ogni minuto).
+    *   **Allerta**: Un conto alla rovescia appare nell'HUD quando una stella è prossima all'esplosione.
+    *   **Impatto**: Distruzione totale di ogni vascello nel quadrante allo scadere del tempo.
+    *   **Eredità**: La stella viene sostituita da un **Buco Nero** permanente, alterando per sempre la mappa galattica.
+*   **Pianeti**: Corpi celesti ricchi di minerali.
 *   **Buchi Neri (Black Holes)**: Singolarità gravitazionali con dischi di accrezione. Sono la fonte primaria di Antimateria (`har`), ma la loro attrazione può essere fatale.
 *   **Nebulose (Nebulas)**: Grandi nubi di gas ionizzati (Classi Mutara, Paulson, ecc.). Forniscono copertura tattica (occultamento naturale) ma drenano gli scudi e disturbano i sensori.
 *   **Pulsar**: Stelle di neutroni che emettono radiazioni letali. Navigare troppo vicino danneggia i sistemi e l'equipaggio.
@@ -201,7 +333,11 @@ Di seguito la lista completa dei comandi disponibili, raggruppati per funzione.
      Genera un wormhole per un salto istantaneo verso il quadrante di destinazione.
     *   **Requisiti**: 5000 unità di Energia e 1 Cristallo di Dilithio.
     *   **Procedura**: Richiede una sequenza di stabilizzazione della singolarità di circa 3 secondi.
-*   `apr <ID> <DIST>`: **Approach Autopilot**. Avvicinamento automatico al bersaglio ID fino a distanza DIST.
+*   `apr [ID] [DIST]`: **Approach Autopilot**. Avvicinamento automatico al bersaglio ID fino a distanza DIST.
+    *   Se non viene fornito un ID, utilizza il **bersaglio attualmente agganciato** (`lock`).
+    *   Se viene fornito un solo numero, viene interpretato come **distanza** dal bersaglio agganciato (se < 100).
+*   `cha`: **Chase Autopilot**. Insegue attivamente il bersaglio agganciato mantenendo la distanza di ingaggio.
+*   `rad <MSG>`: **Subspace Radio**. Invia un messaggio globale. Usa `@Fazione` per messaggi di squadra o `#ID` per messaggi privati.
 *   `doc`: **Docking**. Attracco a una Base Stellare (richiede distanza ravvicinata).
 *   `map`: **Stellar Cartography**. Attiva la visualizzazione 3D globale 10x10x10 dell'intera galassia.
     *   **Legenda Colori**: Nemici (Rosso), Basi (Verde), Pianeti (Ciano), Stelle (Giallo), Buchi Neri (Viola), **Nebulose (Grigio)**, **Pulsar (Arancione Pulsante)**.
@@ -227,6 +363,9 @@ Di seguito la lista completa dei comandi disponibili, raggruppati per funzione.
 ### ⚔️ Combattimento Tattico
 *   `pha <E>`: **Fire Phasers**. Spara phaser sul bersaglio agganciato (`lock`) con energia E. 
 *   `pha <ID> <E>`: Spara phaser su uno specifico bersaglio ID. Il danno diminuisce con la distanza.
+*   `cha`: **Chase**. Insegue e intercetta automaticamente il bersaglio agganciato.
+*   `rad <MSG>`: **Radio**. Invia un messaggio subspaziale agli altri capitani (@Fazione per chat di squadra).
+*   `axs` / `grd`: **Guide Visive**. Attiva/disattiva gli assi 3D o la griglia tattica.
 *   `enc <algo>`: **Encryption Toggle**. Attiva o disattiva la crittografia in tempo reale. Supporta gli standard **AES-256-GCM**, **ChaCha20**, **ARIA**, **Camellia**, **Blowfish**, **RC4**, **CAST5**, **IDEA**, **3DES** e **PQC (ML-KEM)**. Fondamentale per proteggere le comunicazioni e leggere i messaggi sicuri degli altri capitani.
 *   `tor`: **Fire Photon Torpedo**. Lancia un siluro a guida automatica sul bersaglio agganciato.
 *   `tor <H> <M>`: Lancia un siluro in modalità balistica manuale (Heading/Mark).
@@ -238,7 +377,7 @@ Per interagire con gli oggetti della galassia tramite i comandi `lock`, `scan`, 
 | Categoria | Intervallo ID | Esempio | Utilizzo Principale |
 | :--- | :--- | :--- | :--- |
 | **Player** | 1 - 999 | `lock 1` | Tuo vascello o altri giocatori |
-| **NPC (Nemici)** | 1.000 - 1.999 | `lock 1050` | Inseguimento (`cha`) e combattimento |
+| **NPC (Nemici)** | 1.000 - 1.999 | `lock 1050` | Ingaggio tattico (Skirmish AI) |
 | **Basi Stellari** | 2.000 - 2.999 | `lock 2005` | Attracco (`doc`) e rifornimento |
 | **Pianeti** | 3.000 - 3.999 | `lock 3012` | Estrazione mineraria (`min`) |
 | **Stelle** | 4.000 - 6.999 | `lock 4500` | Raccolta energia solare (`sco`) |
@@ -312,12 +451,55 @@ Il comando `apr <ID> <DISTANZA>` permette di avvicinarsi automaticamente a quals
 
 *   `she <F> <R> <T> <B> <L> <RI>`: **Shield Configuration**. Distribuisce energia ai 6 scudi.
 *   `clo`: **Cloaking Device**. Attiva/Disattiva occultamento (consuma energia).
-*   `pow <E> <S> <W>`: **Power Distribution**. Ripartisce energia reattore (Motori, Scudi, Armi %).
-*   `aux jettison`: **Eject Warp Core**. Espelle il nucleo (Manovra suicida / Ultima risorsa).
+*   `pow <E> <S> <W>`: **Power Distribution**. Ripartisce energia reattore (Motori, Scudi, Armi %). I valori sono relativi (es. `pow 1 1 1` equivale a `pow 33 33 33`).
+*   `aux jettison`: **Eject Warp Core**. Espelle il nucleo di curvatura (Manovra suicida).
 *   `xxx`: **Self-Destruct**. Autodistruzione sequenziale.
 
+### ⚡ Gestione Reattore e Potenza
+
+Il comando `pow` è fondamentale per la sopravvivenza e la superiorità tattica. Determina come la potenza del reattore principale viene ripartita tra i tre sottosistemi core:
+
+*   **Motori (E)**: Influenza la reattività e la velocità massima dei **Motori a Impulso**. Un'alta allocazione permette manovre rapide e inseguimenti più efficaci.
+*   **Scudi (S)**: Governa il **Tasso di Rigenerazione** di tutti i 6 quadranti difensivi. Se gli scudi sono danneggiati, attingeranno energia dal reattore per rigenerarsi.
+    *   **Scaling Dinamico**: La velocità di rigenerazione è un prodotto sia della **Potenza (S)** assegnata che dell'**Integrità del Sistema Scudi**. Se il generatore degli scudi è danneggiato, la rigenerazione sarà gravemente ostacolata indipendentemente dall'allocazione di potenza.
+
+#### 🛡️ Meccaniche degli Scudi Direzionali
+La nave è protetta da 6 quadranti indipendenti: **Frontale (F), Posteriore (R), Superiore (T), Inferiore (B), Sinistro (L) e Destro (RI)**.
+*   **Danno Localizzato**: Gli attacchi (Faser/Siluri) colpiscono ora quadranti specifici in base all'angolo relativo di impatto.
+*   **Rigenerazione Continua**: A differenza dei vecchi sistemi, la rigenerazione è continua ma scala con la salute dell'hardware.
+*   **Collasso degli Scudi**: Se un quadrante raggiunge lo 0% di integrità, i colpi successivi provenienti da quella direzione infliggeranno danni diretti al reattore energetico principale.
+
+*   **Armi (W)**: Scala direttamente l'**Intensità dei Faser** e il **Tasso di Ricarica**. Un'allocazione elevata convoglia più energia nei banchi faser, permettendo di infliggere danni esponenzialmente maggiori e ricaricare il condensatore molto più velocemente.
+
+#### 🎯 Nota Tactical Ordnance: Faser e Siluri
+*   **Condensatore Faser**: Visibile nell'HUD come "PHASER CAPACITOR: XX%". Rappresenta l'energia attualmente accumulata per il fuoco.
+    *   **Fuoco**: Ogni colpo consuma una parte del condensatore. Se la carica è inferiore al 10%, i faser non possono fare fuoco.
+    *   **Ricarica**: Si ricarica automaticamente ogni secondo. La velocità di ricarica è potenziata assegnando più potenza alle **Armi (W)** tramite il comando `pow`.
+*   **Integrità Faser**: Visibile nell'HUD come "PHASER INTEGRITY: XX%". Rappresenta lo stato dell'hardware. Il danno inflitto è moltiplicato per questo valore. Usa `rep 4` per ripararli.
+*   **Tubi di Lancio**: Visibili nell'HUD come "TUBES: <STATO>".
+    *   **READY**: Il sistema è armato e pronto al fuoco.
+    *   **FIRING...**: Un siluro è attualmente in volo. Nuovi lanci sono inibiti fino all'impatto o all'uscita dal settore.
+    *   **LOADING...**: Sequenza di raffreddamento e ricarica post-lancio (circa 5 secondi).
+    *   **OFFLINE**: L'integrità hardware è inferiore al 50%. Il lancio è impossibile fino alla riparazione (`rep 5`).
+
+### 💓 Supporto Vitale e Sicurezza Equipaggio
+L'HUD mostra "LIFE SUPPORT: XX.X%", valore direttamente collegato all'integrità dei sistemi vitali della nave.
+*   **Inizializzazione**: Ogni missione inizia con il Supporto Vitale al 100%.
+*   **Soglia Critica**: Se la percentuale scende sotto il **75%**, l'equipaggio inizierà a subire perdite periodiche a causa di guasti ambientali (radiazioni, mancanza di ossigeno o fluttuazioni gravitazionali).
+*   **Riparazioni d'Emergenza**: Mantenere il Supporto Vitale sopra la soglia è la massima priorità. Usa immediatamente `rep 7` se l'integrità è compromessa.
+*   **Fallimento Missione**: Se il numero di membri dell'equipaggio raggiunge lo **zero**, il vascello è dichiarato perso e la simulazione termina.
+
+**Feedback HUD**: L'allocazione attuale è visibile nel pannello diagnostico in basso a destra come `POWER: E:XX% S:XX% W:XX%`. Monitorare questo valore è essenziale per ottimizzare la nave in base alla fase della missione (Esplorazione vs Combattimento).
+
 ### 📦 Operazioni e Risorse
-*   `bor`: **Boarding Party**. Invia squadre d'abbordaggio (Dist < 1.0). Può causare perdite di equipaggio se respinto.
+*   `bor [ID]`: **Boarding Party**. Invia squadre di arrembaggio (Dist < 1.0).
+    *   Funziona sul **bersaglio attualmente agganciato** se l'ID non è specificato.
+    *   **Interazione NPC/Relitti**: Premi automatici (Dilithium, Chip, Riparazioni, Superstiti o Prigionieri).
+    *   **Interazione tra Giocatori**: Apre un **Menu Tattico Interattivo** con scelte specifiche:
+        *   **Vascelli Alleati**: `1`: Trasferimento Energia, `2`: Supporto Tecnico (Riparazioni), `3`: Rinforzi Equipaggio.
+        *   **Vascelli Ostili**: `1`: Sabotaggio Sistemi, `2`: Raid della Stiva (Furto Risorse), `3`: Cattura Ostaggi.
+    *   **Selezione**: Rispondi con il numero `1`, `2`, o `3` per eseguire l'azione scelta.
+    *   **Rischi**: Probabilità di resistenza (30% per i giocatori, variabile per NPC) con possibili perdite tra i membri del team.
 *   `dis`: **Dismantle**. Smantella relitti nemici per risorse (Dist < 1.5).
 *   `min`: **Mining**. Estrae risorse da un pianeta in orbita (Dist < 2.0).
 *   `sco`: **Solar Scooping**. Raccoglie energia da una stella (Dist < 2.0).
@@ -325,26 +507,36 @@ Il comando `apr <ID> <DISTANZA>` permette di avvicinarsi automaticamente a quals
 *   `con <T> <A>`: **Convert Resources**. Converte risorse in stiva.
     *   `1`: Dilithium -> Energia.
     *   `3`: Verterium -> Siluri.
-*   `load <T> <A>`: **Load Cargo**. Carica dalla stiva ai sistemi.
-    *   `1`: Energia.
-    *   `2`: Siluri.
-*   `inv`: **Inventory**. Mostra il contenuto della stiva (Cargo Bay).
-*   `rep <ID>`: **Repair**. Ripara un sistema danneggiato usando risorse.
+*   `load <T> <A>`: **Load Cargo**. Trasferisce risorse dalla stiva ai sistemi attivi della nave.
+    *   `1`: Energia (Reattore Principale). Capacità max: 9.999.999 unità.
+    *   `2`: Siluri (Tubi di Lancio). Capacità max: 1.000 unità.
+*   `inv`: **Inventory**. Mostra il contenuto della stiva (Cargo Bay), inclusi materiali grezzi e **Prigionieri**.
+
+### 📦 Gestione Carico e Risorse
+
+Star Trek Ultra distingue tra **Sistemi Attivi** e **Stoccaggio Stiva**. Questa distinzione è visibile nell'HUD come `ENERGY: X (CARGO: Y)`.
+
+*   **Energia/Siluri Attivi**: Sono le risorse immediatamente utilizzabili dai sistemi della nave (Motori, Scudi, Faser e Tubi di Lancio).
+*   **Riserve in Stiva**: Risorse conservate nella Cargo Bay. Fungono da serbatoio secondario. Se il reattore principale è scarico, è necessario trasferire manualmente l'energia dalla stiva usando il comando `load`.
+*   **Solar Scooping e Harvesting**: Le risorse raccolte dalle stelle (`sco`) o dai buchi neri (`har`) vengono inizialmente depositate nella **Stiva** per evitare sovraccarichi al reattore.
+*   **Conversione Risorse**: Materie prime come Dilithium o Verterium devono essere prima convertite (`con`) in Energia o Siluri utilizzabili all'interno della stiva prima di poter essere caricate nei sistemi attivi.
+
+*   `rep [ID]`: **Repair**. Ripara un sistema danneggiato consumando **50 Tritanio** e **10 Antimateria**.
+    *   Se usato senza ID, elenca tutti i 10 sistemi della nave e la loro integrità attuale.
+    *   **ID Sistemi**: `0`: Warp, `1`: Impulse, `2`: Sensori, `3`: Trasportatori, `4`: Faser, `5`: Siluri, `6`: Computer, `7`: Supporto Vitale, `8`: Scudi, `9`: Ausiliari.
 *   **Gestione Equipaggio**: 
     *   Il numero iniziale di personale dipende dalla classe della nave (es. 1012 per la Galaxy, 50 per la Defiant).
     *   **Integrità Vitale**: Se il sistema di **Supporto Vitale** (`Life Support`) scende sotto il 75%, l'equipaggio inizierà a subire perdite periodiche.
+    *   **Integrità Scudi**: Se l'integrità del **Sistema Scudi (ID 8)** è bassa, la ricarica automatica dei 6 quadranti è rallentata.
     *   **Condizione di Fallimento**: Se l'equipaggio raggiunge quota **zero**, la missione termina e la nave è considerata perduta.
-*   `load <T> <A>`: **Load Cargo**. Carica dalla stiva ai sistemi.
-    *   `1`: Energia.
-    *   `2`: Siluri.
-*   `inv`: **Inventory**. Mostra il contenuto della stiva (Cargo Bay).
-*   `rep <ID>`: **Repair**. Ripara un sistema danneggiato usando risorse.
 
 ### 🛡️ Crittografia e Guerra Elettronica (Subspace Security)
 Il sistema implementa un layer di sicurezza di grado militare per tutte le comunicazioni tra i vascelli e il comando di flotta.
 
 *   **Implementazione Tecnica**: La cifratura è gestita tramite la libreria **OpenSSL**, utilizzando algoritmi a 256-bit con autenticazione del pacchetto (GCM/Poly).
-*   **Firma Digitale (Ed25519)**: Oltre alla cifratura, ogni messaggio radio include una firma crittografica generata tramite curve ellittiche (**Ed25519**). Questo garantisce **Autenticità** (solo il vero capitano può firmare) e **Integrità** (il messaggio non è stato alterato). I messaggi verificati appaiono con il tag `[VERIFIED]`.
+*   **Firma Digitale (Ed25519)**: Oltre alla cifratura, ogni messaggio radio include una firma crittografica generata tramite curve ellittiche (**Ed25519**). Questo garantisce **Autenticità** (solo il vero capitano può firmare) e **Integrità** (il messaggio non è stato alterato).
+    *   **Verificato**: I messaggi con una firma valida appaiono con il tag verde **`[VERIFIED]`**.
+    *   **Allerta Manomissione**: Se una firma è presente ma non valida, appare il tag rosso **`[UNVERIFIED]`**, avvertendo di potenziali intercettazioni subspaziali o corruzione dei dati.
 *   **Rotating Frequency Codes**: Ogni messaggio ha una firma unica basata sul `frame_id` del server. Questo impedisce a un nemico di "registrare e riprodurre" i tuoi comandi.
 *   **Session Persistence & Handshake Safety**: Sebbene il server salvi il profilo del capitano, i protocolli di crittografia vengono resettati a `off` a ogni nuova connessione. Questo garantisce che i messaggi di benvenuto e la sincronizzazione iniziale siano sempre leggibili, evitando "lock-out" dovuti a protocolli dimenticati.
 *   **Dynamic Diagnostic Feedback**: In caso di discrepanza tra i protocolli dei capitani (es. uno usa AES e l'altro ChaCha), il computer di bordo analizza il rumore binario e fornisce suggerimenti contestuali (`[HINT]`) per aiutare il capitano a sincronizzare la frequenza.
@@ -407,7 +599,7 @@ L'interfaccia a schermo (Overlay) fornisce un monitoraggio costante dei parametr
 #### 🛠️ Personalizzazione della Vista
 Il comandante può configurare la propria interfaccia tramite comandi CLI rapidi:
 *   `grd`: Attiva/Disattiva la **Griglia Tattica Galattica**, utile per percepire profondità e distanze.
-*   `axs`: Attiva/Disattiva la **Bussola e gli Assi di Riferimento**.
+*   `axs`: Attiva/Disattiva la **Bussola Tattica AR**. Questa nuova bussola olografica è ancorata rigidamente allo scafo della nave. L'anello di Azimut (Heading) e l'arco di Elevazione (Mark) ruotano solidalmente con il vascello, fornendo un riferimento di navigazione immediato e intuitivo ("Realtà Aumentata") per le manovre di combattimento.
 *   `h` (tasto rapido): Nasconde completamente l'HUD per una visione "cinematica" del settore.
 *   **Zoom & Rotazione**: Controllo totale della telecamera tattica tramite mouse o tasti `W/S` e frecce direzionali.
 
@@ -633,15 +825,11 @@ Il sistema di continuità per i giocatori si basa sulla **Persistent Identity**:
 *   **Hot-Swap Connessione**: Se un capitano perde la connessione (crash del client o instabilità di rete), il server mantiene il vascello "attivo" ma immobile per un periodo di grazia, permettendo al giocatore di riprenderne il controllo immediato al rientro.
 
 #### 🆘 Protocollo EMERGENCY RESCUE (Salvataggio d'Emergenza)
-Per garantire la continuità della carriera anche nelle situazioni tattiche più disastrose, il simulatore implementa un protocollo di recupero automatico attivato durante la fase di login.
-
-*   **Rilevamento Collisioni**: Se un giocatore tenta di ricollegarsi e il server rileva che la nave è posizionata all'interno di un corpo celeste (stella o pianeta), viene attivata la procedura di soccorso per evitare il "Death Loop".
-*   **Stato Critico**: Il protocollo interviene anche se il vascello è stato precedentemente distrutto (energia a zero o perdita totale dell'equipaggio).
-*   **Azioni di Soccorso**: Il Comando della Flotta Stellare esegue le seguenti operazioni automatiche:
-    *   **Rilocazione Spaziale**: La nave viene teletrasportata in un settore casuale e sicuro della galassia, lontano da ogni minaccia immediata.
-    *   **Ripristino Sistemi**: Riparazione d'urgenza di tutti gli 8 sottosistemi core fino all'**80% di integrità**.
-*   **Ricarica Energia**: Fornitura di **500.000 unità** di energia di emergenza.
-*   **Rifornimento Siluri**: Dotazione di **1.000 siluri** standard.
+In caso di distruzione del vascello o perdita totale di energia/equipaggio, il Comando della Flotta Stellare attiva un protocollo di recupero automatico al login successivo:
+*   **Ripristino Sistemi**: Riparazione d'emergenza di tutti i sottosistemi core fino all'**80% di integrità**.
+*   **Ricarica Energetica**: Fornitura di **9.999.999 unità** di energia di emergenza.
+*   **Rifornimento Munizioni**: Ricarica completa di **1.000 siluri fotonici**.
+*   **Rilocazione Sicura**: Salto automatico in un quadrante casuale, con verifica di sicurezza per **evitare supernove attive** e zone di collisione. La nave viene posizionata al centro del settore (5.0, 5.0, 5.0).
 *   **Equipaggio di Soccorso**: Se il personale era a zero, viene assegnato un team di soccorso minimo di **100 membri**.
 
 Questa architettura garantisce che Star Trek Ultra non sia solo una sessione di gioco, ma una vera e propria carriera spaziale in evoluzione.
@@ -710,9 +898,14 @@ Il progetto Star Trek Ultra è una dimostrazione di ingegneria del software orie
 La visualizzazione tattica è gestita da un motore OpenGL moderno che combina tecniche classiche e programmabili:
 *   **GLSL Shader Engine**: Gli effetti di bagliore delle stelle, la distorsione del Buco Nero e le scariche phaser sono processati tramite shader scritti in **OpenGL Shading Language**. Questo sposta il carico estetico sulla GPU, liberando la CPU per la logica di rete.
 *   **Vertex Buffer Objects (VBO)**: La geometria statica (stelle di fondo, griglia tattica) viene caricata nella memoria della scheda video all'avvio. Durante il rendering, viene inviato un singolo comando di disegno alla GPU, massimizzando il throughput grafico.
-*   **Projective HUD Technology**: Utilizza trasformazioni di matrice inverse e `gluProject` per mappare coordinate 3D spaziali in coordinate 2D di schermo, permettendo all'interfaccia di agganciare dinamicamente i tag di identificazione sopra i vascelli in movimento.
+*   **Projective HUD Technology**: Utilizza trasformazioni di matrice inversa e `gluProject` per mappare coordinate spaziali 3D in coordinate dello schermo 2D, permettendo all'interfaccia di ancorare dinamicamente i tag di identificazione sopra i vascelli in movimento.
+*   **Overlay Tattico Intelligente**: Quando un bersaglio viene agganciato (`lock <ID>`), un display centrale in realtà aumentata fornisce telemetria a scansione profonda:
+    *   **Analisi Energia Assoluta**: Mostra le unità di energia esatte rimanenti (non solo la percentuale) per calcolare la potenza letale dei faser.
+    *   **Identificazione IFF**: Visualizza la fazione del bersaglio (Federazione, Klingon, Romulani, etc.) con allerta codificata per colore.
+    *   **Tracciamento Movimento**: Visualizzazione in tempo reale di Heading e Mark del bersaglio per prevedere manovre evasive.
+    *   **Telemetria Dinamica**: Calcolo continuo della distanza per la gestione ottimale del raggio d'azione delle armi.
 
-### 📦 Dipendenze e Compilazione
+### 📦 Tecnologie e Requisiti di Sistema
 Per compilare il progetto, è necessario un ambiente di sviluppo Unix-like (preferibilmente Linux) con i seguenti requisiti:
 *   **Compilatore**: GCC 13+ o Clang 16+ (per supporto C23 completo).
 *   **Librerie**: 
@@ -753,8 +946,8 @@ Il progetto implementa diverse soluzioni ingegneristiche avanzate per gestire la
 *   **Atomic Broadcast Pattern**: Per garantire la coerenza multi-giocatore, il server implementa un invio atomico degli aggiornamenti. Durante il broadcast, lo stato della galassia viene bloccato globalmente, assicurando che ogni client riceva un frame di dati identico e sincronizzato, eliminando "ghosting" o discrepanze tra i capitani.
 
 *   **Real-Time Network Diagnostics**: Il sistema non si limita a ricevere dati, ma analizza la qualità del segnale calcolando il **Pulse Jitter** (deviazione standard dell'intervallo tra i frame) e l'**Integrità del Segnale**. Queste metriche permettono di monitorare la fluidità della simulazione e la salute del protocollo binario in tempo reale.
-*   **Sincronizzazione Autoritaria Multi-Canale**: Per eventi cataclismatici come le Supernove, il client implementa una logica di fallback che incrocia i dati della mappa globale con i pacchetti di evento specifici. Questo garantisce che gli allarmi visivi e i timer siano sempre coerenti e attivi, anche in presenza di latenza o perdita parziale di dati.
-*   **Filtro Euristico dell'Integrità Dati**: Il visore implementa algoritmi di validazione in tempo reale per distinguere tra dati strutturali (BPNBS) e segnali temporali di emergenza. Questo previene anomalie di visualizzazione (come timer a 8 cifre) filtrando i dati corrotti o fuori range prima che raggiungano l'HUD.
+*   **Sincronizzazione Autoritaria Multi-Canale**: Per eventi cataclismatici come le Supernove, il client implementa una logica di doppia validazione. Incrocia i pacchetti di evento in tempo reale con i dati di stato codificati nella griglia. Questo previene timer "bloccati" e garantisce che il countdown rimanga accurato e sincronizzato anche durante le transizioni rapide tra quadranti.
+*   **Integrità dei Dati e Filtraggio Euristico**: Il visualizzatore implementa algoritmi di validazione in tempo reale per distinguere tra dati strutturali del quadrante (BPNBS) e segnali temporali di emergenza. Questo previene anomalie visive (come timer fuori scala) filtrando dati obsoleti o corrotti durante i passaggi di consegna della rete.
 *   **Zero-Latency Protocol Switching**: Il sistema di crittografia supporta il cambio di stato istantaneo.
  Il client sincronizza il proprio stato di decifratura una frazione di secondo prima dell'invio del comando al server, garantendo che anche i messaggi di risposta immediata (Handshake) siano correttamente processati senza "glitch" informativi.
 *   **Fixed Timestep Logic**: Il server processa la fisica a un tick-rate fisso di 30Hz (`clock_nanosleep`), mentre il client renderizza a 60Hz+ con interpolazione lineare.
