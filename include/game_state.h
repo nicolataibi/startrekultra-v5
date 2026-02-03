@@ -29,6 +29,8 @@ typedef struct {
     int32_t active;
     int32_t health_pct; /* 0-100% Health/Energy status for HUD */
     int32_t energy;     /* Remaining energy units */
+    int32_t plating;    /* Duranium Plating */
+    int32_t hull_integrity; /* Physical Hull % */
     int32_t faction;    /* Faction ID */
     int32_t id;         /* Universal Target ID */
     char name[64];  /* Captain name or ship name */
@@ -66,7 +68,7 @@ typedef struct {
     int32_t cargo_energy;
     int32_t cargo_torpedoes;
     int32_t crew_count;
-    int32_t inventory[8];
+    int32_t inventory[10];
     int32_t species_counts[11];
     int32_t shields[6];
     
@@ -82,6 +84,7 @@ typedef struct {
     uint8_t is_playing_dead;
     uint8_t is_cloaked;
     float system_health[10];
+    float hull_integrity;
     float life_support;
     
     /* Time & Meta */
@@ -93,6 +96,7 @@ typedef struct {
     uint8_t show_axes;
     uint8_t show_grid;
     uint8_t shm_crypto_algo;
+    int32_t duranium_plating;
 
     /* Multi-user sync (Objects in current sector) */
     int32_t object_count;

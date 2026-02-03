@@ -711,10 +711,26 @@ void handle_pha(int i, const char *params) {
                 target->state.shields[s_idx] = 0;
             }
             
-            target->state.energy -= dmg_rem; 
+            if (dmg_rem > 0 && target->state.duranium_plating > 0) {
+                if (target->state.duranium_plating >= dmg_rem) {
+                    target->state.duranium_plating -= dmg_rem;
+                    dmg_rem = 0;
+                } else {
+                    dmg_rem -= target->state.duranium_plating;
+                    target->state.duranium_plating = 0;
+                }
+            }
+            
+            if (dmg_rem > 0) {
+                float hull_dmg = dmg_rem / 1000.0f;
+                target->state.hull_integrity -= hull_dmg;
+                if (target->state.hull_integrity < 0) target->state.hull_integrity = 0;
+                target->state.energy -= dmg_rem / 2;
+            }
+
             target->shield_regen_delay = 90; /* 3 seconds at 30Hz */
-            if (target->state.energy <= 0) { 
-                target->state.energy = 0; target->state.crew_count = 0; target->active = 0; 
+            if (target->state.hull_integrity <= 0 || target->state.energy <= 0) { 
+                target->state.energy = 0; target->state.hull_integrity = 0; target->state.crew_count = 0; target->active = 0; 
                 target->state.boom = (NetPoint){(float)tx,(float)ty,(float)tz,1}; 
             }
             send_server_msg(tid-1, "WARNING", "UNDER PHASER ATTACK!");
@@ -810,7 +826,7 @@ void handle_scan(int i, const char *params) {
             int idx = tid - 3000;
             if (planets[idx].active && planets[idx].q1==pq1 && planets[idx].q2==pq2 && planets[idx].q3==pq3) {
                 found = true;
-                const char* res[] = {"-","Dilithium","Tritanium","Verterium","Monotanium","Isolinear","Gases"};
+                const char* res[] = {"-","Dilithium","Tritanium","Verterium","Monotanium","Isolinear","Gases","Duranium"};
                 snprintf(rep, 1024, GREEN "\n--- PLANETARY SURVEY ---" RESET "\nTYPE: Class-M Habitable\nRESOURCE: %s\nRESERVES: %d units\n", res[planets[idx].resource_type], planets[idx].amount);
             }
         } 
@@ -1065,12 +1081,13 @@ void handle_doc(int i, const char *params) {
 
 void handle_con(int i, const char *params) {
     int t,a; 
-    if(sscanf(params," %d %d",&t,&a)==2 && t>=1 && t<=6 && players[i].state.inventory[t]>=a) {
+    if(sscanf(params," %d %d",&t,&a)==2 && t>=1 && t<=7 && players[i].state.inventory[t]>=a) {
         players[i].state.inventory[t]-=a; 
         if(t==1) { players[i].state.cargo_energy+=a*10; } 
         else if(t==2) { players[i].state.cargo_energy+=a*2; } 
         else if(t==3) { players[i].state.cargo_torpedoes+=a/20; } 
         else if(t==6) { players[i].state.cargo_energy+=a*5; }
+        else if(t==7) { players[i].state.cargo_energy+=a*4; }
         
         if(players[i].state.cargo_energy>1000000) players[i].state.cargo_energy=1000000; 
         if(players[i].state.cargo_torpedoes>1000) players[i].state.cargo_torpedoes=1000;
@@ -1184,6 +1201,7 @@ void handle_sta(int i, const char *params) {
     strcat(b, YELLOW "[ STORED MINERALS & RESOURCES ]\n" RESET);
     snprintf(b+strlen(b), 4096-strlen(b), " DILITHIUM:  %-5d  TRITANIUM:  %-5d  VERTERIUM: %-5d\n", players[i].state.inventory[1], players[i].state.inventory[2], players[i].state.inventory[3]);
     snprintf(b+strlen(b), 4096-strlen(b), " MONOTANIUM: %-5d  ISOLINEAR:  %-5d  GASES:     %-5d\n", players[i].state.inventory[4], players[i].state.inventory[5], players[i].state.inventory[6]);
+    snprintf(b+strlen(b), 4096-strlen(b), " DURANIUM:   %-5d  PRISONERS:  %-5d  PLATING:   %-5d\n", players[i].state.inventory[7], players[i].state.inventory[8], players[i].state.duranium_plating);
     strcat(b, BLUE "\n[ DEFENSIVE GRID AND ARMAMENTS ]\n" RESET);
     snprintf(b+strlen(b), 4096-strlen(b), " SHIELDS: F:%-4d R:%-4d T:%-4d B:%-4d L:%-4d RI:%-4d\n PHOTON TORPEDOES: %-2d  LOCK: %s\n", players[i].state.shields[0], players[i].state.shields[1], players[i].state.shields[2], players[i].state.shields[3], players[i].state.shields[4], players[i].state.shields[5], players[i].state.torpedoes, (players[i].state.lock_target > 0) ? RED "[ LOCKED ]" RESET : "[ NONE ]");
     strcat(b, BLUE "\n[ SYSTEMS INTEGRITY ]\n" RESET);
@@ -1195,8 +1213,8 @@ void handle_sta(int i, const char *params) {
 }
 
 void handle_inv(int i, const char *params) {
-    char b[512]=YELLOW "\n--- CARGO MANIFEST ---\n" RESET; char it[64]; const char* r[]={"-","Dilithium","Tritanium","Verterium","Monotanium","Isolinear","Gases"};
-    for(int j=1; j<=6; j++){ sprintf(it," %-12s: %-4d\n",r[j],players[i].state.inventory[j]); strcat(b,it); }
+    char b[512]=YELLOW "\n--- CARGO MANIFEST ---\n" RESET; char it[64]; const char* r[]={"-","Dilithium","Tritanium","Verterium","Monotanium","Isolinear","Gases","Duranium","Prisoners"};
+    for(int j=1; j<=8; j++){ sprintf(it," %-12s: %-4d\n",r[j],players[i].state.inventory[j]); strcat(b,it); }
     snprintf(it, sizeof(it), BLUE " Stored Energy: %d\n Stored Torps:  %d\n" RESET, players[i].state.cargo_energy, players[i].state.cargo_torpedoes); strcat(b, it);
     send_server_msg(i, "LOGISTICS", b);
 }
@@ -1245,6 +1263,16 @@ void handle_xxx(int i, const char *params) {
     send_server_msg(i, "COMPUTER", "Self-destruct sequence initiated. Zero-zero-zero-destruct-zero.");
     players[i].state.energy = 0; players[i].state.crew_count = 0; players[i].active = 0;
     players[i].state.boom = (NetPoint){(float)players[i].state.s1, (float)players[i].state.s2, (float)players[i].state.s3, 1};
+}
+
+void handle_hull(int i, const char *params) {
+    if (players[i].state.inventory[7] >= 100) {
+        players[i].state.inventory[7] -= 100;
+        players[i].state.duranium_plating += 500;
+        send_server_msg(i, "ENGINEERING", "Hull reinforced with Duranium plating. Structural integrity increased.");
+    } else {
+        send_server_msg(i, "COMPUTER", "Insufficient Duranium for hull reinforcement (Req: 100).");
+    }
 }
 
 void handle_jum(int i, const char *params) {
@@ -1354,6 +1382,7 @@ static const CommandDef command_registry[] = {
     {"help", handle_help,"Display this directory"},
     {"aux ", handle_aux, "Auxiliary Systems"},
     {"xxx",  handle_xxx, "Self-Destruct"},
+    {"hull", handle_hull, "Reinforce Hull (100 Duranium)"},
     {"supernova", handle_supernova, "Admin: Trigger Supernova"},
     {NULL, NULL, NULL}
 };
@@ -1419,7 +1448,7 @@ void process_command(int i, const char *cmd) {
                             send_server_msg(i, "BOARDING", "Raid successful. Resources seized.");
                             send_server_msg(tid-1, "SECURITY", "Enemy raid in progress! Cargo hold breached!");
                         } else {
-                            int pris = 2 + rand()%10; target->state.crew_count -= pris; players[i].state.inventory[7] += pris;
+                            int pris = 2 + rand()%10; target->state.crew_count -= pris; players[i].state.inventory[8] += pris;
                             send_server_msg(i, "SECURITY", "Hostages captured. Prisoners in cargo bay.");
                             send_server_msg(tid-1, "SECURITY", "Intruders captured our officers!");
                         }

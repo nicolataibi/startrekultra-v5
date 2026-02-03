@@ -38,6 +38,83 @@ void *game_loop_thread(void *arg) {
     }
 }
 
+#include <sys/utsname.h>
+#include <sys/sysinfo.h>
+#include <time.h>
+#include <gnu/libc-version.h>
+#include <ifaddrs.h>
+#include <arpa/inet.h>
+#include "ui.h"
+
+void display_system_telemetry() {
+    struct utsname uts;
+    struct sysinfo info;
+    struct ifaddrs *ifaddr, *ifa;
+    uname(&uts);
+    sysinfo(&info);
+
+    long mem_unit = info.mem_unit;
+    long total_ram = (info.totalram * mem_unit) / 1024 / 1024;
+    long free_ram = (info.freeram * mem_unit) / 1024 / 1024;
+    long shared_ram = (info.sharedram * mem_unit) / 1024 / 1024;
+    int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+
+    printf("\n%s .--- LCARS (Library Computer Access and Retrieval System) ----------.%s\n", B_MAGENTA, RESET);
+    printf("%s | %s HOST IDENTIFIER:   %s%-48s %s|%s\n", B_MAGENTA, B_WHITE, B_GREEN, uts.nodename, B_MAGENTA, RESET);
+    printf("%s | %s OS KERNEL:         %s%-20s %sVERSION: %s%-19s %s|%s\n", B_MAGENTA, B_WHITE, B_GREEN, uts.sysname, B_WHITE, B_GREEN, uts.release, B_MAGENTA, RESET);
+    printf("%s | %s CORE LIBRARIES:    %sGNU libc %-39s %s|%s\n", B_MAGENTA, B_WHITE, B_GREEN, gnu_get_libc_version(), B_MAGENTA, RESET);
+    printf("%s | %s LOGICAL CORES:     %s%-2d Isolinear Units (Active)                  %s|%s\n", B_MAGENTA, B_WHITE, B_GREEN, nprocs, B_MAGENTA, RESET);
+    
+    printf("%s |                                                                     |%s\n", B_MAGENTA, RESET);
+    printf("%s | %s MEMORY ALLOCATION (LOGICAL LAYER)                                  %s|%s\n", B_MAGENTA, B_WHITE, B_MAGENTA, RESET);
+    printf("%s | %s PHYSICAL RAM:      %s%ld MB Total / %ld MB Free                    %s|%s\n", B_MAGENTA, B_WHITE, B_GREEN, total_ram, free_ram, B_MAGENTA, RESET);
+    printf("%s | %s SHARED SEGMENTS:   %s%ld MB (IPC/SHM Active)                       %s|%s\n", B_MAGENTA, B_WHITE, B_GREEN, shared_ram, B_MAGENTA, RESET);
+    
+    printf("%s |                                                                     |%s\n", B_MAGENTA, RESET);
+    printf("%s | %s SUBSPACE NETWORK TOPOLOGY                                          %s|%s\n", B_MAGENTA, B_WHITE, B_MAGENTA, RESET);
+    if (getifaddrs(&ifaddr) == -1) {
+        printf("%s | %s NETWORK ERROR:     %sUnable to scan subspace frequencies           %s|%s\n", B_MAGENTA, B_WHITE, B_RED, B_MAGENTA, RESET);
+    } else {
+        for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+            if (ifa->ifa_addr == NULL || ifa->ifa_addr->sa_family != AF_INET) continue;
+            char addr[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr, addr, sizeof(addr));
+            if (strcmp(ifa->ifa_name, "lo") == 0) continue;
+            printf("%s | %s INTERFACE: %-7s %sIP ADDR: %-15s (ACTIVE)         %s|%s\n", B_MAGENTA, B_WHITE, ifa->ifa_name, B_GREEN, addr, B_MAGENTA, RESET);
+        }
+        freeifaddrs(ifaddr);
+    }
+
+    /* Traffic Stats from /proc/net/dev */
+    FILE *f = fopen("/proc/net/dev", "r");
+    if (f) {
+        char line[256];
+        /* Skip 2 lines header */
+        fgets(line, 256, f); fgets(line, 256, f);
+        while (fgets(line, 256, f)) {
+            char ifname[32]; long rx, tx, tmp;
+            if (sscanf(line, " %[^:]: %ld %ld %ld %ld %ld %ld %ld %ld %ld", ifname, &rx, &tmp, &tmp, &tmp, &tmp, &tmp, &tmp, &tmp, &tx) >= 2) {
+                if (strcmp(ifname, "lo") == 0 || rx == 0) continue;
+                printf("%s | %s TRAFFIC (%-5s):   %sRX: %-8ld KB  TX: %-8ld KB             %s|%s\n", 
+                       B_MAGENTA, B_WHITE, ifname, B_GREEN, rx/1024, tx/1024, B_MAGENTA, RESET);
+            }
+        }
+        fclose(f);
+    }
+    
+    printf("%s |                                                                     |%s\n", B_MAGENTA, RESET);
+    printf("%s | %s SUBSPACE DYNAMICS                                                  %s|%s\n", B_MAGENTA, B_WHITE, B_MAGENTA, RESET);
+    double load = 1.0 / (1 << SI_LOAD_SHIFT);
+    printf("%s | %s LOAD INTERFERENCE: %s%.2f (1m)  %.2f (5m)  %.2f (15m)                  %s|%s\n", 
+           B_MAGENTA, B_WHITE, B_GREEN, info.loads[0] * load, info.loads[1] * load, info.loads[2] * load, B_MAGENTA, RESET);
+    
+    long days = info.uptime / 86400;
+    long hours = (info.uptime % 86400) / 3600;
+    long mins = (info.uptime % 3600) / 60;
+    printf("%s | %s UPTIME METRICS:    %s%ldd %02ldh %02ldm                                  %s|%s\n", B_MAGENTA, B_WHITE, B_GREEN, days, hours, mins, B_MAGENTA, RESET);
+    printf("%s '---------------------------------------------------------------------'%s\n\n", B_MAGENTA, RESET);
+}
+
 int main(int argc, char *argv[]) {
     int server_fd, epoll_fd;
     struct sockaddr_in addr;
@@ -76,6 +153,8 @@ int main(int argc, char *argv[]) {
     printf(" | \033[1;37m  AI Core Support by \033[1;34mGoogle Gemini\033[1;37m                                       \033[1;31m  |\n" );
     printf(" | \033[1;37m  License Type:      \033[1;33mGNU GPL v3.0\033[1;37m                                        \033[1;31m  |\n" );
     printf(" \\____________________________________________________________________________/\033[0m\n\n" );
+
+    display_system_telemetry();
 
     if (!load_galaxy()) { generate_galaxy(); save_galaxy(); }
     init_static_spatial_index();
@@ -198,12 +277,10 @@ int main(int argc, char *argv[]) {
                             if (slot == -1) { for(int j=0; j<MAX_CLIENTS; j++) if (players[j].name[0] == '\0') { slot = j; break; } }
                             
                             if (slot != -1) {
-                                if (players[slot].socket != 0 && players[slot].socket != fd) {
-                                    epoll_ctl(epoll_fd, EPOLL_CTL_DEL, players[slot].socket, NULL);
-                                    close(players[slot].socket);
-                                }
                                 players[slot].socket = fd;
                                 int is_new = (players[slot].name[0] == '\0');
+                                players[slot].active = 0; /* Block updates during sync */
+
                                 if (is_new) {
                                     strcpy(players[slot].name, pkt.name); players[slot].faction = pkt.faction; players[slot].ship_class = pkt.ship_class;
                                     players[slot].state.energy = 9999999; players[slot].state.torpedoes = 1000;
@@ -227,9 +304,11 @@ int main(int argc, char *argv[]) {
                                                                         players[slot].gy = (players[slot].state.q2 - 1) * 10.0 + players[slot].state.s2;
                                                                         players[slot].gz = (players[slot].state.q3 - 1) * 10.0 + players[slot].state.s3;
                                                                         
-                                                                        players[slot].state.inventory[1] = 10; /* Initial Dilithium for jumps */
-
-                                                                        for(int s=0; s<10; s++) players[slot].state.system_health[s] = 100.0f;
+                                                                                                                players[slot].state.inventory[1] = 10; /* Initial Dilithium for jumps */
+                                                                        
+                                                                                                                players[slot].state.hull_integrity = 100.0f;
+                                                                        
+                                                                                                                for(int s=0; s<10; s++) players[slot].state.system_health[s] = 100.0f;
                                                                         players[slot].state.life_support = 100.0f;
                                                                         players[slot].state.phaser_charge = 100.0f;
                                 }
@@ -295,6 +374,7 @@ int main(int argc, char *argv[]) {
                                         players[slot].state.energy = 9999999;
                                         players[slot].state.torpedoes = 1000;
                                         if (players[slot].state.crew_count <= 0) players[slot].state.crew_count = 100;
+                                        players[slot].state.hull_integrity = 80.0f;
                                         for(int s=0; s<10; s++) players[slot].state.system_health[s] = 80.0f;
                                         players[slot].gx = (players[slot].state.q1-1)*10.0 + 5.0;
                                         players[slot].gy = (players[slot].state.q2-1)*10.0 + 5.0;

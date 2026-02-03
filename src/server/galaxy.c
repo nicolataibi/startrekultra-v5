@@ -11,6 +11,7 @@
 #include <time.h>
 #include <math.h>
 #include "server_internal.h"
+#include "ui.h"
 
 NPCStar stars_data[MAX_STARS];
 NPCBlackHole black_holes[MAX_BH];
@@ -431,7 +432,7 @@ void generate_galaxy() {
                     bases[b_count] = (NPCBase){.id=b_count, .faction=FACTION_FEDERATION, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .health=5000, .active=1}; b_count++; actual_b++;
                 }
                 for(int p=0; p<planets_cnt && p_count < MAX_PLANETS; p++) {
-                    planets[p_count] = (NPCPlanet){.id=p_count, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .resource_type=(rand()%6)+1, .amount=1000, .active=1}; p_count++; actual_p++;
+                    planets[p_count] = (NPCPlanet){.id=p_count, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .resource_type=(rand()%7)+1, .amount=1000, .active=1}; p_count++; actual_p++;
                 }
                 for(int s=0; s<star && s_count < MAX_STARS; s++) {
                     stars_data[s_count] = (NPCStar){.id=s_count, .faction=4, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .active=1}; s_count++; actual_s++;
@@ -513,5 +514,15 @@ void generate_galaxy() {
                 galaxy_master.k9 += actual_k;
                 galaxy_master.b9 += actual_b;
             }
-    printf("Galaxy generated: %d NPCs, %d Stars, %d Planets, %d Bases, %d Black Holes, %d Nebulas, %d Pulsars, %d Comets, %d Asteroids, %d Derelicts, %d Mines, %d Buoys, %d Platforms, %d Rifts, %d Monsters.\n", n_count, s_count, p_count, b_count, bh_count, neb_count, pul_count, com_count, ast_count, der_count, mine_count, buoy_count, plat_count, rift_count, mon_count);
+
+    printf("\n%s .--- GALAXY GENERATION COMPLETED: ASTROMETRICS REPORT ----------------.%s\n", B_CYAN, RESET);
+    printf("%s | %s 🚀 Vessels (NPCs):    %s%-5d %s| %s 🪐 Planets:           %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, n_count, B_CYAN, B_WHITE, B_GREEN, p_count, B_CYAN);
+    printf("%s | %s ☀️  Stars:             %s%-5d %s| %s 🛰️  Starbases:         %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, s_count, B_CYAN, B_WHITE, B_GREEN, b_count, B_CYAN);
+    printf("%s | %s 🕳️  Black Holes:       %s%-5d %s| %s ☁️  Nebulas:           %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, bh_count, B_CYAN, B_WHITE, B_GREEN, neb_count, B_CYAN);
+    printf("%s | %s 🌟 Pulsars:           %s%-5d %s| %s ☄️  Comets:            %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, pul_count, B_CYAN, B_WHITE, B_GREEN, com_count, B_CYAN);
+    printf("%s | %s 💎 Asteroids:         %s%-5d %s| %s 🏚️  Derelicts:         %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, ast_count, B_CYAN, B_WHITE, B_GREEN, der_count, B_CYAN);
+    printf("%s | %s 💣 Mines:             %s%-5d %s| %s 📡 Buoys:             %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, mine_count, B_CYAN, B_WHITE, B_GREEN, buoy_count, B_CYAN);
+    printf("%s | %s 🛡️  Defense Platforms: %s%-5d %s| %s 🌀 Spacetime Rifts:    %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, plat_count, B_CYAN, B_WHITE, B_GREEN, rift_count, B_CYAN);
+    printf("%s | %s 👾 Class-Omega Threats:%s%-5d                                %s|\n", B_CYAN, B_WHITE, B_RED, mon_count, B_CYAN);
+    printf("%s '---------------------------------------------------------------------'%s\n\n", B_CYAN, RESET);
 }

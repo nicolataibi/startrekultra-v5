@@ -428,6 +428,8 @@ void *network_listener(void *arg) {
                 pthread_mutex_lock(&g_shared_state->mutex);
                 /* Sincronizziamo lo stato locale con i dati ottimizzati dal server */
                 g_shared_state->shm_energy = upd.energy;
+                g_shared_state->shm_duranium_plating = upd.duranium_plating;
+                g_shared_state->shm_hull_integrity = upd.hull_integrity;
                 g_shared_state->shm_crew = upd.crew_count;
                 g_shared_state->shm_torpedoes = upd.torpedoes;
                 g_shared_state->shm_cargo_energy = upd.cargo_energy;
@@ -468,6 +470,8 @@ void *network_listener(void *arg) {
                     g_shared_state->objects[o].ship_class = upd.objects[o].ship_class;
                     g_shared_state->objects[o].health_pct = upd.objects[o].health_pct;
                     g_shared_state->objects[o].energy = upd.objects[o].energy;
+                    g_shared_state->objects[o].plating = upd.objects[o].plating;
+                    g_shared_state->objects[o].hull_integrity = upd.objects[o].hull_integrity;
                     g_shared_state->objects[o].faction = upd.objects[o].faction;
                     g_shared_state->objects[o].id = upd.objects[o].id;
                     strncpy(g_shared_state->objects[o].shm_name, upd.objects[o].name, 63);
@@ -500,8 +504,6 @@ void *network_listener(void *arg) {
                     g_shared_state->boom.shm_y = upd.boom.net_y;
                     g_shared_state->boom.shm_z = upd.boom.net_z;
                     g_shared_state->boom.active = 1;
-                } else {
-                    g_shared_state->boom.active = 0;
                 }
                 
                 if (upd.dismantle.active) {
@@ -510,8 +512,6 @@ void *network_listener(void *arg) {
                     g_shared_state->dismantle.shm_z = upd.dismantle.net_z;
                     g_shared_state->dismantle.species = upd.dismantle.species;
                     g_shared_state->dismantle.active = 1;
-                } else {
-                    g_shared_state->dismantle.active = 0;
                 }
                 
                 /* Wormhole Event */
@@ -827,9 +827,10 @@ int main(int argc, char *argv[]) {
                         printf("bor ID      : Boarding party operation (Dist < 1.0). Works on Lock.\n");
                         printf("min         : Planetary Mining (Must be in orbit dist < 2.0)\n");
                         printf("doc         : Dock with Starbase (Replenish/Repair, same faction)\n");
-                        printf("con T A     : Convert Resources (1:Dilithium->E, 3:Verterium->Torps)\n");
+                        printf("con T A     : Convert (1:Dili->E, 2:Trit->E, 3:Vert->Torps, 6:Gas->E, 7:Duran->E)\n");
                         printf("load T A    : Load from Cargo Bay (1:Energy, 2:Torps)\n");
-                        printf("rep ID      : Repair System (Uses Tritanium or Isolinear Crystals)\n");
+                        printf("hull        : Reinforce Hull (Uses 100 Duranium for +500 Plating)\n");
+                        printf("rep ID      : Repair System (Uses 50 Tritanium + 10 Isolinear)\n");
                         printf("inv         : Cargo Inventory Report\n");
                         printf("who         : List active captains in galaxy\n");
                         printf("cal Q1 Q2 Q3: Warp Calculator (Inter-quadrant)\n");
@@ -845,6 +846,7 @@ int main(int argc, char *argv[]) {
                         printf("rad #ID MSG : Send Private Message to Player ID\n");
                         printf("clo         : Toggle Cloaking Device (Consumes constant Energy)\n");
                         printf("axs / grd   : Toggle 3D Visual Guides\n");
+                        printf("map         : Toggle Galactic Starmap View\n");
                         printf("xxx         : Self-Destruct\n");
                     } else if (strncmp(g_input_buf, "dis ", 4) == 0 || strcmp(g_input_buf, "dis") == 0) {
                         PacketCommand cpkt = {PKT_COMMAND, ""};

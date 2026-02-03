@@ -31,6 +31,8 @@ typedef struct {
     int active;
     int health_pct;
     int energy;
+    int plating;
+    int hull_integrity;
     int faction;
     int id;
     char shm_name[64];
@@ -60,6 +62,8 @@ typedef struct {
     int shm_energy;
     int shm_crew;
     int shm_torpedoes;
+    int shm_duranium_plating;
+    float shm_hull_integrity;
     int shm_shields[6];
     int shm_cargo_energy;
     int shm_cargo_torpedoes;

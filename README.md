@@ -39,8 +39,31 @@ Compila il progetto per generare gli eseguibili aggiornati:
 make
 ```
 
-### 3. Avvio del Server
-Lancia lo script di avvio sicuro. Ti verrà chiesto di creare una **Master Key** (password segreta per il server):
+### 3. Guida Operativa ai Comandi e Crittografia Subspaziale
+
+Il ponte di comando di Star Trek Ultra opera tramite un'interfaccia a riga di comando (CLI) ad alta precisione. Oltre ai comandi di navigazione e combattimento, il simulatore implementa un sofisticato sistema di **Guerra Elettronica** basato su crittografia reale.
+
+#### 🛰️ Comandi di Navigazione Avanzata e Utility
+*   `cal <Q1> <Q2> <Q3>`: **Warp Calculator**. Calcola istantaneamente il vettore (Heading/Mark) e la distanza necessaria per raggiungere un quadrante specifico della galassia. Essenziale per pianificare salti a lungo raggio senza errori di calcolo.
+*   `ical <X> <Y> <Z>`: **Impulse Calculator**. Fornisce la soluzione di navigazione per coordinate di settore precise [0.0 - 10.0]. Utilizzalo per manovre di precisione attorno a stazioni o pianeti.
+*   `who`: **Captains Registry**. Elenca tutti i comandanti attualmente attivi nella galassia, i loro ID di tracciamento e la posizione attuale. Fondamentale per identificare alleati o potenziali predatori prima di entrare in un settore.
+*   `sta`: **Status Report**. Diagnostica completa dei sistemi, inclusi i livelli di energia, integrità hardware e ripartizione della potenza.
+*   `hull`: **Duranium Reinforcement**. Se possiedi **100 unità di Duranio** in stiva, questo comando applica una placcatura rinforzata allo scafo (+500 HP di scudo fisico), visibile in oro nell'HUD.
+
+#### 🛡️ Crittografia Tattica: Le "Frequenze" di Comunicazione
+In Star Trek Ultra, la crittografia non è solo sicurezza, ma una **scelta di frequenza operativa**. Ogni algoritmo agisce come una banda di comunicazione separata.
+
+*   **Identità e Firma (Ed25519)**: Ogni pacchetto radio è firmato digitalmente. Se ricevi un messaggio con tag **`[VERIFIED]`**, hai la certezza matematica che provenga dal capitano dichiarato e che non sia stato alterato da sensori nemici o fenomeni spaziali.
+*   **Frequenze Crittografiche (`enc <TIPO>`)**:
+    *   **AES (`enc aes`)**: Lo standard di flotta bilanciato. Sicuro e ottimizzato per l'hardware moderno.
+    *   **PQC (`enc pqc`)**: **Crittografia Post-Quantistica (ML-KEM)**. Rappresenta la difesa definitiva contro i computer quantistici dei Borg o di civiltà temporalmente avanzate. È il protocollo più sicuro disponibile.
+    *   **ChaCha (`enc chacha`)**: Ultra-veloce, ideale per comunicazioni rapide in condizioni di instabilità subspaziale.
+    *   **Camellia (`enc camellia`)**: Protocollo standard dell'Impero Romulano, ottimizzato per resistere ad attacchi di forza bruta.
+    *   **ARIA (`enc aria`)**: Standard utilizzato dall'Alleanza Klingon per le operazioni di coalizione.
+    *   **IDEA / CAST5**: Protocolli spesso utilizzati da gruppi di resistenza (Maquis) o mercenari per sfuggire al monitoraggio standard della Flotta.
+    *   **OFF (`enc off`)**: Comunicazione in chiaro. Rischiosa, ma utile per chiamate di soccorso universali leggibili da chiunque.
+
+**Implicazione Tattica**: Se una flotta alleata decide di operare su "Frequenza ARIA", ogni membro deve impostare `enc aria`. Chi rimane su AES vedrà solo rumore statico (**`<< SIGNAL DISTURBED >>`**), permettendo comunicazioni sicure e segrete anche in settori affollati.
 ```bash
 ./run_server.sh
 ```
@@ -463,11 +486,15 @@ Il comando `pow` è fondamentale per la sopravvivenza e la superiorità tattica.
 *   **Scudi (S)**: Governa il **Tasso di Rigenerazione** di tutti i 6 quadranti difensivi. Se gli scudi sono danneggiati, attingeranno energia dal reattore per rigenerarsi.
     *   **Scaling Dinamico**: La velocità di rigenerazione è un prodotto sia della **Potenza (S)** assegnata che dell'**Integrità del Sistema Scudi**. Se il generatore degli scudi è danneggiato, la rigenerazione sarà gravemente ostacolata indipendentemente dall'allocazione di potenza.
 
-#### 🛡️ Meccaniche degli Scudi Direzionali
+#### 🛡️ Meccaniche degli Scudi e Integrità dello Scafo
 La nave è protetta da 6 quadranti indipendenti: **Frontale (F), Posteriore (R), Superiore (T), Inferiore (B), Sinistro (L) e Destro (RI)**.
+
 *   **Danno Localizzato**: Gli attacchi (Faser/Siluri) colpiscono ora quadranti specifici in base all'angolo relativo di impatto.
-*   **Rigenerazione Continua**: A differenza dei vecchi sistemi, la rigenerazione è continua ma scala con la salute dell'hardware.
-*   **Collasso degli Scudi**: Se un quadrante raggiunge lo 0% di integrità, i colpi successivi provenienti da quella direzione infliggeranno danni diretti al reattore energetico principale.
+*   **Hull Integrity (Integrità Scafo)**: Rappresenta la salute fisica della nave (0-100%). Se un quadrante di scudi raggiunge lo 0% o il colpo è eccessivamente potente, il danno residuo colpisce direttamente l'integrità strutturale.
+*   **Hull Plating (Duranio)**: La placcatura aggiuntiva (comando `hull`) funge da buffer: assorbe il danno fisico *prima* che questo intacchi la Hull Integrity.
+*   **Condizione di Distruzione**: Se la **Hull Integrity raggiunge lo 0%**, la nave esplode istantaneamente, indipendentemente dai livelli di energia o scudi rimanenti.
+*   **Rigenerazione Continua**: A differenza dei vecchi sistemi, la rigenerazione degli scudi è continua ma scala con la salute dell'hardware.
+*   **Collasso degli Scudi**: Se un quadrante raggiunge lo 0% di integrità, i colpi successivi provenienti da quella direzione infliggeranno danni diretti allo scafo e al reattore energetico principale.
 
 *   **Armi (W)**: Scala direttamente l'**Intensità dei Faser** e il **Tasso di Ricarica**. Un'allocazione elevata convoglia più energia nei banchi faser, permettendo di infliggere danni esponenzialmente maggiori e ricaricare il condensatore molto più velocemente.
 
@@ -504,25 +531,41 @@ L'HUD mostra "LIFE SUPPORT: XX.X%", valore direttamente collegato all'integrità
 *   `min`: **Mining**. Estrae risorse da un pianeta in orbita (Dist < 2.0).
 *   `sco`: **Solar Scooping**. Raccoglie energia da una stella (Dist < 2.0).
 *   `har`: **Harvest Antimatter**. Raccoglie antimateria da un buco nero (Dist < 2.0).
-*   `con <T> <A>`: **Convert Resources**. Converte risorse in stiva.
+*   `con T A`: **Convert Resources**. Converte materie prime in energia o siluri (`T`: tipo risorsa, `A`: quantità).
     *   `1`: Dilithium -> Energia.
+    *   `2`: Tritanium -> Energia.
     *   `3`: Verterium -> Siluri.
-*   `load <T> <A>`: **Load Cargo**. Trasferisce risorse dalla stiva ai sistemi attivi della nave.
+    *   `6`: Gas -> Energia.
+    *   `7`: Duranio -> Energia.
+*   `load <T> <A>`: **Load Systems**. Trasferisce energia o siluri dalla stiva ai sistemi attivi.
     *   `1`: Energia (Reattore Principale). Capacità max: 9.999.999 unità.
-    *   `2`: Siluri (Tubi di Lancio). Capacità max: 1.000 unità.
-*   `inv`: **Inventory**. Mostra il contenuto della stiva (Cargo Bay), inclusi materiali grezzi e **Prigionieri**.
+    *   `2`: Siluri (Tubi di Lancio). Capacità max: 1000 unità.
+
+#### 🏗️ Rinforzo Scafo (Hull Plating)
+*   `hull`: **Reinforce Hull**. Utilizza **100 unità di Duranio** per applicare una placcatura rinforzata allo scafo (+500 unità di integrità). 
+    *   La placcatura in Duranio funge da scudo fisico secondario, assorbendo il danno residuo che supera gli scudi energetici prima che questo colpisca il reattore principale.
+    *   Lo stato della placcatura è visibile nell'HUD 3D e tramite il comando `sta`.
+*   `inv`: **Inventory**. Mostra il contenuto della stiva (Cargo Bay), inclusi materiali grezzi (**Monotanio**, **Isolineare**, **Duranio**) e **Prigionieri**.
 
 ### 📦 Gestione Carico e Risorse
 
 Star Trek Ultra distingue tra **Sistemi Attivi** e **Stoccaggio Stiva**. Questa distinzione è visibile nell'HUD come `ENERGY: X (CARGO: Y)`.
 
-*   **Energia/Siluri Attivi**: Sono le risorse immediatamente utilizzabili dai sistemi della nave (Motori, Scudi, Faser e Tubi di Lancio).
-*   **Riserve in Stiva**: Risorse conservate nella Cargo Bay. Fungono da serbatoio secondario. Se il reattore principale è scarico, è necessario trasferire manualmente l'energia dalla stiva usando il comando `load`.
-*   **Solar Scooping e Harvesting**: Le risorse raccolte dalle stelle (`sco`) o dai buchi neri (`har`) vengono inizialmente depositate nella **Stiva** per evitare sovraccarichi al reattore.
-*   **Conversione Risorse**: Materie prime come Dilithium o Verterium devono essere prima convertite (`con`) in Energia o Siluri utilizzabili all'interno della stiva prima di poter essere caricate nei sistemi attivi.
+*   **Energia/Siluri Attivi**: Sono le risorse immediatamente utilizzabili dai sistemi della nave.
+*   **Riserve in Stiva**: Risorse conservate nella Cargo Bay.
+    *   **Tabella Risorse**:
+        1. **Dilithium**: Salto Warp e conversione energia.
+        2. **Tritanium**: Riparazione scafi e conversione energia.
+        3. **Verterium**: Produzione siluri fotonici.
+        4. **Monotanium**: Lega strutturale avanzata.
+        5. **Isolinear**: Chip per riparazioni sistemi complessi.
+        6. **Gases**: Raccolti dalle comete, conversione energia.
+        7. **Duranium**: Placcatura corazzata scafo.
+        8. **Prisoners**: Personale nemico catturato.
+*   **Conversione Risorse**: Materie prime devono essere convertite (`con`) in Energia o Siluri prima dell'uso.
 
-*   `rep [ID]`: **Repair**. Ripara un sistema danneggiato consumando **50 Tritanio** e **10 Antimateria**.
-    *   Se usato senza ID, elenca tutti i 10 sistemi della nave e la loro integrità attuale.
+*   `rep [ID]`: **Repair**. Ripara un sistema danneggiato consumando **50 Tritanio** e **10 Isolineare**.
+    *   Se usato senza ID, elenca tutti i 10 sistemi della nave.
     *   **ID Sistemi**: `0`: Warp, `1`: Impulse, `2`: Sensori, `3`: Trasportatori, `4`: Faser, `5`: Siluri, `6`: Computer, `7`: Supporto Vitale, `8`: Scudi, `9`: Ausiliari.
 *   **Gestione Equipaggio**: 
     *   Il numero iniziale di personale dipende dalla classe della nave (es. 1012 per la Galaxy, 50 per la Defiant).
@@ -583,15 +626,36 @@ Il sistema utilizza algoritmi di proiezione spaziale per ancorare le informazion
 *   **Visual Latching**: Gli effetti di combattimento (phaser, esplosioni) sono sincronizzati temporalmente con la logica del server, fornendo un feedback visivo immediato all'impatto dei colpi.
 
 #### 🧭 Bussola Tattica 3D (`axs`)
-Attivando gli assi visivi (`axs`), il simulatore proietta un sistema di riferimento sferico centrato sulla propria nave:
-*   **Coordinate di Confine**: Al centro di ogni faccia del cubo tattico vengono proiettate le coordinate `[X,Y,Z]` dei quadranti adiacenti, permettendo di identificare istantaneamente la destinazione di un salto warp o di una manovra a impulso verso un settore confinante.
-*   **Anello del Heading**: Un disco orizzontale graduato che ruota con la nave, indicando i 360 gradi del piano galattico.
-*   **Arco del Mark**: Una guida verticale che visualizza l'inclinazione zenitale (-90/+90), fondamentale per inseguimenti tridimensionali complessi.
-*   **Assi Galattici**: Linee di riferimento per gli assi X (rosso), Y (verde) e Z (blu) che delimitano i confini del settore attuale.
+Attivando gli assi visivi (`axs`), il simulatore proietta un sistema di riferimento sferico centrato sulla propria nave. 
+
+**Nota sulla Convenzione degli Assi**: Il motore grafico utilizza lo standard **OpenGL (Y-Up)**.
+*   **X (Rosso)**: Asse trasversale (Sinistra/Destra).
+*   **Y (Verde)**: Asse verticale (Alto/Basso). È l'asse di rotazione per il *Heading*.
+*   **Z (Blu)**: Asse longitudinale (Profondità/Avanzamento).
+*   **Coordinate di Confine**: Al centro di ogni faccia del cubo tattico vengono proiettate le coordinate `[X,Y,Z]` dei quadranti adiacenti.
+
+---
+
+### 🖥️ Architettura del Server e Telemetria LCARS
+
+All'avvio del `trek_server`, il sistema esegue una diagnostica completa dell'infrastruttura ospite, visualizzando un pannello di telemetria **LCARS (Library Computer Access and Retrieval System)**.
+
+#### 📊 Dati Monitorati
+*   **Infrastruttura Logica**: Identificazione dell'host, versione del kernel Linux e delle librerie core (**GNU libc**).
+*   **Allocazione Memoria**: 
+    *   **Physical RAM**: Stato della memoria fisica disponibile.
+    *   **Shared Segments (SHM)**: Monitoraggio dei segmenti di memoria condivisa attivi, vitali per il *Direct Bridge* IPC.
+*   **Topologia di Rete**: Elenco delle interfacce attive, indirizzi IP e statistiche di traffico (**RX/TX**) in tempo reale recuperate dal kernel.
+*   **Dinamica del Sottospazio**: Carico medio del sistema (*Load Average*) e numero di task logici attivi.
+
+Questa diagnostica assicura che il server operi in un ambiente nominale prima di aprire i canali di comunicazione subspaziale sulla porta `3073`.
+
 
 #### 📟 Telemetria e Monitoraggio HUD
 L'interfaccia a schermo (Overlay) fornisce un monitoraggio costante dei parametri vitali:
-*   **Stato Reattore & Scudi**: Visualizzazione in tempo reale dell'energia disponibile e della potenza media della griglia difensiva.
+*   **Reactor & Shield Status**: Real-time display of available energy and average defensive grid power.
+*   **Hull Integrity**: Stato fisico dello scafo (0-100%). Se scende a zero, il vascello è perduto.
+*   **Hull Plating**: Indicatore in oro dell'integrità dello scafo rinforzato con Duranio (visibile solo se presente).
 *   **Coordinate di Settore**: Conversione istantanea dei dati spaziali in coordinate relative `[S1, S2, S3]` (0.0 - 10.0), speculari a quelle utilizzate nei comandi `nav` e `imp`.
 *   **Rilevatore di Minacce**: Un contatore dinamico indica il numero di vascelli ostili rilevati dai sensori nel quadrante attuale.
 *   **Suite di Diagnostica del Sottospazio (Subspace Uplink)**: Un pannello diagnostico avanzato (basso a destra) che monitora la salute del collegamento neurale/dati. Mostra in tempo reale l'uptime del link, il **Pulse Jitter**, l'**Integrità del Segnale**, l'efficienza del protocollo e lo stato attivo della crittografia **AES-256-GCM**.
@@ -599,7 +663,7 @@ L'interfaccia a schermo (Overlay) fornisce un monitoraggio costante dei parametr
 #### 🛠️ Personalizzazione della Vista
 Il comandante può configurare la propria interfaccia tramite comandi CLI rapidi:
 *   `grd`: Attiva/Disattiva la **Griglia Tattica Galattica**, utile per percepire profondità e distanze.
-*   `axs`: Attiva/Disattiva la **Bussola Tattica AR**. Questa nuova bussola olografica è ancorata rigidamente allo scafo della nave. L'anello di Azimut (Heading) e l'arco di Elevazione (Mark) ruotano solidalmente con il vascello, fornendo un riferimento di navigazione immediato e intuitivo ("Realtà Aumentata") per le manovre di combattimento.
+*   `axs`: Attiva/Disattiva la **Bussola Tattica AR**. Questa bussola olografica è ancorata alla posizione della nave: l'anello di Azimut (Heading) rimane orientato verso il Nord galattico (coordinate fisse), mentre l'arco di Elevazione (Mark) ruota solidalmente con il vascello, fornendo un riferimento di navigazione immediato per le manovre di combattimento.
 *   `h` (tasto rapido): Nasconde completamente l'HUD per una visione "cinematica" del settore.
 *   **Zoom & Rotazione**: Controllo totale della telecamera tattica tramite mouse o tasti `W/S` e frecce direzionali.
 
@@ -826,7 +890,7 @@ Il sistema di continuità per i giocatori si basa sulla **Persistent Identity**:
 
 #### 🆘 Protocollo EMERGENCY RESCUE (Salvataggio d'Emergenza)
 In caso di distruzione del vascello o perdita totale di energia/equipaggio, il Comando della Flotta Stellare attiva un protocollo di recupero automatico al login successivo:
-*   **Ripristino Sistemi**: Riparazione d'emergenza di tutti i sottosistemi core fino all'**80% di integrità**.
+*   **Ripristino Sistemi**: Riparazione d'emergenza di tutti i sottosistemi core e della **Hull Integrity** fino all'**80% di integrità**.
 *   **Ricarica Energetica**: Fornitura di **9.999.999 unità** di energia di emergenza.
 *   **Rifornimento Munizioni**: Ricarica completa di **1.000 siluri fotonici**.
 *   **Rilocazione Sicura**: Salto automatico in un quadrante casuale, con verifica di sicurezza per **evitare supernove attive** e zone di collisione. La nave viene posizionata al centro del settore (5.0, 5.0, 5.0).

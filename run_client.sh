@@ -2,6 +2,9 @@
 # STAR TREK ULTRA - TACTICAL BRIDGE INTERFACE
 # Professional Startup Script
 
+# TREK_SUB_KEY="ciao" ./run_client.sh
+
+
 # Colori
 RED='\033[1;31m'
 GREEN='\033[1;32m'

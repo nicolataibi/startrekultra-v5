@@ -443,11 +443,15 @@ The `pow` command is critical for survival and tactical superiority. It dictates
 *   **Shields (S)**: Governs the **Regeneration Rate** of all 6 shield quadrants. If shields are damaged, they draw energy from the reactor to rebuild their integrity.
     *   **Dynamic Scaling**: The regeneration speed is a product of both the assigned **Power (S)** and the **Shield System Integrity**. If the shield generator is damaged, regeneration will be severely hampered regardless of power allocation.
 
-#### 🛡️ Directional Shield Mechanics
-The ship is protected by 6 independent shield quadrants: **Front (F), Rear (R), Top (T), Bottom (B), Left (L), and Right (RI)**.
+#### 🛡️ Shield Mechanics and Hull Integrity
+The ship is protected by 6 independent quadrants: **Front (F), Rear (R), Top (T), Bottom (B), Left (L), and Right (RI)**.
+
 *   **Localized Damage**: Attacks (Phasers/Torpedoes) now hit specific quadrants based on the relative angle of impact.
-*   **Continuous Regeneration**: Unlike older systems, regeneration is continuous but scales with hardware health.
-*   **Shield Failure**: If a quadrant reaches 0% integrity, subsequent hits from that direction will deal direct damage to the ship's main energy reactor.
+*   **Hull Integrity**: Represents the physical health of the ship (0-100%). If a shield quadrant reaches 0% or the impact is excessively powerful, residual damage directly hits the structural integrity.
+*   **Hull Plating (Duranium)**: Additional plating (command `hull`) acts as a buffer: it absorbs physical damage *before* it affects Hull Integrity.
+*   **Destruction Condition**: If **Hull Integrity reaches 0%**, the ship instantly explodes, regardless of remaining energy or shield levels.
+*   **Continuous Regeneration**: Unlike older systems, shield regeneration is continuous but scales with hardware health.
+*   **Shield Failure**: If a quadrant reaches 0% integrity, subsequent hits from that direction will deal direct damage to the hull and the main energy reactor.
 
 *   **Weapons (W)**: Directly scales the **Phaser Beam Intensity** and **Recharge Rate**. A higher allocation results in more energy being focused into the phaser banks, dealing exponentially more damage and allowing the phaser capacitor to refill much faster.
 
@@ -483,62 +487,92 @@ The HUD displays "LIFE SUPPORT: XX.X%", which is directly linked to the integrit
 *   `dis`: **Dismantle**. Dismantles enemy wrecks for resources (Dist < 1.5).*   `min`: **Mining**. Extracts resources from an orbiting planet (Dist < 2.0).
 *   `sco`: **Solar Scooping**. Collects energy from a star (Dist < 2.0).
 *   `har`: **Harvest Antimatter**. Collects antimatter from a black hole (Dist < 2.0).
-*   `con <T> <A>`: **Convert Resources**. Converts resources in cargo bay.
+*   `con T A`: **Convert Resources**. Converts raw materials into energy or torpedoes (`T`: resource type, `A`: amount).
     *   `1`: Dilithium -> Energy.
+    *   `2`: Tritanium -> Energy.
     *   `3`: Verterium -> Torpedoes.
-*   `load <T> <A>`: **Load Cargo**. Transfers resources from the cargo bay to active systems.
+    *   `6`: Gas -> Energy.
+    *   `7`: Duranium -> Energy.
+*   `load <T> <A>`: **Load Systems**. Transfers energy or torpedoes from cargo to active systems.
     *   `1`: Energy (Main Reactor). Max capacity: 9,999,999 units.
-    *   `2`: Torpedoes (Launchers). Max capacity: 1,000 units.
-*   `inv`: **Inventory**. Shows cargo bay content, including raw materials and **Prisoners**.
+    *   `2`: Torpedoes (Launch Tubes). Max capacity: 1000 units.
+
+#### 🏗️ Hull Reinforcement (Hull Plating)
+*   `hull`: **Reinforce Hull**. Uses **100 units of Duranium** to apply reinforced plating to the hull (+500 integrity units).
+    *   Duranium plating acts as a secondary physical shield, absorbing residual damage that bypasses energy shields before it hits the main reactor.
+    *   Plating status is visible in the 3D HUD and via the `sta` command.
+*   `inv`: **Inventory**. Shows cargo bay content, including raw materials (**Monotanium**, **Isolinear**, **Duranium**) and **Prisoners**.
 
 ### 📦 Cargo and Resource Management
 
 Star Trek Ultra distinguishes between **Active Systems** and **Cargo Storage**. This is reflected in the HUD as `ENERGY: X (CARGO: Y)`.
 
-*   **Active Energy/Torps**: These are resources currently available for immediate use by the ship's systems (Engines, Shields, Phasers, and Torpedo Tubes).
-*   **Cargo Reserves**: Resources stored in the Cargo Bay. These act as a secondary reservoir. If your main reactor is low, you must manually transfer energy from the cargo hold using the `load` command.
-*   **Solar Scooping & Harvesting**: Resources collected from stars (`sco`) or black holes (`har`) are initially placed in the **Cargo Bay** to prevent reactor overloads.
-*   **Resource Conversion**: Raw materials like Dilithium or Verterium must be converted (`con`) into usable Energy or Torpedoes within the Cargo Bay before they can be loaded into active systems.
+*   **Active Energy/Torps**: These are resources currently available for immediate use.
+*   **Cargo Reserves**: Resources stored in the Cargo Bay.
+    *   **Resource Table**:
+        1. **Dilithium**: Warp Jump and energy conversion.
+        2. **Tritanium**: Hull repairs and energy conversion.
+        3. **Verterium**: Photon torpedo production.
+        4. **Monotanium**: Advanced structural alloy.
+        5. **Isolinear**: Chips for complex system repairs.
+        6. **Gases**: Collected from comets, energy conversion.
+        7. **Duranium**: Armored hull plating.
+        8. **Prisoners**: Captured enemy personnel.
+*   **Resource Conversion**: Raw materials must be converted (`con`) into usable Energy or Torpedoes before loading.
 
-*   `rep [ID]`: **Repair**. Repairs a damaged system using **50 Tritanium** and **10 Antimatter**.
-    *   If no ID is provided, lists all 10 ship systems and their current integrity.
+*   `rep [ID]`: **Repair**. Repairs a damaged system using **50 Tritanium** and **10 Isolinear**.
+    *   If no ID is provided, lists all 10 ship systems.
     *   **System IDs**: `0`: Warp, `1`: Impulse, `2`: Sensors, `3`: Transp, `4`: Phasers, `5`: Torps, `6`: Computer, `7`: Life Support, `8`: Shields, `9`: Aux.
 *   **Crew Management**: 
     *   Initial personnel number depends on ship class (e.g., 1012 for Galaxy, 50 for Defiant).    *   **Vital Integrity**: If **Life Support** drops below 75%, the crew will start suffering periodic losses.
     *   **Shield Integrity**: If the **Shield System (ID 8)** integrity is low, the automatic recharge of the 6 quadrants is slowed down.
     *   **Failure Condition**: If crew reaches **zero**, the mission ends and the ship is considered lost.
 
-### 🛡️ Encryption and Electronic Warfare (Subspace Security)
-The system implements a military-grade security layer for all communications between vessels and fleet command.
+### 3. Operational Command Guide & Subspace Cryptography
 
-*   **Technical Implementation**: Encryption is managed via the **OpenSSL** library, using 256-bit algorithms with packet authentication (GCM/Poly).
-*   **Digital Signature (Ed25519)**: In addition to encryption, every radio message includes a cryptographic signature generated via elliptic curves (**Ed25519**). This ensures **Authenticity** (only the real captain can sign) and **Integrity** (the message has not been altered).
-    *   **Verified**: Messages with a valid signature appear with the green **`[VERIFIED]`** tag.
-    *   **Tamper Alert**: If a signature is present but invalid, the red **`[UNVERIFIED]`** tag appears, warning of potential subspace interception or data corruption.
-*   **Rotating Frequency Codes**: Each message has a unique signature based on the server's `frame_id`. This prevents an enemy from "recording and replaying" your commands.
-*   **Session Persistence & Handshake Safety**: While the server saves the captain's profile, encryption protocols are reset to `off` upon every new connection. This ensures that welcome messages and initial synchronization are always readable, preventing "lock-outs" due to forgotten protocol settings.
-*   **Dynamic Diagnostic Feedback**: In case of a protocol mismatch (e.g., one captain using AES and another using ChaCha), the bridge computer analyzes the binary noise and provides contextual hints (`[HINT]`) to help the captain synchronize the frequency.
-*   **Selective Decryption (Radio Frequencies)**: Different algorithms act as separate communication frequencies.
-    *   If a captain transmits in `enc aes`, only those tuned to `enc aes` will be able to read it.
-    *   If you are tuned to a different protocol (e.g., listening in AES but receiving ChaCha), you will see the message **<< SIGNAL DISTURBED: FREQUENCY MISMATCH >>**.
-    *   This forces allies to pre-coordinate on the mission "frequency" to be used.
-*   **Deterministic Synchronization**: Each packet carries its own `origin_frame`, allowing the receiver to reconstruct the exact original encryption frequency, making the system immune to network delays (lag).
-*   **Operational Commands**:
-    *   `enc aes`: Enables the **AES-256-GCM** standard (Robust, hardware accelerated).
-    *   `enc chacha`: Enables the **ChaCha20-Poly1305** standard (Modern, ultra-fast).
-    *   `enc aria`: Enables the **ARIA-256-GCM** standard (South Korean standard).
-    *   `enc camellia`: Enables **Camellia-256-CTR** (Romulan high-security standard).
-    *   `enc bf`: Enables **Blowfish-CBC** (Ferengi Commerce Protocol).
-    *   `enc rc4`: Enables **RC4 Stream** (Tactical Low-Latency Link).
-    *   `enc cast`: Enables **CAST5-CBC** (Old Republic standard).
-    *   `enc idea`: Enables **IDEA-CBC** (Maquis/Resistance protocol).
-    *   `enc 3des`: Enables **Triple DES-CBC** (Ancient Earth probe standard).
-    *   `enc pqc`: Enables **ML-KEM-1024** (Post-Quantum Encryption). Standardized by NIST to resist attacks from future quantum computers.
-    *   `enc off`: Disables security protocols (RAW communication).### 📡 Communications and Miscellaneous
+The Star Trek Ultra bridge operates via a high-precision Command Line Interface (CLI). Beyond navigation and combat, the simulator implements a sophisticated **Electronic Warfare** system based on real-world cryptography.
+
+#### 🛰️ Advanced Navigation & Utility Commands
+*   `cal <Q1> <Q2> <Q3>`: **Warp Calculator**. Instantly calculates the vector (Heading/Mark) and distance required to reach a specific galaxy quadrant. Essential for planning long-range jumps without calculation errors.
+*   `ical <X> <Y> <Z>`: **Impulse Calculator**. Provides the navigation solution for precise sector coordinates [0.0 - 10.0]. Use it for precision maneuvers around stations or planets.
+*   `who`: **Captains Registry**. Lists all commanders currently active in the galaxy, their tracking IDs, and current position. Crucial for identifying allies or potential predators before entering a sector.
+*   `sta`: **Status Report**. Complete systems diagnostic, including energy levels, hardware integrity, and power distribution.
+*   `hull`: **Duranium Reinforcement**. If you have **100 units of Duranium** in cargo, this command applies reinforced plating to the hull (+500 HP physical shield), visible as gold in the HUD.
+
+#### 🛡️ Tactical Cryptography: Communication "Frequencies"
+In Star Trek Ultra, encryption is not just about security—it's a **tactical frequency choice**. Each algorithm acts as a separate communication band.
+
+*   **Identity & Signature (Ed25519)**: Every radio packet is digitally signed. If you receive a message with a **`[VERIFIED]`** tag, you have mathematical certainty it comes from the declared captain and has not been altered by enemy sensors or spatial phenomena.
+*   **Cryptographic Frequencies (`enc <TYPE>`)**:
+    *   **AES (`enc aes`)**: The balanced Starfleet standard. Secure and optimized for modern hardware.
+    *   **PQC (`enc pqc`)**: **Post-Quantum Cryptography (ML-KEM)**. Represents the ultimate defense against Quantum Computers from the Borg or temporally advanced civilizations. The most secure protocol available.
+    *   **ChaCha (`enc chacha`)**: Ultra-fast, ideal for quick communications in unstable subspace conditions.
+    *   **Camellia (`enc camellia`)**: Standard protocol of the Romulan Empire, known for its elegant structure and resistance to brute-force attacks.
+    *   **ARIA (`enc aria`)**: Standard used by the Klingon Alliance for coalition operations.
+    *   **IDEA / CAST5**: Protocols often used by resistance groups (Maquis) or mercenaries to avoid standard Starfleet monitoring.
+    *   **OFF (`enc off`)**: Clear communication. Risky, but useful for universal distress calls readable by anyone.
+
+**Tactical Implication**: If an allied fleet decides to operate on "ARIA Frequency", every member must set `enc aria`. Those staying on AES will see only static noise (**`<< SIGNAL DISTURBED >>`**), allowing secure and secret communications even in crowded sectors.
+
+### 📡 Communications and Miscellaneous
 *   `rad <MSG>`: Sends radio message to all (Open channel).
     *   **Faction Table (@Fac)**:
         | Faction | Full Name | Abbreviated |
         | :--- | :--- | :--- |
+        | **Federazione** | `@Federation` | `@Fed` |
+        | **Klingon** | `@Klingon` | `@Kli` |
+        | **Romulani** | `@Romulan` | `@Rom` |
+        | **Borg** | `@Borg` | `@Bor` |
+        | **Cardassiani** | `@Cardassian` | `@Car` |
+        | **Dominio** | `@JemHadar` | `@Jem` |
+        | **Tholiani** | `@Tholian` | `@Tho` |
+        | **Ferengi** | `@Ferengi` | `@Fer` |
+        | **Specie 8472** | `@Species8472`| `@8472` |
+        | **Gorn / Breen / Hirogen** | Full Name | - |
+*   `rad #ID <MSG>`: Private message to player ID.
+*   `psy`: **Psychological Warfare**. Attempts a bluff (Corbomite Maneuver).
+*   `axs` / `grd`: Toggles 3D visual guides (Axes / Grid).
+*   `h` (hotkey): Hides the HUD for a "cinematic" view.
         | **Federation** | `@Federation` | `@Fed` |
         | **Klingon** | `@Klingon` | `@Kli` |
         | **Romulan** | `@Romulan` | `@Rom` |
@@ -561,15 +595,36 @@ The system uses spatial projection algorithms to anchor information directly abo
 *   **Visual Latching**: Combat effects (phasers, explosions) are temporally synchronized with server logic, providing immediate visual feedback on hit impact.
 
 #### 🧭 3D Tactical Compass (`axs`)
-By activating visual axes (`axs`), the simulator projects a spherical reference system centered on your ship:
-*   **Boundary Coordinates**: At the center of each face of the tactical cube, the coordinates `[X,Y,Z]` of adjacent quadrants are projected, allowing instantaneous identification of the destination for a warp jump or impulse maneuver towards a neighboring sector.
-*   **Heading Ring**: A graduated horizontal disk that rotates with the ship, indicating the 360 degrees of the galactic plane.
-*   **Mark Arc**: A vertical guide displaying zenith inclination (-90/+90), crucial for complex 3D pursuits.
-*   **Galactic Axes**: Reference lines for X (red), Y (green), and Z (blue) axes delimiting the current sector boundaries.
+By activating visual axes (`axs`), the simulator projects a spherical reference system centered on your ship.
+
+**Axis Convention Note**: The graphics engine uses the **OpenGL (Y-Up)** standard.
+*   **X (Red)**: Transverse axis (Left/Right).
+*   **Y (Green)**: Vertical axis (Up/Down). This is the rotation axis for *Heading*.
+*   **Z (Blue)**: Longitudinal axis (Depth/Forward motion).
+*   **Boundary Coordinates**: At the center of each face of the tactical cube, the coordinates `[X,Y,Z]` of adjacent quadrants are projected.
+
+---
+
+### 🖥️ Server Architecture and LCARS Telemetry
+
+Upon launching `trek_server`, the system performs a complete diagnostic of the host infrastructure, displaying an **LCARS (Library Computer Access and Retrieval System)** telemetry panel.
+
+#### 📊 Monitored Data
+*   **Logical Infrastructure**: Host identification, Linux kernel version, and core libraries (**GNU libc**).
+*   **Memory Allocation**: 
+    *   **Physical RAM**: Status of available physical memory.
+    *   **Shared Segments (SHM)**: Monitoring of active shared memory segments, vital for the *Direct Bridge* IPC.
+*   **Network Topology**: List of active interfaces, IP addresses, and real-time traffic statistics (**RX/TX**) retrieved from the kernel.
+*   **Subspace Dynamics**: System load average and number of active logical tasks.
+
+This diagnostic ensures the server operates in a nominal environment before opening subspace communication channels on port `3073`.
+
 
 #### 📟 Telemetry and HUD Monitoring
 The on-screen interface (Overlay) provides constant monitoring of vital parameters:
 *   **Reactor & Shield Status**: Real-time display of available energy and average defensive grid power.
+*   **Hull Integrity**: Physical state of the hull (0-100%). If it drops to zero, the vessel is lost.
+*   **Hull Plating**: Golden indicator of Duranium-reinforced hull integrity (visible only if present).
 *   **Sector Coordinates**: Instant conversion of spatial data into relative coordinates `[S1, S2, S3]` (0.0 - 10.0), mirroring those used in `nav` and `imp` commands.
 *   **Threat Detector**: A dynamic counter indicates the number of hostile vessels detected by sensors in the current quadrant.
 *   **Subspace Uplink Diagnostics Suite**: An advanced diagnostic panel (bottom right) monitoring the health of the neural/data link. It shows real-time Link Uptime, **Pulse Jitter**, **Signal Integrity**, protocol efficiency, and the active status of **AES-256-GCM** encryption.
@@ -577,7 +632,7 @@ The on-screen interface (Overlay) provides constant monitoring of vital paramete
 #### 🛠️ View Customization
 The commander can configure their interface via quick CLI commands:
 *   `grd`: Activates/Deactivates the **Galactic Tactical Grid**, useful for perceiving depth and distances.
-*   `axs`: Activates/Deactivates the **Compass and Reference Axes**.
+*   `axs`: Activates/Deactivates the **AR Tactical Compass**. This holographic compass is anchored to the ship's position: the Azimuth ring (Heading) remains oriented towards Galactic North (fixed coordinates), while the Elevation arc (Mark) rotates with the vessel, providing an immediate navigation reference for combat maneuvers.
 *   `h` (hotkey): Completely hides the HUD for a "cinematic" view of the sector.
 *   **Zoom & Rotation**: Total control of the tactical camera via mouse or `W/S` keys and directional arrows.
 
@@ -804,7 +859,7 @@ The player continuity system relies on **Persistent Identity**:
 
 #### 🆘 EMERGENCY RESCUE Protocol
 In case of vessel destruction or fatal collision, upon re-entry Starfleet Command will initiate an automatic rescue mission, repositioning the ship in a safe sector and restoring core systems.
-*   **Systems Restoration**: Emergency repair of all core subsystems up to **80% integrity**.
+*   **Systems Restoration**: Emergency repair of all core subsystems and **Hull Integrity** up to **80% integrity**.
 *   **Energy Recharge**: Supply of **9,999,999 units** of emergency energy.
 *   **Ammunition Resupply**: Full reload of **1,000 photon torpedoes**.
 *   **Safe Relocation**: Automatic jump to a random quadrant, with a safety check to **avoid active supernovas** and collision zones. Ships are positioned at sector center (5.0, 5.0, 5.0).

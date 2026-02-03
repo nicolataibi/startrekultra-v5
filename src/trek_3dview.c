@@ -132,6 +132,8 @@ float pulse = 0.0f;
 float map_anim = 0.0f;
 
 int g_energy = 0, g_crew = 0, g_shields = 0, g_klingons = 0;
+int g_duranium_plating = 0;
+float g_hull_integrity = 100.0f;
 int g_shields_val[6] = {0};
 int g_cargo_energy = 0, g_cargo_torps = 0, g_torpedoes_launcher = 0;
 float g_system_health[10] = {0};
@@ -158,6 +160,8 @@ typedef struct {
     int ship_class;
     int health_pct;   /* HUD */
     int energy;       /* HUD */
+    int plating;      /* HUD */
+    int hull_integrity; /* HUD */
     int faction;      /* HUD */
     int id;           /* HUD */
     char name[64];    /* HUD Name */
@@ -297,6 +301,8 @@ void loadGameState() {
     last_frame_id = g_shared_state->frame_id;
     g_is_loading = 1;
     g_energy = g_shared_state->shm_energy;
+    g_duranium_plating = g_shared_state->shm_duranium_plating;
+    g_hull_integrity = g_shared_state->shm_hull_integrity;
     g_crew = g_shared_state->shm_crew;
     g_torpedoes_launcher = g_shared_state->shm_torpedoes;
     g_cargo_energy = g_shared_state->shm_cargo_energy;
@@ -405,6 +411,8 @@ void loadGameState() {
             obj->ship_class = g_shared_state->objects[i].ship_class;
             obj->health_pct = g_shared_state->objects[i].health_pct;
             obj->energy = g_shared_state->objects[i].energy;
+            obj->plating = g_shared_state->objects[i].plating;
+            obj->hull_integrity = g_shared_state->objects[i].hull_integrity;
             obj->faction = g_shared_state->objects[i].faction;
             strncpy(obj->name, g_shared_state->objects[i].shm_name, 63);
         }
@@ -517,9 +525,9 @@ void loadGameState() {
             g_dismantle.particles[i].x = g_dismantle.x;
             g_dismantle.particles[i].y = g_dismantle.y;
             g_dismantle.particles[i].z = g_dismantle.z;
-            g_dismantle.particles[i].vx = ((rand()%100)-50)/500.0f;
-            g_dismantle.particles[i].vy = ((rand()%100)-50)/500.0f;
-            g_dismantle.particles[i].vz = ((rand()%100)-50)/500.0f;
+            g_dismantle.particles[i].vx = ((rand()%100)-50)/150.0f;
+            g_dismantle.particles[i].vy = ((rand()%100)-50)/150.0f;
+            g_dismantle.particles[i].vz = ((rand()%100)-50)/150.0f;
             g_dismantle.particles[i].r = (rand()%100)/100.0f;
             g_dismantle.particles[i].g = (rand()%100)/100.0f;
             g_dismantle.particles[i].b = (rand()%100)/100.0f;
@@ -627,8 +635,8 @@ void drawHUD(int obj_idx) {
                 } break;
                 case 5: {
                     type_name = "PLANET"; glColor3f(0.0f, 1.0f, 0.5f);
-                    const char* res[] = {"None", "Dilithium", "Tritanium", "Verterium", "Pergium", "Antimatter", "Xenon"};
-                    int r_idx = obj->ship_class; if(r_idx<0) r_idx=0; if(r_idx>6) r_idx=6;
+                    const char* res[] = {"-", "Dilithium", "Tritanium", "Verterium", "Monotanium", "Isolinear", "Gases", "Duranium"};
+                    int r_idx = obj->ship_class; if(r_idx<0) r_idx=0; if(r_idx>7) r_idx=7;
                     sprintf(buf, "PLANET: %s [%d]", res[r_idx], id);
                 } break;
                 case 6: type_name = "BLACK HOLE"; glColor3f(0.5f, 0.0f, 1.0f); break;
@@ -693,6 +701,24 @@ void drawHUD(int obj_idx) {
             glVertex2f(winX - w/2 + bar, winY + h);
             glVertex2f(winX - w/2, winY + h);
             glEnd();
+
+            /* Hull Integrity Text */
+            char hbuf[32];
+            sprintf(hbuf, "HULL: %d%%", obj->hull_integrity);
+            if (obj->hull_integrity > 60) glColor3f(0, 1, 0);
+            else if (obj->hull_integrity > 25) glColor3f(1, 1, 0);
+            else glColor3f(1, 0, 0);
+            glRasterPos2f(winX + w/2 + 5, winY);
+            for(int i=0; i<strlen(hbuf); i++) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, hbuf[i]);
+
+            /* Plating indicator if present */
+            if (obj->plating > 0) {
+                char pbuf[32];
+                sprintf(pbuf, "HULL: +%d", obj->plating);
+                glColor3f(1.0f, 0.8f, 0.0f); /* Yellow for Duranium */
+                glRasterPos2f(winX - (strlen(pbuf)*4), winY + 35);
+                for(int i=0; i<strlen(pbuf); i++) glutBitmapCharacter(GLUT_BITMAP_HELVETICA_10, pbuf[i]);
+            }
         }
 
         glEnable(GL_DEPTH_TEST); glEnable(GL_LIGHTING);
@@ -711,13 +737,14 @@ void drawCompass() {
     glColor3f(0, 0, 0.5); glVertex3f(0,0,-5.5); glVertex3f(0,0,5.5); /* Z - Bluish */
     glEnd();
 
-    /* Local Tactical Compass around the ship (origin in shifted space) */
-    glPushMatrix();
+    /* Axis Labels */
+    glColor3f(1.0, 0.0, 0.0); drawText3D(5.7f, 0, 0, "X");
+    glColor3f(0.0, 1.0, 0.0); drawText3D(0, 5.7f, 0, "Y");
+    glColor3f(0.3, 0.3, 1.0); drawText3D(0, 0, 5.7f, "Z");
 
-    /* Rotate Compass to align with Ship Heading (Augmented Reality) */
-    glRotatef(objects[0].h, 0, 1, 0);
+    /* Local Tactical Compass around the ship (origin in shifted space) */
     
-    /* 1. Heading Ring (Horizontal plane XZ in OpenGL) */
+    /* 1. Heading Ring (Horizontal plane XZ in OpenGL) - Fixed to World */
     glColor4f(0.0f, 1.0f, 1.0f, 0.3f);
     glBegin(GL_LINE_LOOP);
     for(int i=0; i<360; i+=5) {
@@ -726,7 +753,7 @@ void drawCompass() {
     }
     glEnd();
 
-    /* 2. Heading Labels (every 45 degrees) */
+    /* 2. Heading Labels (every 45 degrees) - Fixed to World */
     glColor3f(0.0f, 0.8f, 0.8f);
     for(int i=0; i<360; i+=45) {
         float rad = i * M_PI / 180.0f;
@@ -735,6 +762,10 @@ void drawCompass() {
         char buf[8]; sprintf(buf, "%d", i);
         drawText3D(lx, 0.1f, lz, buf);
     }
+
+    glPushMatrix();
+    /* Rotate only the Mark Arc to align with Ship Heading (Augmented Reality) */
+    glRotatef(objects[0].h, 0, 1, 0);
 
     /* 3. Mark Arc (Frontal Vertical plane -90 to +90) */
     glColor4f(1.0f, 1.0f, 0.0f, 0.2f);
@@ -1883,17 +1914,25 @@ void drawTorpedo() {
 
 void drawDismantle() {
     if (g_dismantle.timer <= 0) return;
+    
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
     glDisable(GL_LIGHTING);
-    glPointSize(3.0f);
-    glBegin(GL_POINTS);
+    
+    float alpha = g_dismantle.timer / 60.0f;
+    
     for(int i=0; i<100; i++) {
         if (g_dismantle.particles[i].active) {
-            glColor4f(g_dismantle.particles[i].r, g_dismantle.particles[i].g, g_dismantle.particles[i].b, g_dismantle.timer/60.0f);
-            glVertex3f(g_dismantle.particles[i].x, g_dismantle.particles[i].y, g_dismantle.particles[i].z);
+            glPushMatrix();
+            glTranslatef(g_dismantle.particles[i].x, g_dismantle.particles[i].y, g_dismantle.particles[i].z);
+            glColor4f(g_dismantle.particles[i].r, g_dismantle.particles[i].g, g_dismantle.particles[i].b, alpha);
+            glutSolidSphere(0.05f * alpha, 8, 8);
+            glPopMatrix();
         }
     }
-    glEnd();
+    
     glEnable(GL_LIGHTING);
+    glDisable(GL_BLEND);
 }
 
 void drawFaceLabels() {
@@ -2190,6 +2229,21 @@ void display() {
         glColor3f(1.0f, 1.0f, 1.0f);
         sprintf(buf, "ENERGY: %-7d (CARGO: %-7d) | TORPS: %-4d (CARGO: %-4d)", g_energy, g_cargo_energy, g_torpedoes_launcher, g_cargo_torps);
         drawText3D(x_off, y_pos, 0, buf); y_pos -= 18;
+        
+        /* Hull Integrity Main Display */
+        if (g_hull_integrity > 60) glColor3f(0, 1, 0);
+        else if (g_hull_integrity > 25) glColor3f(1, 1, 0);
+        else glColor3f(1, 0, 0);
+        sprintf(buf, "HULL INTEGRITY: %.1f%%", g_hull_integrity);
+        drawText3D(x_off, y_pos, 0, buf); y_pos -= 18;
+
+        if (g_duranium_plating > 0) {
+            glColor3f(1.0f, 0.8f, 0.0f);
+            sprintf(buf, "HULL PLATING: %-5d [DURANIUM REINFORCED]", g_duranium_plating);
+            drawText3D(x_off, y_pos, 0, buf); y_pos -= 18;
+        }
+
+        glColor3f(1.0f, 1.0f, 1.0f);
         sprintf(buf, "CREW:   %-4d   SHIELDS AVG: %-3d%%      | LOCK:  ", g_crew, g_shields);
         drawText3D(x_off, y_pos, 0, buf);
         if (g_lock_target > 0) {
@@ -2227,11 +2281,11 @@ void display() {
         /* 4. Cargo Inventory (2 columns) */
         glColor3f(0.8f, 0.5f, 0.0f);
         drawText3D(x_off, y_pos, 0, "--- CARGO INVENTORY ---"); y_pos -= 18;
-        const char* res_names[] = {"None", "Dilithium", "Tritanium", "Verterium", "Pergium", "Antimatter", "Xenon", "Prisoners"};
+        const char* res_names[] = {"-", "Dilithium", "Tritanium", "Verterium", "Monotanium", "Isolinear", "Gases", "Duranium", "Prisoners"};
         for(int i=1; i<5; i++) {
             for(int col=0; col<2; col++) {
                 int idx = i + col*4;
-                if (idx > 7) continue;
+                if (idx > 8) continue;
                 glColor3f(0.7, 0.7, 0.7);
                 sprintf(buf, "%-10s: %-4d", res_names[idx], g_inventory[idx]);
                 drawText3D(x_off + col*150, y_pos, 0, buf);

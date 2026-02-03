@@ -122,6 +122,8 @@ typedef struct {
     int32_t cargo_energy;
     int32_t cargo_torpedoes;
     int32_t crew_count;
+    int32_t duranium_plating;
+    float hull_integrity;
     int32_t shields[6];
     int32_t inventory[8];
     float system_health[10];
