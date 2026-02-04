@@ -48,6 +48,16 @@ typedef struct {
 } NetDismantle;
 
 typedef struct {
+    int32_t active;
+    int32_t q1, q2, q3;
+    float s1, s2, s3;
+    float eta;
+    int32_t status; /* 0:LAUNCHED, 1:ARRIVED, 2:TRANSMITTING */
+    float gx, gy, gz; /* Galactic Absolute Position */
+    float vx, vy, vz; /* Galactic Velocity Vector */
+} NetProbe;
+
+typedef struct {
     /* Galaxy Data - Moved to TOP for reliable alignment and sync */
     int64_t g[11][11][11];    /* The Galaxy Cube (BPNBS Encoding) */
     int32_t z[11][11][11];          /* Scanned Map Cube */
@@ -98,6 +108,11 @@ typedef struct {
     uint8_t shm_crypto_algo;
     int32_t duranium_plating;
 
+    /* Cryptographic & Signature Data */
+    uint8_t server_signature[64];
+    uint8_t server_pubkey[32];
+    uint32_t encryption_flags;
+
     /* Multi-user sync (Objects in current sector) */
     int32_t object_count;
     NetObject objects[MAX_NET_OBJECTS];
@@ -108,6 +123,8 @@ typedef struct {
     NetPoint wormhole;
     NetPoint jump_arrival;
     NetDismantle dismantle;
+    NetPoint recovery_fx;
+    NetProbe probes[3];
 } StarTrekGame;
 
 #pragma pack(pop)

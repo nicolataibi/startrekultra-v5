@@ -32,6 +32,9 @@ ConnectedPlayer players[MAX_CLIENTS];
 StarTrekGame galaxy_master;
 SupernovaState supernova_event = {0,0,0,0};
 
+uint8_t SERVER_PUBKEY[32];
+uint8_t SERVER_PRIVKEY[64];
+
 QuadrantIndex (*spatial_index)[11][11] = NULL;
 
 void init_static_spatial_index() {
@@ -515,14 +518,14 @@ void generate_galaxy() {
                 galaxy_master.b9 += actual_b;
             }
 
-    printf("\n%s .--- GALAXY GENERATION COMPLETED: ASTROMETRICS REPORT ----------------.%s\n", B_CYAN, RESET);
-    printf("%s | %s 🚀 Vessels (NPCs):    %s%-5d %s| %s 🪐 Planets:           %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, n_count, B_CYAN, B_WHITE, B_GREEN, p_count, B_CYAN);
+    printf("\n%s .--- GALAXY GENERATION COMPLETED: ASTROMETRICS REPORT ----------.%s\n", B_CYAN, RESET);
+    printf("%s | %s 🚀 Vessels (NPCs):     %s%-5d %s| %s 🪐 Planets:            %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, n_count, B_CYAN, B_WHITE, B_GREEN, p_count, B_CYAN);
     printf("%s | %s ☀️  Stars:             %s%-5d %s| %s 🛰️  Starbases:         %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, s_count, B_CYAN, B_WHITE, B_GREEN, b_count, B_CYAN);
     printf("%s | %s 🕳️  Black Holes:       %s%-5d %s| %s ☁️  Nebulas:           %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, bh_count, B_CYAN, B_WHITE, B_GREEN, neb_count, B_CYAN);
-    printf("%s | %s 🌟 Pulsars:           %s%-5d %s| %s ☄️  Comets:            %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, pul_count, B_CYAN, B_WHITE, B_GREEN, com_count, B_CYAN);
-    printf("%s | %s 💎 Asteroids:         %s%-5d %s| %s 🏚️  Derelicts:         %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, ast_count, B_CYAN, B_WHITE, B_GREEN, der_count, B_CYAN);
-    printf("%s | %s 💣 Mines:             %s%-5d %s| %s 📡 Buoys:             %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, mine_count, B_CYAN, B_WHITE, B_GREEN, buoy_count, B_CYAN);
+    printf("%s | %s 🌟 Pulsars:            %s%-5d %s| %s ☄️  Comets:            %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, pul_count, B_CYAN, B_WHITE, B_GREEN, com_count, B_CYAN);
+    printf("%s | %s 💎 Asteroids:          %s%-5d %s| %s 🏚️  Derelicts:         %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, ast_count, B_CYAN, B_WHITE, B_GREEN, der_count, B_CYAN);
+    printf("%s | %s 💣 Mines:              %s%-5d %s| %s 📡 Buoys:              %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, mine_count, B_CYAN, B_WHITE, B_GREEN, buoy_count, B_CYAN);
     printf("%s | %s 🛡️  Defense Platforms: %s%-5d %s| %s 🌀 Spacetime Rifts:    %s%-5d %s|\n", B_CYAN, B_WHITE, B_GREEN, plat_count, B_CYAN, B_WHITE, B_GREEN, rift_count, B_CYAN);
-    printf("%s | %s 👾 Class-Omega Threats:%s%-5d                                %s|\n", B_CYAN, B_WHITE, B_RED, mon_count, B_CYAN);
-    printf("%s '---------------------------------------------------------------------'%s\n\n", B_CYAN, RESET);
+    printf("%s | %s 👾 Class-Omega Threats:%s%-5d                                 %s|\n", B_CYAN, B_WHITE, B_RED, mon_count, B_CYAN);
+    printf("%s '---------------------------------------------------------------'%s\n\n", B_CYAN, RESET);
 }

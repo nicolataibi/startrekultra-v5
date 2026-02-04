@@ -162,6 +162,8 @@ extern pthread_mutex_t game_mutex;
 extern int g_debug;
 extern int global_tick;
 extern uint8_t MASTER_SESSION_KEY[32];
+extern uint8_t SERVER_PUBKEY[32];
+extern uint8_t SERVER_PRIVKEY[64];
 
 typedef struct {
     int supernova_q1, supernova_q2, supernova_q3;
@@ -172,7 +174,7 @@ extern SupernovaState supernova_event;
 
 #define LOG_DEBUG(...) do { if (g_debug) { printf("DEBUG: " __VA_ARGS__); fflush(stdout); } } while (0)
 
-#define GALAXY_VERSION 20260209
+#define GALAXY_VERSION 20260210
 
 /* Spatial Partitioning Index */
 typedef struct {

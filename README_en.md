@@ -299,15 +299,17 @@ The Star Trek Ultra universe is a dynamic ecosystem populated by 17 classes of e
 Below is the complete list of available commands, grouped by function.
 
 ### 🚀 Navigation
-*   `nav <H> <M> <W>`: **Warp Navigation**. Set course and warp speed.
+*   `nav <H> <M> <Dist> [Factor]`: **High-Precision Warp Navigation**. Set course, precise distance and optional velocity.
     *   `H`: Heading (0-359).
     *   `M`: Mark (-90 to +90).
-    *   `W`: Warp Factor (0-8).
-*   `imp <H> <M> <S>`: **Impulse Drive**. Sub-light engines. `S` represents speed from 0.0 to 1.0 (Full Impulse). At maximum power (1.0), the ship travels at 1.5 sector units per second, crossing an entire quadrant in approximately 6.6 seconds.
+    *   `Dist`: Distance in Quadrants (supports decimals, e.g. `1.73`).
+    *   `Factor`: (Optional) Warp Factor from 1.0 to 9.9 (Default: 6.0).
+*   `imp <H> <M> <S>`: **Impulse Drive**. Sub-light engines. `S` represents speed from 0.0 to 1.0 (Full Impulse).
     *   `S`: Speed (0.0 - 1.0).
     *   `imp 0 0 0`: All Stop.
-    *   `cal <QX> <QY> <QZ>`: **Warp Calculator**. Calculates H, M, W to reach a distant quadrant.
-    *   `ical <X> <Y> <Z>`: **Impulse Calculator**. Calculates H, M, and Distance to reach precise coordinates (0.0-10.0) within the current quadrant. Essential for mining and docking.
+*   `cal <QX> <QY> <QZ> [SX SY SZ]`: **Navigational Computer (High Precision)**. Generates a full report with Heading, Mark, and a **Velocity Comparison Table**. If sector coordinates (SX, SY, SZ) are provided, it calculates the pinpoint route to that specific location.
+*   `ical <X> <Y> <Z>`: **Impulse Calculator (ETA)**. Calculates H, M, and ETA to reach precise coordinates (0.0-10.0) within the current quadrant, based on current engine power allocation.
+    
     *   `jum <QX> <QY> <QZ>`: **Wormhole Jump (Einstein-Rosen Bridge)**.
      Generates a wormhole for an instant jump to the destination quadrant.
     *   **Requirements**: 5000 units of Energy and 1 Dilithium Crystal.
@@ -334,7 +336,14 @@ Below is the complete list of available commands, grouped by function.
     *   **Primary Legend**: `[ H P N B S ]` (Black Holes, Planets, NPCs, Bases, Stars).
     *   **Anomaly Symbols**: `~`:Nebula, `*`:Pulsar, `+`:Comet, `#`:Asteroid, `M`:Monster, `>`:Rift.
     *   **Localization**: Your current quadrant is highlighted with a blue background.
-*   `aux probe <QX> <QY> <QZ>`: Launches a long-range probe to a specific quadrant.
+*   `aux probe <QX> <QY> <QZ>`: **Subspace Sensor Probe**. Launches an automated probe to a specific quadrant.
+    *   **Galactic Entity**: Probes are global objects. They traverse intermediate quadrants in real-time and are **visible to all players** along their flight path.
+    *   **Sensor Integration**: Probes appear in the **SRS (Short Range Sensors)** list for any ship in the same sector (ID range 19000+), revealing the **Owner's Name** and current status.
+    *   **Functionality**: Displays **ETA** and mission status in the owner's HUD.
+    *   **Data Retrieval**: Upon arrival, it reveals the quadrant's composition (`H P N B S`) in the owner's map and sends a live telemetry report.
+    *   **Persistence**: Remains at the target location as a **Derelict** (Red rings) after the mission.
+    *   **Command `aux report <1-3>`**: Requests a fresh sensor update from an active probe.
+    *   **Command `aux recover <1-3>`**: Recovers a probe if the ship is in the same quadrant and within range (< 2.0 units), freeing the slot and restoring 500 energy units.
 *   `sta`: **Status Report**. Complete report on ship state, mission, and **Crew** monitoring.
 *   `dam`: **Damage Report**. Detailed system damage.
 *   `who`: List of active captains in the galaxy.
@@ -372,6 +381,7 @@ To interact with galactic objects using the `lock`, `scan`, `pha`, `tor`, `bor`,
 | **Platforms** | 16,000 - 16,999| `lock 16000` | Destroying hostile sentinels |
 | **Spatial Rifts** | 17,000 - 17,999| `lock 17000` | Use for random jumps |
 | **Monsters** | 18,000 - 18,999| `lock 18000` | Extreme combat scenarios |
+| **Probes** | 19,000 - 19,999| `scan 19000` | Automated data collection |
 
 **Note**: Locking only works if the object is in your current quadrant. If the ID exists but is far away, the computer will indicate the target's `Q[x,y,z]` coordinates.
 
@@ -431,7 +441,7 @@ The `apr <ID> <DIST>` command allows you to automatically approach any object de
 
 *   `she <F> <R> <T> <B> <L> <RI>`: **Shield Configuration**. Distributes energy to the 6 shields.
 *   `clo`: **Cloaking Device**. Activates/Deactivates cloak (consumes energy).
-*   `pow <E> <S> <W>`: **Power Distribution**. Allocates reactor energy (Engines, Shields, Weapons %). Values are relative (e.g., `pow 1 1 1` is equal to `pow 33 33 33`).
+*   `pow <E> <S> <W>`: **Power Allocation**. Allocates reactor energy (Engines, Shields, Weapons %).
 *   `aux jettison`: **Eject Warp Core**. Ejects the core (Suicide maneuver / Last resort).
 *   `xxx`: **Self-Destruct**. Sequential self-destruction.
 
@@ -533,8 +543,8 @@ Star Trek Ultra distinguishes between **Active Systems** and **Cargo Storage**. 
 The Star Trek Ultra bridge operates via a high-precision Command Line Interface (CLI). Beyond navigation and combat, the simulator implements a sophisticated **Electronic Warfare** system based on real-world cryptography.
 
 #### 🛰️ Advanced Navigation & Utility Commands
-*   `cal <Q1> <Q2> <Q3>`: **Warp Calculator**. Instantly calculates the vector (Heading/Mark) and distance required to reach a specific galaxy quadrant. Essential for planning long-range jumps without calculation errors.
-*   `ical <X> <Y> <Z>`: **Impulse Calculator**. Provides the navigation solution for precise sector coordinates [0.0 - 10.0]. Use it for precision maneuvers around stations or planets.
+*   `cal <Q1> <Q2> <Q3>`: **Navigational Computer (High Precision)**. Instantly calculates the exact vector (Heading/Mark), distance, and provides a **Warp Velocity Table** with synchronized travel times.
+*   `ical <X> <Y> <Z>`: **Impulse Calculator (ETA)**. Provides a full navigational computation for precise sector coordinates [0.0 - 10.0], including real-time travel time at current power levels.
 *   `who`: **Captains Registry**. Lists all commanders currently active in the galaxy, their tracking IDs, and current position. Crucial for identifying allies or potential predators before entering a sector.
 *   `sta`: **Status Report**. Complete systems diagnostic, including energy levels, hardware integrity, and power distribution.
 *   `hull`: **Duranium Reinforcement**. If you have **100 units of Duranium** in cargo, this command applies reinforced plating to the hull (+500 HP physical shield), visible as gold in the HUD.
@@ -936,6 +946,7 @@ Tactical visualization is managed by a modern OpenGL engine combining classic an
     *   **IFF Identification**: Displays the target's faction (Federation, Klingon, Romulan, etc.) with color-coded alerts.
     *   **Motion Tracking**: Real-time display of target Heading and Mark to predict evasion maneuvers.
     *   **Dynamic Rangefinding**: Continuous distance calculation for optimal weapons range management.
+    *   **Subspace Probe Tracking**: A dedicated **PROBES STATUS** panel monitors active probes, showing their current mission phase (En Route / Transmitting), target coordinates, and remaining travel time (ETA).
 
 ### 📦 Dependencies and Compilation
 To compile the project, a Unix-like development environment (preferably Linux) is required with the following requirements:

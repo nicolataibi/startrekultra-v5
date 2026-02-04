@@ -55,6 +55,16 @@ typedef struct {
 } SharedDismantle;
 
 typedef struct {
+    int active;
+    int q1, q2, q3;
+    float s1, s2, s3;
+    float eta;
+    int status;
+    float gx, gy, gz;
+    float vx, vy, vz;
+} SharedProbe;
+
+typedef struct {
     pthread_mutex_t mutex;
     sem_t data_ready;
     
@@ -67,7 +77,7 @@ typedef struct {
     int shm_shields[6];
     int shm_cargo_energy;
     int shm_cargo_torpedoes;
-    int inventory[8];
+    int inventory[10];
     float shm_system_health[10];
     float shm_power_dist[3];
     int shm_tube_state;
@@ -82,6 +92,9 @@ typedef struct {
     int shm_show_map;
     int is_cloaked;
     int shm_crypto_algo;
+    uint32_t shm_encryption_flags;
+    uint8_t shm_server_signature[64];
+    uint8_t shm_server_pubkey[32];
     int shm_q[3];
     float shm_s[3];
     int64_t shm_galaxy[11][11][11];
@@ -110,6 +123,8 @@ typedef struct {
     SharedPoint supernova_pos;
     int shm_sn_q[3];
     SharedDismantle dismantle;
+    SharedPoint recovery_fx;
+    SharedProbe probes[3];
     
     /* Synchronization counter */
     long long frame_id;

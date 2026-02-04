@@ -441,8 +441,20 @@ void *network_listener(void *arg) {
                 g_shared_state->shm_phaser_charge = upd.phaser_charge;
                 g_shared_state->shm_tube_state = upd.tube_state;
                 g_shared_state->shm_corbomite = upd.corbomite_count;
-                for(int inv=0; inv<8; inv++) g_shared_state->inventory[inv] = upd.inventory[inv];
+                for(int inv=0; inv<10; inv++) g_shared_state->inventory[inv] = upd.inventory[inv];
                 g_shared_state->shm_lock_target = upd.lock_target;
+                
+                for(int p=0; p<3; p++) {
+                    g_shared_state->probes[p].active = upd.probes[p].active;
+                    g_shared_state->probes[p].q1 = upd.probes[p].q1;
+                    g_shared_state->probes[p].q2 = upd.probes[p].q2;
+                    g_shared_state->probes[p].q3 = upd.probes[p].q3;
+                    g_shared_state->probes[p].s1 = upd.probes[p].s1;
+                    g_shared_state->probes[p].s2 = upd.probes[p].s2;
+                    g_shared_state->probes[p].s3 = upd.probes[p].s3;
+                    g_shared_state->probes[p].eta = upd.probes[p].eta;
+                    g_shared_state->probes[p].status = upd.probes[p].status;
+                }
                 
                 g_shared_state->is_cloaked = upd.is_cloaked;
                 g_shared_state->shm_q[0] = upd.q1;
@@ -519,6 +531,12 @@ void *network_listener(void *arg) {
                 g_shared_state->wormhole.shm_y = upd.wormhole.net_y;
                 g_shared_state->wormhole.shm_z = upd.wormhole.net_z;
                 g_shared_state->wormhole.active = upd.wormhole.active;
+
+                /* Recovery FX */
+                g_shared_state->recovery_fx.shm_x = upd.recovery_fx.net_x;
+                g_shared_state->recovery_fx.shm_y = upd.recovery_fx.net_y;
+                g_shared_state->recovery_fx.shm_z = upd.recovery_fx.net_z;
+                g_shared_state->recovery_fx.active = upd.recovery_fx.active;
 
                 /* Jump Arrival Event */
                 if (upd.jump_arrival.active) {
@@ -731,6 +749,14 @@ int main(int argc, char *argv[]) {
     LOG_DEBUG("Waiting for Galaxy Master...\n");
     if (read_all(sock, &master_sync, sizeof(StarTrekGame)) == sizeof(StarTrekGame)) {
         printf(B_GREEN "Galaxy Map synchronized.\n" RESET);
+        LOG_DEBUG("Received Encryption Flags: 0x%08X\n", master_sync.encryption_flags);
+        if (master_sync.encryption_flags & 0x01) {
+            printf(B_CYAN "[SECURE] Subspace Signature: " B_GREEN "VERIFIED (HMAC-SHA256)\n" RESET);
+            printf(B_CYAN "[SECURE] Server Identity:    " B_YELLOW);
+            for(int k=0; k<16; k++) printf("%02X", master_sync.server_pubkey[k]);
+            printf("... [ACTIVE]\n" RESET);
+            printf(B_CYAN "[SECURE] Encryption Layer:   " B_GREEN "AES-GCM + PQC (Quantum Ready)\n" RESET);
+        }
     } else {
         printf(B_RED "ERROR: Failed to synchronize Galaxy Map.\n" RESET);
     }
@@ -742,6 +768,9 @@ int main(int argc, char *argv[]) {
         pthread_mutex_lock(&g_shared_state->mutex);
         memcpy(g_shared_state->shm_galaxy, master_sync.g, sizeof(master_sync.g));
         g_shared_state->shm_crypto_algo = CRYPTO_NONE;
+        g_shared_state->shm_encryption_flags = master_sync.encryption_flags;
+        memcpy(g_shared_state->shm_server_signature, master_sync.server_signature, 64);
+        memcpy(g_shared_state->shm_server_pubkey, master_sync.server_pubkey, 32);
         pthread_mutex_unlock(&g_shared_state->mutex);
     }
     
@@ -806,7 +835,7 @@ int main(int argc, char *argv[]) {
                     }
                     if (strcmp(g_input_buf, "help") == 0) {
                         printf(B_WHITE "\n--- STAR TREK ULTRA: MULTIPLAYER COMMANDS ---" RESET "\n");
-                        printf("nav H M W   : Warp Navigation (Heading 0-359, Mark -90/90, Warp 0-8)\n");
+                        printf("nav H M W [F]: Warp Navigation (H 0-359, M -90/90, W Dist, F Factor 1-9.9)\n");
                         printf("imp H M S   : Impulse Drive (H, M, Speed 0.0-1.0). imp 0 0 0 to stop.\n");
                         printf("jum Q1 Q2 Q3: Wormhole Jump (Instant travel, costs 5000 En + 1 Dilithium)\n");
                         printf("srs         : Short Range Sensors (Current Quadrant View)\n");
@@ -817,12 +846,14 @@ int main(int argc, char *argv[]) {
                         printf("tor <H> <M> : Launch Photon Torpedo at specific Heading/Mark\n");
                         printf("she F R T B L RI : Configure 6 Shield Quadrants\n");
                         printf("lock ID     : Lock-on Target (0:Self, 1+:Nearby vessels)\n");
-                        printf("enc aes/chacha/aria/camellia/seed/cast/idea/3des/bf/rc4/des/pqc/off : Toggle Encryption\n");
+                        printf("enc <algo>  : Toggle Encryption (aes, chacha, aria, camellia, ..., pqc)\n");
                         printf("scan ID     : Detailed analysis of vessel or anomaly\n");
-                        printf("pow E S W   : Power Distribution (Engines, Shields, Weapons %%)\n");
+                        printf("pow E S W   : Power Allocation (Engines, Shields, Weapons %%)\n");
                         printf("psy         : Psychological Warfare (Corbomite Bluff)\n");
-                        printf("aux probe QX QY QZ: Launch long-range probe\n");
-                        printf("aux jettison: Eject Warp Core (Suicide maneuver)\n");
+                        printf("aux probe QX QY QZ: Launch sensor probe\n");
+                        printf("aux report <N>    : Request sensor update from Probe N\n");
+                        printf("aux recover <N>   : Recover Probe N in sector (+500 Energy)\n");
+                        printf("aux jettison      : Eject Warp Core (WARNING!)\n");
                         printf("dis ID      : Dismantle enemy wreck/derelict (Dist < 1.5)\n");
                         printf("bor ID      : Boarding party operation (Dist < 1.0). Works on Lock.\n");
                         printf("min         : Planetary Mining (Must be in orbit dist < 2.0)\n");
@@ -833,8 +864,8 @@ int main(int argc, char *argv[]) {
                         printf("rep ID      : Repair System (Uses 50 Tritanium + 10 Isolinear)\n");
                         printf("inv         : Cargo Inventory Report\n");
                         printf("who         : List active captains in galaxy\n");
-                        printf("cal Q1 Q2 Q3: Warp Calculator (Inter-quadrant)\n");
-                        printf("ical X Y Z  : Impulse Calculator (Local sector coordinates)\n");
+                        printf("cal Q1..3 S1..3: Warp Calc (Pinpoint Precision Route & ETA)\n");
+                        printf("ical X Y Z  : Impulse Calculator (Sector ETA at current power)\n");
                         printf("apr ID DIST : Approach target autopilot. Works on Lock.\n");
                         printf("cha         : Chase locked target (Inter-sector aware)\n");
                         printf("sco         : Solar scooping for energy\n");

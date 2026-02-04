@@ -125,7 +125,7 @@ typedef struct {
     int32_t duranium_plating;
     float hull_integrity;
     int32_t shields[6];
-    int32_t inventory[8];
+    int32_t inventory[10];
     float system_health[10];
     float power_dist[3];
     float life_support;
@@ -140,6 +140,8 @@ typedef struct {
     NetPoint wormhole;
     NetPoint jump_arrival;
     NetDismantle dismantle;
+    NetPoint recovery_fx;
+    NetProbe probes[3];
     NetPoint supernova_pos; 
     int32_t supernova_q[3];
     int32_t beam_count;

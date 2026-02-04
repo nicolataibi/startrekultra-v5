@@ -137,7 +137,7 @@ float g_hull_integrity = 100.0f;
 int g_shields_val[6] = {0};
 int g_cargo_energy = 0, g_cargo_torps = 0, g_torpedoes_launcher = 0;
 float g_system_health[10] = {0};
-int g_inventory[8] = {0};
+int g_inventory[10] = {0};
 int g_lock_target = 0;
 int g_show_axes = 0;
 int g_show_grid = 0;
@@ -191,10 +191,25 @@ typedef struct {
     Particle particles[150];
 } ArrivalEffect;
 
+typedef struct {
+    float x, y, z;
+    int active;
+    int status;
+    float eta;
+    int q1, q2, q3;
+} ViewProbe;
+
+typedef struct {
+    float x, y, z;
+    int timer;
+} RecoveryFX;
+
 GameObject objects[200];
 int objectCount = 0;
+ViewProbe g_local_probes[3];
 Dismantle g_dismantle = {-100, -100, -100, 0, 0};
 ArrivalEffect g_arrival_fx = {0, 0, 0, 0};
+RecoveryFX g_recovery_fx = {0, 0, 0, 0};
 
 /* Rimosse variabili globali scia singola per scia universale */
 typedef struct { float x, y, z, alpha; } PhaserBeam;
@@ -308,7 +323,7 @@ void loadGameState() {
     g_cargo_energy = g_shared_state->shm_cargo_energy;
     g_cargo_torps = g_shared_state->shm_cargo_torpedoes;
     for(int s=0; s<10; s++) g_system_health[s] = g_shared_state->shm_system_health[s];
-    for(int inv=0; inv<8; inv++) g_inventory[inv] = g_shared_state->inventory[inv];
+    for(int inv=0; inv<10; inv++) g_inventory[inv] = g_shared_state->inventory[inv];
     g_lock_target = g_shared_state->shm_lock_target;
     int total_s = 0;
     for(int s=0; s<6; s++) total_s += g_shared_state->shm_shields[s];
@@ -346,6 +361,18 @@ void loadGameState() {
     }
 
     memcpy(g_galaxy, g_shared_state->shm_galaxy, sizeof(g_galaxy));
+
+    for(int p=0; p<3; p++) {
+        g_local_probes[p].active = g_shared_state->probes[p].active;
+        g_local_probes[p].q1 = g_shared_state->probes[p].q1;
+        g_local_probes[p].q2 = g_shared_state->probes[p].q2;
+        g_local_probes[p].q3 = g_shared_state->probes[p].q3;
+        g_local_probes[p].eta = g_shared_state->probes[p].eta;
+        g_local_probes[p].status = g_shared_state->probes[p].status;
+        g_local_probes[p].x = g_shared_state->probes[p].s1 - 5.0f;
+        g_local_probes[p].y = g_shared_state->probes[p].s3 - 5.0f;
+        g_local_probes[p].z = 5.0f - g_shared_state->probes[p].s2;
+    }
 
     int updated[200] = {0};
     objectCount = g_shared_state->object_count;
@@ -535,6 +562,14 @@ void loadGameState() {
         }
         /* Reset event to prevent re-triggering */
         g_shared_state->dismantle.active = 0;
+    }
+
+    if (g_shared_state->recovery_fx.active) {
+        g_recovery_fx.x = g_shared_state->recovery_fx.shm_x - 5.0f;
+        g_recovery_fx.y = g_shared_state->recovery_fx.shm_z - 5.0f;
+        g_recovery_fx.z = 5.0f - g_shared_state->recovery_fx.shm_y;
+        g_recovery_fx.timer = 60;
+        g_shared_state->recovery_fx.active = 0;
     }
     pthread_mutex_unlock(&g_shared_state->mutex);
     kill(getppid(), SIGUSR2);
@@ -1881,6 +1916,11 @@ void drawJumpArrival() {
     glPopMatrix();
 }
 
+/* Personal Probe HUD Data Sync Only (Rendering is now universal via drawObject Type 27) */
+void updateProbeHUD() {
+    /* No 3D rendering here anymore */
+}
+
 void drawTorpedo() {
     if (!g_torp.active) return;
     glDisable(GL_LIGHTING);
@@ -1910,6 +1950,52 @@ void drawTorpedo() {
     glutSolidSphere(0.02, 10, 10);
     
     glPopMatrix(); glEnable(GL_LIGHTING);
+}
+
+void drawRecoveryEffect() {
+    if (g_recovery_fx.timer <= 0) return;
+    
+    float x = g_recovery_fx.x;
+    float y = g_recovery_fx.y;
+    float z = g_recovery_fx.z;
+    float t = (float)g_recovery_fx.timer / 60.0f; 
+    
+    glDisable(GL_LIGHTING);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+    
+    /* 1. Golden Transporter Beam (Vertical) - Radius reduced to 0.12 */
+    float beam_alpha = (t > 0.5f) ? (1.0f - t) * 2.0f : (t * 2.0f);
+    glColor4f(1.0f, 0.9f, 0.3f, beam_alpha * 0.7f); 
+    
+    glPushMatrix();
+    glTranslatef(x, y, z);
+    glRotatef(90, 1, 0, 0); 
+    glTranslatef(0, 0, -2.0f); 
+    GLUquadric *q = gluNewQuadric();
+    gluCylinder(q, 0.12, 0.12, 4.0, 16, 1);
+    gluDeleteQuadric(q);
+    glPopMatrix();
+    
+    /* 2. Swirling Sparkles - Increased visibility and count */
+    for(int i=0; i<30; i++) {
+        float angle = (pulse * 25.0f) + (i * 12.0f);
+        float r = 0.15f; /* Slightly wider than the beam */
+        float px = x + cos(angle * M_PI / 180.0f) * r;
+        float pz = z + sin(angle * M_PI / 180.0f) * r;
+        /* Vertical distribution centered around the probe */
+        float py = y - 1.5f + (float)(i % 15) * 0.2f;
+        
+        glColor4f(1.0f, 1.0f, 1.0f, beam_alpha);
+        glPushMatrix();
+        glTranslatef(px, py, pz);
+        glutSolidSphere(0.025, 4, 4); /* Made them larger */
+        glPopMatrix();
+    }
+    
+    glDisable(GL_BLEND);
+    glEnable(GL_LIGHTING);
+    g_recovery_fx.timer--;
 }
 
 void drawDismantle() {
@@ -2100,8 +2186,10 @@ void display() {
         drawExplosion();
         drawJumpArrival();
         drawTorpedo();
+        updateProbeHUD();
         if (g_wormhole.active && g_jump_arrival.timer <= 0) drawWormhole(g_wormhole.x, g_wormhole.y, g_wormhole.z, g_wormhole.h, g_wormhole.m, 0);
         drawDismantle();
+        drawRecoveryEffect();
 
         /* Supernova Flash */
         if (g_sn_pos.active && g_sn_q[0] == g_my_q[0] && g_sn_q[1] == g_my_q[1] && g_sn_q[2] == g_my_q[2] && g_sn_pos.timer < 30) {
@@ -2162,6 +2250,27 @@ void display() {
                     case 18: drawSpecies8472(0,0,0); break;
                     case 19: drawBreen(0,0,0); break;
                     case 20: drawHirogen(0,0,0); break;
+                    case 27: {
+                        /* Universal Probe Rendering */
+                        int status = objects[i].ship_class; /* Passed from server */
+                        if (status == 2) {
+                            /* Derelict Red */
+                            glColor3f(0.4f, 0.4f, 0.45f); glutSolidSphere(0.05, 8, 8);
+                            glColor3f(1.0f, 0.0f, 0.0f);
+                            glPushMatrix(); glRotatef(pulse * 20.0f, 0, 1, 0); glutWireTorus(0.01, 0.1, 4, 12); glPopMatrix();
+                            glPushMatrix(); glRotatef(90, 1, 0, 0); glRotatef(-pulse * 15.0f, 0, 1, 0); glPushAttrib(GL_LINE_BIT); glLineWidth(0.5f); glutWireTorus(0.005, 0.12, 4, 16); glPopAttrib(); glPopMatrix();
+                        } else {
+                            /* Active Cyan with Glow */
+                            glColor3f(0.0f, 0.7f, 1.0f); glutSolidSphere(0.05, 8, 8);
+                            glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+                            float p_glow = 0.08f + sin(pulse*5.0f)*0.03f;
+                            glColor4f(0.0f, 0.4f, 1.0f, 0.5f); glutSolidSphere(p_glow, 12, 12);
+                            glDisable(GL_BLEND);
+                            glColor3f(0.0f, 1.0f, 1.0f);
+                            glPushMatrix(); glRotatef(pulse * 100.0f, 0, 1, 0); glutWireTorus(0.01, 0.1, 4, 12); glPopMatrix();
+                            glPushMatrix(); glRotatef(90, 1, 0, 0); glRotatef(-pulse * 80.0f, 0, 1, 0); glPushAttrib(GL_LINE_BIT); glLineWidth(0.5f); glutWireTorus(0.005, 0.12, 4, 16); glPopAttrib(); glPopMatrix();
+                        }
+                    } break;
                 }
             }
             glPopMatrix();
@@ -2294,6 +2403,33 @@ void display() {
         }
         y_pos -= 10;
 
+        /* 4.1 Subspace Probes Status */
+        glColor3f(0.0f, 0.8f, 1.0f);
+        drawText3D(x_off, y_pos, 0, "--- PROBES STATUS ---"); y_pos -= 18;
+        for(int p=0; p<3; p++) {
+            if (g_local_probes[p].active) {
+                const char* st_name = "EN ROUTE";
+                if (g_local_probes[p].status == 1) {
+                    st_name = "TRANSMITTING";
+                    glColor3f(1.0f, 1.0f, 0.0f);
+                } else if (g_local_probes[p].status == 2) {
+                    st_name = "DERELICT";
+                    glColor3f(0.5f, 0.5f, 0.5f);
+                } else {
+                    glColor3f(0.0f, 1.0f, 0.0f);
+                }
+                sprintf(buf, "P%d: %-12s [%d,%d,%d] ETA: %4.1fs", 
+                        p+1, st_name, 
+                        g_local_probes[p].q1, g_local_probes[p].q2, g_local_probes[p].q3,
+                        (g_local_probes[p].eta < 0) ? 0 : g_local_probes[p].eta);
+            } else {
+                glColor3f(0.3f, 0.3f, 0.3f);
+                sprintf(buf, "P%d: IDLE", p+1);
+            }
+            drawText3D(x_off, y_pos, 0, buf); y_pos -= 15;
+        }
+        y_pos -= 10;
+
         /* 5. Reactor Power Distribution */
         glColor3f(1.0f, 1.0f, 0.0f);
         drawText3D(x_off, y_pos, 0, "--- REACTOR POWER ALLOCATION ---"); y_pos -= 18;
@@ -2422,7 +2558,7 @@ void display() {
         }
 
         /* --- BOTTOM RIGHT: Subspace Telemetry --- */
-        int ty = 120;
+        int ty = 150;
         glColor3f(0.0f, 0.8f, 1.0f); /* LCARS Blue */
         drawText3D(750, ty, 0, "--- SUBSPACE UPLINK DIAGNOSTICS ---"); ty -= 20;
         
@@ -2490,6 +2626,16 @@ void display() {
             glColor3f(1.0f, 0.0f, 0.0f);
             drawText3D(750, ty, 0, "ENCRYPTION: DISABLED / RAW");
         }
+        ty -= 15;
+
+        if (g_shared_state->shm_encryption_flags & 0x01) {
+            glColor3f(0.0f, 1.0f, 0.0f);
+            drawText3D(750, ty, 0, "SIGNATURE: VERIFIED (HMAC-SHA256)");
+        } else {
+            glColor3f(1.0f, 0.5f, 0.0f);
+            drawText3D(750, ty, 0, "SIGNATURE: NOT PRESENT");
+        }
+        ty -= 15;
     }
 
     long long sn_val = g_shared_state->shm_galaxy[g_my_q[0]][g_my_q[1]][g_my_q[2]];

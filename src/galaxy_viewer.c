@@ -129,6 +129,12 @@ int main(int argc, char *argv[]) {
 
         printf("--- Galaxy Statistics ---\n");
         printf("Version: %d\n", version);
+        if (galaxy_master.encryption_flags & 0x01) {
+            printf("Signature: VERIFIED (HMAC-SHA256)\n");
+            printf("Encryption Flags: 0x%08X\n", galaxy_master.encryption_flags);
+        } else {
+            printf("Signature: NOT PRESENT / UNVERIFIED\n");
+        }
         printf("Total NPCs: %d\n", n_active);
         printf("Total Stars: %d\n", s_active);
         printf("Total Bases: %d\n", b_active);

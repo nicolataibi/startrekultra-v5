@@ -44,8 +44,8 @@ make
 Il ponte di comando di Star Trek Ultra opera tramite un'interfaccia a riga di comando (CLI) ad alta precisione. Oltre ai comandi di navigazione e combattimento, il simulatore implementa un sofisticato sistema di **Guerra Elettronica** basato su crittografia reale.
 
 #### 🛰️ Comandi di Navigazione Avanzata e Utility
-*   `cal <Q1> <Q2> <Q3>`: **Warp Calculator**. Calcola istantaneamente il vettore (Heading/Mark) e la distanza necessaria per raggiungere un quadrante specifico della galassia. Essenziale per pianificare salti a lungo raggio senza errori di calcolo.
-*   `ical <X> <Y> <Z>`: **Impulse Calculator**. Fornisce la soluzione di navigazione per coordinate di settore precise [0.0 - 10.0]. Utilizzalo per manovre di precisione attorno a stazioni o pianeti.
+*   `cal <Q1> <Q2> <Q3>`: **Warp Calculator**. Calcola istantaneamente il vettore (Heading/Mark), la distanza e fornisce una **Tabella del Profilo Warp** con i tempi di arrivo stimati.
+*   `ical <X> <Y> <Z>`: **Impulse Calculator**. Fornisce la soluzione di navigazione completa per coordinate di settore precise [0.0 - 10.0], incluso il tempo di percorrenza in base all'attuale potenza dei motori.
 *   `who`: **Captains Registry**. Elenca tutti i comandanti attualmente attivi nella galassia, i loro ID di tracciamento e la posizione attuale. Fondamentale per identificare alleati o potenziali predatori prima di entrare in un settore.
 *   `sta`: **Status Report**. Diagnostica completa dei sistemi, inclusi i livelli di energia, integrità hardware e ripartizione della potenza.
 *   `hull`: **Duranium Reinforcement**. Se possiedi **100 unità di Duranio** in stiva, questo comando applica una placcatura rinforzata allo scafo (+500 HP di scudo fisico), visibile in oro nell'HUD.
@@ -343,15 +343,18 @@ L'universo di Star Trek Ultra è un ecosistema dinamico popolato da 17 classi di
 Di seguito la lista completa dei comandi disponibili, raggruppati per funzione.
 
 ### 🚀 Navigazione
-*   `nav <H> <M> <W>`: **Warp Navigation**. Imposta rotta e velocità di curvatura.
+*   `nav <H> <M> <Dist> [Fattore]`: **Navigazione Warp ad Alta Precisione**. Imposta rotta, distanza precisa e velocità opzionale.
     *   `H`: Heading (0-359).
     *   `M`: Mark (-90 a +90).
-    *   `W`: Warp Factor (0-8).
-*   `imp <H> <M> <S>`: **Impulse Drive**. Motori sub-luce. `S` rappresenta la velocità da 0.0 a 1.0 (Full Impulse). A massima potenza (1.0), la nave percorre 1.5 unità di settore al secondo, attraversando un intero quadrante in circa 6.6 secondi.
+    *   `Dist`: Distanza in Quadranti (supporta decimali, es. `1.73`).
+    *   `Fattore`: (Opzionale) Fattore Warp da 1.0 a 9.9 (Default: 6.0).
+*   `imp <H> <M> <S>`: **Impulse Drive**. Motori sub-luce. `S` rappresenta la velocità da 0.0 a 1.0 (Full Impulse).
     *   `S`: Speed (0.0 - 1.0).
     *   `imp 0 0 0`: Arresto motori (All Stop).
-    *   `cal <QX> <QY> <QZ>`: **Warp Calculator**. Calcola H, M, W per raggiungere un quadrante distante.
-    *   `ical <X> <Y> <Z>`: **Impulse Calculator**. Calcola H, M e Distanza per raggiungere coordinate precise (0.0-10.0) all'interno del quadrante attuale. Fondamentale per l'estrazione mineraria e l'attracco.
+*   `cal <QX> <QY> <QZ> [SX SY SZ]`: **Computer di Navigazione (Alta Precisione)**. Calcola il vettore esatto e la distanza dalla posizione attuale verso la destinazione specificata (Quadrante + Settore opzionale). Include una **Tabella del Profilo Warp** con ETA sincronizzati.
+*   `ical <X> <Y> <Z>`: **Impulse Calculator (ETA)**. Fornisce la soluzione di navigazione completa per coordinate di settore precise [0.0 - 10.0], incluso il tempo di percorrenza in tempo reale.
+Line 353: *   `cal <QX> <QY> <QZ>`: **Warp Calculator**. Calcola H, M e tempo di arrivo stimato per raggiungere un quadrante distante.
+    
     *   `jum <QX> <QY> <QZ>`: **Wormhole Jump (Einstein-Rosen Bridge)**.
      Genera un wormhole per un salto istantaneo verso il quadrante di destinazione.
     *   **Requisiti**: 5000 unità di Energia e 1 Cristallo di Dilithio.
@@ -378,7 +381,15 @@ Di seguito la lista completa dei comandi disponibili, raggruppati per funzione.
     *   **Legenda Primaria**: `[ H P N B S ]` (Buchi Neri, Pianeti, Navi, Basi, Stelle).
     *   **Simbologia Anomalie**: `~`:Nebulosa, `*`:Pulsar, `+`:Cometa, `#`:Asteroide, `M`:Mostro, `>`:Rift.
     *   **Localizzazione**: Il proprio quadrante è evidenziato da uno sfondo blu.
-*   `aux probe <QX> <QY> <QZ>`: Lancia una sonda a lungo raggio verso un quadrante specifico.
+*   `aux probe <QX> <QY> <QZ>`: **Sonda Sensore Subspaziale**. Lancia una sonda automatizzata verso un quadrante specifico.
+    *   **Entità Galattica**: Le sonde sono oggetti globali. Attraversano i quadranti in tempo reale e sono **visibili a tutti i giocatori** lungo la rotta.
+    *   **Integrazione Sensori**: Le sonde appaiono nella lista **SRS (Short Range Sensors)** di chiunque si trovi nello stesso settore (ID range 19000+), rivelando il **Nome del Proprietario** e lo stato attuale.
+    *   **Funzionamento**: Visualizza l'**ETA** e lo stato della missione nell'HUD del proprietario.
+    *   **Recupero Dati**: All'arrivo, rivela la composizione del quadrante (`H P N B S`) nella mappa e invia un rapporto telemetrico.
+    *   **Persistenza**: Rimane nel quadrante bersaglio come **Relitto (Derelict)** (anelli rossi) a fine missione.
+    *   **Comando `aux report <1-3>`**: Interroga nuovamente una sonda attiva per ricevere un rapporto aggiornato.
+    *   **Comando `aux recover <1-3>`**: Recupera una sonda se la nave si trova nello stesso quadrante e a distanza ravvicinata (< 2.0 unità), liberando lo slot e recuperando 500 unità di energia.
+Line 385:     *   **Persistenza**: Dopo aver completato la missione, la sonda rimane nel quadrante bersaglio come **Relitto (Derelict)**, visibile in 3D come un oggetto grigio e inattivo.
 *   `sta`: **Status Report**. Rapporto completo stato nave, missione e monitoraggio dell'**Equipaggio**.
 *   `dam`: **Damage Report**. Dettaglio danni ai sistemi.
 *   `who`: Lista dei capitani attivi nella galassia.
@@ -415,6 +426,7 @@ Per interagire con gli oggetti della galassia tramite i comandi `lock`, `scan`, 
 | **Piattaforme** | 16.000 - 16.999| `lock 16000` | Distruzione sentinelle ostili |
 | **Rift Spaziali** | 17.000 - 17.999| `lock 17000` | Utilizzo per salti casuali |
 | **Mostri** | 18.000 - 18.999| `lock 18000` | Combattimento estremo |
+| **Sonde** | 19.000 - 19.999| `scan 19000` | Raccolta dati automatizzata |
 
 **Nota**: Il lock funziona solo se l'oggetto è nel tuo quadrante attuale. Se l'ID esiste ma è lontano, il computer indicherà le coordinate `Q[x,y,z]` del bersaglio.
 
@@ -968,6 +980,7 @@ La visualizzazione tattica è gestita da un motore OpenGL moderno che combina te
     *   **Identificazione IFF**: Visualizza la fazione del bersaglio (Federazione, Klingon, Romulani, etc.) con allerta codificata per colore.
     *   **Tracciamento Movimento**: Visualizzazione in tempo reale di Heading e Mark del bersaglio per prevedere manovre evasive.
     *   **Telemetria Dinamica**: Calcolo continuo della distanza per la gestione ottimale del raggio d'azione delle armi.
+    *   **Tracciamento Sonde Subspaziali**: Un pannello dedicato **PROBES STATUS** monitora le sonde attive, mostrando la fase della missione (In Viaggio / Trasmissione), le coordinate bersaglio e il tempo rimanente (ETA).
 
 ### 📦 Tecnologie e Requisiti di Sistema
 Per compilare il progetto, è necessario un ambiente di sviluppo Unix-like (preferibilmente Linux) con i seguenti requisiti:

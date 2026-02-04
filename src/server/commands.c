@@ -106,8 +106,12 @@ void handle_pow(int i, const char *params) {
 }
 
 void handle_nav(int i, const char *params) {
-    double h, m, w; 
-    if (sscanf(params, "%lf %lf %lf", &h, &m, &w) == 3) {
+    double h, m, w, factor = 6.0; /* Default Warp 6 */
+    int args = sscanf(params, "%lf %lf %lf %lf", &h, &m, &w, &factor);
+    if (args >= 3) {
+        if (factor < 1.0) factor = 1.0;
+        if (factor > 9.9) factor = 9.9;
+        
         normalize_upright(&h, &m);
         players[i].target_h = h; players[i].target_m = m;
         players[i].start_h = players[i].state.ent_h; players[i].start_m = players[i].state.ent_m;
@@ -116,6 +120,9 @@ void handle_nav(int i, const char *params) {
         players[i].target_gx = (players[i].state.q1-1)*10.0+players[i].state.s1+players[i].dx*w*10.0;
         players[i].target_gy = (players[i].state.q2-1)*10.0+players[i].state.s2+players[i].dy*w*10.0;
         players[i].target_gz = (players[i].state.q3-1)*10.0+players[i].state.s3+players[i].dz*w*10.0;
+        
+        /* Store warp factor in warp_speed temporarily to pass it to logic.c */
+        players[i].warp_speed = factor; 
         players[i].nav_state = NAV_STATE_ALIGN; 
         
         double dh = players[i].target_h - players[i].state.ent_h;
@@ -124,9 +131,11 @@ void handle_nav(int i, const char *params) {
         if(fabs(dh)<1.0 && fabs(players[i].target_m - players[i].state.ent_m)<1.0) players[i].nav_timer=10;
         else players[i].nav_timer = 60;
         
-        send_server_msg(i, "HELMSMAN", "Course plotted. Aligning ship.");
+        char msg[128];
+        sprintf(msg, "Course plotted. Aligning ship for Warp %.1f.", factor);
+        send_server_msg(i, "HELMSMAN", msg);
     } else {
-        send_server_msg(i, "COMPUTER", "Usage: nav <H> <M> <W>");
+        send_server_msg(i, "COMPUTER", "Usage: nav <H> <M> <W> [Factor]");
     }
 }
 
@@ -455,6 +464,32 @@ void handle_srs(int i, const char *params) {
         int moid = mo->id+18000;
         char status[64] = ""; if (moid == locked_id) strcat(status, RED "[LOCKED]" RESET);
         SAFE_APPEND(b, LARGE_DATA_BUFFER, "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     %s %s\n", "Monster", moid, mo->x, mo->y, mo->z, d, h, m, (mo->type==30)?"Crystalline Entity":"Space Amoeba", status);
+    }
+
+    /* 12. Subspace Probes (Global) */
+    for (int p_j = 0; p_j < MAX_CLIENTS; p_j++) {
+        if (!players[p_j].socket) continue;
+        for (int pr = 0; pr < 3; pr++) {
+            if (players[p_j].state.probes[pr].active) {
+                int pr_q1 = get_q_from_g(players[p_j].state.probes[pr].gx);
+                int pr_q2 = get_q_from_g(players[p_j].state.probes[pr].gy);
+                int pr_q3 = get_q_from_g(players[p_j].state.probes[pr].gz);
+                
+                if (pr_q1 == q1 && pr_q2 == q2 && pr_q3 == q3) {
+                    float ps1 = players[p_j].state.probes[pr].s1;
+                    float ps2 = players[p_j].state.probes[pr].s2;
+                    float ps3 = players[p_j].state.probes[pr].s3;
+                    double dx = ps1 - s1, dy = ps2 - s2, dz = ps3 - s3;
+                    double d = sqrt(dx*dx + dy*dy + dz*dz);
+                    double h = atan2(dx,-dy)*180/M_PI; if(h<0)h+=360;
+                    double m = (d > 0.001) ? asin(dz/d)*180/M_PI : 0;
+                    int prid = 19000 + (p_j * 3) + pr;
+                    const char *st = (players[p_j].state.probes[pr].status == 2) ? RED "DERELICT" RESET : CYAN "ACTIVE" RESET;
+                    char status[64] = ""; if (prid == locked_id) strcat(status, RED "[LOCKED]" RESET);
+                    SAFE_APPEND(b, LARGE_DATA_BUFFER, "%-10s %-5d [%.1f,%.1f,%.1f] %-5.1f %03.0f / %+03.0f     Subspace Probe (%s) %s %s\n", "Probe", prid, ps1, ps2, ps3, d, h, m, players[p_j].name, st, status);
+                }
+            }
+        }
     }
 
     /* 12. Derelicts */
@@ -961,7 +996,7 @@ void handle_bor(int i, const char *params) {
                             char m[128]; sprintf(m, "Success! Recovered %d survivors from the wreck.", found_people);
                             send_server_msg(i, "BOARDING", m);
                         } else { /* Enemy NPC */
-                            players[i].state.inventory[7] += found_people;
+                            players[i].state.inventory[8] += found_people;
                             char m[128]; sprintf(m, "Success! Captured %d enemy prisoners. Return them to Starbase for debrief.", found_people);
                             send_server_msg(i, "SECURITY", m);
                         }
@@ -1226,15 +1261,60 @@ void handle_dam(int i, const char *params) {
 }
 
 void handle_cal(int i, const char *params) {
-    int qx,qy,qz; 
-    if(sscanf(params,"%d %d %d",&qx,&qy,&qz)==3) {
-        double dx=(qx-players[i].state.q1)*10.0;
-        double dy=(qy-players[i].state.q2)*10.0;
-        double dz=(qz-players[i].state.q3)*10.0;
-        double d=sqrt(dx*dx+dy*dy+dz*dz);
-        double h=atan2(dx,-dy)*180/M_PI; if(h<0)h+=360; double m=asin(dz/d)*180/M_PI;
-        char buf[256]; sprintf(buf, "Navigation Solution: Heading %.1f, Mark %+.1f, Distance %.2f units.", h, m, d/10.0);
+    int qx, qy, qz; 
+    float sx = 5.0f, sy = 5.0f, sz = 5.0f;
+    int args = sscanf(params, "%d %d %d %f %f %f", &qx, &qy, &qz, &sx, &sy, &sz);
+    
+    if (args >= 3) {
+        if (!IS_Q_VALID(qx, qy, qz)) {
+            send_server_msg(i, "COMPUTER", "Invalid quadrant coordinates.");
+            return;
+        }
+
+        /* High-Precision: Calculate distance from current absolute position to specific target */
+        double target_gx = (qx - 1) * 10.0 + sx;
+        double target_gy = (qy - 1) * 10.0 + sy;
+        double target_gz = (qz - 1) * 10.0 + sz;
+        
+        double dx = target_gx - players[i].gx;
+        double dy = target_gy - players[i].gy;
+        double dz = target_gz - players[i].gz;
+        double d = sqrt(dx*dx + dy*dy + dz*dz);
+        
+        if (d < 0.001) {
+            send_server_msg(i, "COMPUTER", "Target matches current position.");
+            return;
+        }
+        
+        double h = atan2(dx, -dy) * 180.0 / M_PI; if (h < 0) h += 360;
+        double m = asin(dz / d) * 180.0 / M_PI;
+        double q_dist = d / 10.0;
+        
+        char buf[1024]; 
+        sprintf(buf, "\n" CYAN ".--- NAVIGATIONAL COMPUTATION: PINPOINT PRECISION --." RESET "\n"
+                     " DESTINATION:  " WHITE "Q[%d,%d,%d] Sector [%.1f,%.1f,%.1f]" RESET "\n"
+                     " BEARING:      " GREEN "Heading %.1f, Mark %+.1f" RESET "\n"
+                     " DISTANCE:     " YELLOW "%.2f Quadrants" RESET "\n\n"
+                     WHITE " WARP FACTOR   EST. TIME      NOTES" RESET "\n"
+                     " -----------   ---------      -----------------\n"
+                     " Warp 1.0      %6.1fs      Minimum Warp\n"
+                     " Warp 3.0      %6.1fs      Economic\n"
+                     " Warp 6.0      %6.1fs      Standard Cruise\n"
+                     " Warp 8.0      %6.1fs      High Pursuit\n"
+                     " Warp 9.0      %6.1fs      Maximum Warp\n"
+                     "-------------------------------------------------\n"
+                     " Use 'nav %.1f %.1f %.2f [Factor]'", 
+                     qx, qy, qz, sx, sy, sz, h, m, q_dist,
+                     q_dist * (10.0 / pow(1.0, 0.8)),
+                     q_dist * (10.0 / pow(3.0, 0.8)),
+                     q_dist * (10.0 / pow(6.0, 0.8)),
+                     q_dist * (10.0 / pow(8.0, 0.8)),
+                     q_dist * (10.0 / pow(9.0, 0.8)),
+                     h, m, q_dist
+        );
         send_server_msg(i, "COMPUTER", buf);
+    } else {
+        send_server_msg(i, "COMPUTER", "Usage: cal <QX> <QY> <QZ> [SX SY SZ]");
     }
 }
 
@@ -1248,14 +1328,181 @@ void handle_who(int i, const char *params) {
 }
 
 void handle_aux(int i, const char *params) {
-    if(strcmp(params, " jettison") == 0) {
+    const char *p_ptr = params;
+    while(*p_ptr && (*p_ptr == ' ' || *p_ptr == '\t')) p_ptr++;
+    
+    if(strncmp(p_ptr, "jettison", 8) == 0) {
         send_server_msg(i, "ENGINEERING", "WARP CORE EJECTED! MASSIVE ENERGY DISCHARGE DETECTED!");
         players[i].state.energy = 0; players[i].active = 0;
         players[i].state.boom = (NetPoint){(float)players[i].state.s1, (float)players[i].state.s2, (float)players[i].state.s3, 1};
-    } else if(strncmp(params, " probe", 6) == 0) {
-        send_server_msg(i, "SCIENCE", "Long-range probe launched. Sensors scanning distant sectors...");
-        /* Implementation note: In this version, probe provides a simulated success message.
-           Full quadrant data for the target would require a persistent probe entity. */
+    } else if(strncmp(p_ptr, "probe", 5) == 0) {
+        int qx, qy, qz;
+        const char *args = p_ptr + 5;
+        if (sscanf(args, "%d %d %d", &qx, &qy, &qz) == 3) {
+            if (!IS_Q_VALID(qx, qy, qz)) {
+                send_server_msg(i, "COMPUTER", "Invalid quadrant coordinates.");
+                return;
+            }
+            
+            /* Find free probe slot */
+            int p_idx = -1;
+            for(int p=0; p<3; p++) {
+                if(!players[i].state.probes[p].active) {
+                    p_idx = p;
+                    break;
+                }
+            }
+            
+            if(p_idx == -1) {
+                send_server_msg(i, "COMPUTER", "All 3 probe slots are currently active.");
+                return;
+            }
+            
+            /* Launch probe */
+            players[i].state.probes[p_idx].active = 1;
+            players[i].state.probes[p_idx].q1 = qx;
+            players[i].state.probes[p_idx].q2 = qy;
+            players[i].state.probes[p_idx].q3 = qz;
+            
+            /* Absolute Galactic Start Position (Ship position) */
+            players[i].state.probes[p_idx].gx = (float)players[i].gx;
+            players[i].state.probes[p_idx].gy = (float)players[i].gy;
+            players[i].state.probes[p_idx].gz = (float)players[i].gz;
+            
+            /* Target Galactic Position (Center of target quadrant) */
+            float target_gx = (float)(qx - 1) * 10.0f + 5.0f;
+            float target_gy = (float)(qy - 1) * 10.0f + 5.0f;
+            float target_gz = (float)(qz - 1) * 10.0f + 5.0f;
+            
+            /* Calculate ETA and Velocity Vector */
+            float dx = target_gx - players[i].state.probes[p_idx].gx;
+            float dy = target_gy - players[i].state.probes[p_idx].gy;
+            float dz = target_gz - players[i].state.probes[p_idx].gz;
+            float dist_gal = sqrtf(dx*dx + dy*dy + dz*dz);
+            
+            /* Speed: 1 quadrant per 3 seconds (0.33 units/tick galactically) */
+            float time_total = dist_gal / 3.33f; 
+            if (time_total < 1.0f) time_total = 1.0f;
+            
+            players[i].state.probes[p_idx].vx = dx / (time_total * 30.0f);
+            players[i].state.probes[p_idx].vy = dy / (time_total * 30.0f);
+            players[i].state.probes[p_idx].vz = dz / (time_total * 30.0f);
+            
+            players[i].state.probes[p_idx].eta = time_total;
+            players[i].state.probes[p_idx].status = 0; /* LAUNCHED */
+            
+            /* Initial local sector position */
+            players[i].state.probes[p_idx].s1 = (float)players[i].state.s1;
+            players[i].state.probes[p_idx].s2 = (float)players[i].state.s2;
+            players[i].state.probes[p_idx].s3 = (float)players[i].state.s3;
+            
+            char msg[128];
+            sprintf(msg, "Subspace probe launched to [%d,%d,%d]. ETA: %.1f sec.", qx, qy, qz, players[i].state.probes[p_idx].eta);
+            send_server_msg(i, "SCIENCE", msg);
+        } else {
+            send_server_msg(i, "COMPUTER", "Usage: aux probe <QX> <QY> <QZ>");
+        }
+    } else if(strncmp(p_ptr, "report", 6) == 0) {
+        int p_idx;
+        if (sscanf(p_ptr + 6, "%d", &p_idx) == 1) {
+            p_idx--; /* 1-based to 0-based */
+            if (p_idx < 0 || p_idx >= 3 || !players[i].state.probes[p_idx].active) {
+                send_server_msg(i, "COMPUTER", "Specified probe is not active.");
+                return;
+            }
+            
+            if (players[i].state.probes[p_idx].status == 0) {
+                send_server_msg(i, "SCIENCE", "Probe is still en route. No data available yet.");
+                return;
+            }
+
+            int pq1 = players[i].state.probes[p_idx].q1;
+            int pq2 = players[i].state.probes[p_idx].q2;
+            int pq3 = players[i].state.probes[p_idx].q3;
+            
+            /* Real-time Query via Live Spatial Index */
+            QuadrantIndex *lq = &spatial_index[pq1][pq2][pq3];
+            
+            char msg[1024];
+            sprintf(msg, "\n" CYAN ".--- PROBE P%d: REAL-TIME DEEP SPACE TELEMETRY ---." RESET "\n"
+                         " QUADRANT: " WHITE "[%d, %d, %d]" RESET " | SECTOR: " YELLOW "[%.1f, %.1f, %.1f]" RESET "\n"
+                         "-------------------------------------------------\n"
+                         " 🚀 PLAYERS:   %d    ⚔️  HOSTILES:  %d\n"
+                         " 🛰️  STARBASES: %d    🌟 STARS:      %d\n"
+                         " 🪐 PLANETS:   %d    🕳️  BLACK HOLES:%d\n"
+                         " 🌫️  NEBULAS:   %d    ⚛️  PULSARS:    %d\n"
+                         " ☄️  COMETS:    %d    🪨  ASTEROIDS:  %d\n"
+                         " 🏗️  PLATFORMS: %d    🏚️  DERELICTS:  %d\n"
+                         " 📡 COMM BUOYS:%d    🌀 RIFTS:      %d\n"
+                         " ⚓ MINES:      %d    👾 MONSTERS:   %d\n"
+                         "-------------------------------------------------", 
+                         p_idx+1, pq1, pq2, pq3, 
+                         players[i].state.probes[p_idx].s1, 
+                         players[i].state.probes[p_idx].s2, 
+                         players[i].state.probes[p_idx].s3,
+                         lq->player_count, lq->npc_count,
+                         lq->base_count, lq->star_count,
+                         lq->planet_count, lq->bh_count,
+                         lq->nebula_count, lq->pulsar_count,
+                         lq->comet_count, lq->asteroid_count,
+                         lq->platform_count, lq->derelict_count,
+                         lq->buoy_count, lq->rift_count,
+                         lq->mine_count, lq->monster_count);
+            send_server_msg(i, "SCIENCE", msg);
+        } else {
+            send_server_msg(i, "COMPUTER", "Usage: aux report <1-3>");
+        }
+    } else if(strncmp(p_ptr, "recover", 7) == 0) {
+        int p_idx;
+        if (sscanf(p_ptr + 7, "%d", &p_idx) == 1) {
+            p_idx--; 
+            if (p_idx < 0 || p_idx >= 3 || !players[i].state.probes[p_idx].active) {
+                send_server_msg(i, "COMPUTER", "Specified probe is not active.");
+                return;
+            }
+
+            int pq1 = players[i].state.probes[p_idx].q1;
+            int pq2 = players[i].state.probes[p_idx].q2;
+            int pq3 = players[i].state.probes[p_idx].q3;
+
+            if (pq1 != players[i].state.q1 || pq2 != players[i].state.q2 || pq3 != players[i].state.q3) {
+                send_server_msg(i, "COMPUTER", "Probe is in a different quadrant. You must be in the same quadrant to recover it.");
+                return;
+            }
+
+            float dx = players[i].state.probes[p_idx].s1 - (float)players[i].state.s1;
+            float dy = players[i].state.probes[p_idx].s2 - (float)players[i].state.s2;
+            float dz = players[i].state.probes[p_idx].s3 - (float)players[i].state.s3;
+            float dist = sqrtf(dx*dx + dy*dy + dz*dz);
+
+            if (dist > 2.0f) {
+                send_server_msg(i, "COMPUTER", "Probe is too far for recovery (Distance > 2.0).");
+                return;
+            }
+
+            /* Trigger Visual FX (set timer for sync) */
+            players[i].state.recovery_fx = (NetPoint){
+                players[i].state.probes[p_idx].s1,
+                players[i].state.probes[p_idx].s2,
+                players[i].state.probes[p_idx].s3,
+                10 /* Active for 10 ticks to ensure sync */
+            };
+
+            players[i].state.probes[p_idx].active = 0;
+            players[i].state.energy += 500;
+            if (players[i].state.energy > 9999999) players[i].state.energy = 9999999;
+            
+            send_server_msg(i, "ENGINEERING", "Probe recovered. 500 Energy units salvaged and slot freed.");
+        } else {
+            send_server_msg(i, "COMPUTER", "Usage: aux recover <1-3>");
+        }
+    } else {
+        /* No valid sub-command or empty 'aux' */
+        send_server_msg(i, "COMPUTER", "AUXILIARY SYSTEMS:\n"
+                                       " aux probe <QX> <QY> <QZ> : Launch sensor probe\n"
+                                       " aux report <1-3>         : Get data from probe\n"
+                                       " aux recover <1-3>        : Recover probe in sector\n"
+                                       " aux jettison             : Eject Warp Core (WARNING!)");
     }
 }
 
@@ -1337,8 +1584,22 @@ void handle_ical(int i, const char *params) {
         }
         double h = atan2(dx, -dy) * 180.0 / M_PI; if (h < 0) h += 360;
         double m = (d > 0.001) ? asin(dz / d) * 180.0 / M_PI : 0;
-        char buf[256];
-        sprintf(buf, "Impulse Navigation Solution: Heading %.1f, Mark %+.1f, Distance %.2f sector units.", h, m, d);
+        
+        float engine_mult = 8.0f + (players[i].state.power_dist[0] * 17.0f);
+        /* Base speed for 100% impulse is 0.5 units/tick. 
+           Actual speed = 0.5 * engine_mult units/tick.
+           At 30 FPS, speed_sec = 0.5 * engine_mult * 30.0 units/sec. */
+        double speed_sec = 0.5 * engine_mult * 30.0;
+        double time_sec = d / speed_sec;
+
+        char buf[512];
+        sprintf(buf, "\n" CYAN ".--- IMPULSE NAVIGATION COMPUTATION -------------." RESET "\n"
+                     " DESTINATION:  " WHITE "Sector [%.1f, %.1f, %.1f]" RESET "\n"
+                     " BEARING:      " GREEN "Heading %.1f, Mark %+.1f" RESET "\n"
+                     " DISTANCE:     " YELLOW "%.2f Sector Units" RESET "\n"
+                     " EST. TIME:    " MAGENTA "%.2f seconds (at 100%% Impulse)" RESET "\n"
+                     "-------------------------------------------------", 
+                     tx, ty, tz, h, m, d, time_sec);
         send_server_msg(i, "COMPUTER", buf);
     } else {
         send_server_msg(i, "COMPUTER", "Usage: ical <X> <Y> <Z> (Target Sector Coords)");
@@ -1348,21 +1609,21 @@ void handle_ical(int i, const char *params) {
 /* --- Command Registry Table --- */
 
 static const CommandDef command_registry[] = {
-    {"nav ", handle_nav, "Warp Navigation"},
-    {"imp ", handle_imp, "Impulse Drive"},
-    {"jum ", handle_jum, "Wormhole Jump"},
-    {"apr ", handle_apr, "Approach target"},
+    {"nav ", handle_nav, "Warp Navigation <H> <M> <W> [Factor]"},
+    {"imp ", handle_imp, "Impulse Drive <H> <M> <S>"},
+    {"jum ", handle_jum, "Wormhole Jump <Q1> <Q2> <Q3>"},
+    {"apr ", handle_apr, "Approach target <ID> <DIST>"},
     {"cha",  handle_cha, "Chase locked target"},
     {"srs",  handle_srs, "Short Range Sensors"},
     {"lrs",  handle_lrs, "Long Range Sensors"},
     {"pha ", handle_pha, "Fire Phasers <ID> <E> or <E> (Lock)"},
     {"tor",  handle_tor, "Fire Torpedo <H> <M> or auto (Lock)"},
-    {"she ", handle_she, "Shield Configuration"},
-    {"lock ",handle_lock, "Target Lock-on"},
-    {"enc ", handle_enc,  "Encryption Toggle"},
-    {"pow ", handle_pow,  "Power Distribution"},
+    {"she ", handle_she, "Shield Configuration <F> <R> <T> <B> <L> <RI>"},
+    {"lock ",handle_lock, "Target Lock-on <ID>"},
+    {"enc ", handle_enc,  "Encryption Toggle <algo>"},
+    {"pow ", handle_pow,  "Power Allocation <E> <S> <W>"},
     {"psy",  handle_psy,  "Psychological Warfare (Bluff)"},
-    {"scan ",handle_scan, "Detailed Scan"},
+    {"scan ",handle_scan, "Detailed Scan <ID>"},
     {"clo",  handle_clo, "Cloaking Device"},
     {"bor",  handle_bor, "Boarding Party"},
     {"dis",  handle_dis, "Dismantle Wreck"},
@@ -1376,11 +1637,11 @@ static const CommandDef command_registry[] = {
     {"sta",  handle_sta, "Status Report"},
     {"inv",  handle_inv, "Inventory Report"},
     {"dam",  handle_dam, "Damage Report"},
-    {"cal ", handle_cal, "Warp Calculator"},
-    {"ical ",handle_ical,"Impulse Calculator"},
+    {"cal ", handle_cal, "Warp Calculator <QX><QY><QZ> [SX][SY][SZ]"},
+    {"ical ",handle_ical, "Impulse Calculator (ETA)"},
     {"who",  handle_who, "Active Captains List"},
-    {"help", handle_help,"Display this directory"},
-    {"aux ", handle_aux, "Auxiliary Systems"},
+    {"help", handle_help, "Display this directory"},
+    {"aux ", handle_aux, "Auxiliary (probe/report/recover)"},
     {"xxx",  handle_xxx, "Self-Destruct"},
     {"hull", handle_hull, "Reinforce Hull (100 Duranium)"},
     {"supernova", handle_supernova, "Admin: Trigger Supernova"},
