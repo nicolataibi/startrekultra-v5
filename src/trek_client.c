@@ -275,9 +275,11 @@ void *network_listener(void *arg) {
                         
                         int final_len;
                         if (EVP_DecryptFinal_ex(ctx, (uint8_t*)decrypted + outlen, &final_len) > 0) {
-                            decrypted[outlen + final_len] = '\0';
-                            strncpy(msg->text, decrypted, 65535);
-                            msg->length = outlen + final_len;
+                            int total_len = outlen + final_len;
+                            if (total_len > 65535) total_len = 65535;
+                            memcpy(msg->text, decrypted, total_len);
+                            msg->text[total_len] = '\0';
+                            msg->length = total_len;
                         } else {
                             strcpy(msg->text, B_RED "<< ERROR: SUBSPACE DECRYPTION FAILED - FREQUENCY MISMATCH OR INVALID KEY >>" RESET);
                         }
@@ -358,7 +360,7 @@ void *network_listener(void *arg) {
                 printf("Warning: Invalid object_count received: %d (at offset %zu)\n", upd.object_count, fixed_size);
                 /* DUMP next 16 bytes for debugging */
                 unsigned char dump[16];
-                read(sock, dump, 16);
+                if (read(sock, dump, 16) != 16) { /* Read dummy data */ }
                 LOG_DEBUG("Next bytes: %02x %02x %02x %02x...\n", dump[0], dump[1], dump[2], dump[3]);
                 break;
             }
@@ -486,6 +488,7 @@ void *network_listener(void *arg) {
                     g_shared_state->objects[o].hull_integrity = upd.objects[o].hull_integrity;
                     g_shared_state->objects[o].faction = upd.objects[o].faction;
                     g_shared_state->objects[o].id = upd.objects[o].id;
+                    g_shared_state->objects[o].is_cloaked = upd.objects[o].is_cloaked;
                     strncpy(g_shared_state->objects[o].shm_name, upd.objects[o].name, 63);
                     g_shared_state->objects[o].active = 1;
                 }
@@ -582,7 +585,9 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Please set TREK_SUB_KEY environment variable before launching.\n");
         exit(1);
     }
-    strncpy((char*)SUBSPACE_KEY, env_key, 32);
+    memset(SUBSPACE_KEY, 0, 32);
+    size_t env_len = strlen(env_key);
+    memcpy(SUBSPACE_KEY, env_key, (env_len > 32) ? 32 : env_len);
     
     generate_keys();
     
@@ -639,7 +644,8 @@ int main(int argc, char *argv[]) {
 
     LOG_DEBUG("sizeof(StarTrekGame) = %zu\n", sizeof(StarTrekGame));
     LOG_DEBUG("sizeof(PacketUpdate) = %zu\n", sizeof(PacketUpdate));
-    printf("Server IP: "); scanf("%s", server_ip);
+    printf("Server IP: "); 
+    if (scanf("%63s", server_ip) != 1) { /* handled later by inet_pton */ }
     clear_stdin();
 
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -669,7 +675,7 @@ int main(int argc, char *argv[]) {
     /* Generate Random Session Key */
     FILE *f_rand = fopen("/dev/urandom", "rb");
     if (f_rand) {
-        fread(h_pkt.pubkey, 1, 32, f_rand);
+        if (fread(h_pkt.pubkey, 1, 32, f_rand) != 32) { /* dummy read */ }
         fclose(f_rand);
     } else {
         for(int k=0; k<32; k++) h_pkt.pubkey[k] = rand() % 255;
@@ -700,7 +706,8 @@ int main(int argc, char *argv[]) {
     printf(B_BLUE "Subspace Link Secured. Unique Frequency active.\n" RESET);
 
     /* Identification happens ONLY after secure link is established */
-    printf("Commander Name: "); scanf("%s", captain_name);
+    printf("Commander Name: "); 
+    if (scanf("%63s", captain_name) != 1) { strcpy(captain_name, "Captain"); }
     clear_stdin();
 
     /* Identity Check */
@@ -717,12 +724,12 @@ int main(int argc, char *argv[]) {
         printf("\n" B_WHITE "--- NEW RECRUIT IDENTIFIED ---" RESET "\n");
         printf("--- SELECT YOUR FACTION ---\n");
         printf(" 0: Federation\n 1: Klingon\n 2: Romulan\n 3: Borg\n 4: Cardassian\n 5: Jem'Hadar\n 6: Tholian\n 7: Gorn\n 8: Ferengi\n 9: Species 8472\n 10: Breen\n 11: Hirogen\nSelection: ");
-        scanf("%d", &my_faction);
+        if (scanf("%d", &my_faction) != 1) { my_faction = 0; }
         
         if (my_faction == FACTION_FEDERATION) {
             printf("\n" B_WHITE "--- SELECT YOUR CLASS ---" RESET "\n");
             printf(" 0: Constitution\n 1: Miranda\n 2: Excelsior\n 3: Constellation\n 4: Defiant\n 5: Galaxy\n 6: Sovereign\n 7: Intrepid\n 8: Akira\n 9: Nebula\n 10: Ambassador\n 11: Oberth\n 12: Steamrunner\nSelection: ");
-            scanf("%d", &my_ship_class);
+            if (scanf("%d", &my_ship_class) != 1) { my_ship_class = 0; }
         }
         clear_stdin();
     } else {
@@ -881,7 +888,10 @@ int main(int argc, char *argv[]) {
                         printf("xxx         : Self-Destruct\n");
                     } else if (strncmp(g_input_buf, "dis ", 4) == 0 || strcmp(g_input_buf, "dis") == 0) {
                         PacketCommand cpkt = {PKT_COMMAND, ""};
-                        strncpy(cpkt.cmd, g_input_buf, 255);
+                        size_t clen = strlen(g_input_buf);
+                        if (clen > 255) clen = 255;
+                        memcpy(cpkt.cmd, g_input_buf, clen);
+                        cpkt.cmd[clen] = '\0';
                         send(sock, &cpkt, sizeof(cpkt), 0);
                     } else if (strcmp(g_input_buf, "axs") == 0) {
                         if (g_shared_state) {
@@ -1073,7 +1083,10 @@ int main(int argc, char *argv[]) {
                         }
                     } else {
                         PacketCommand cpkt = {PKT_COMMAND, ""};
-                        strncpy(cpkt.cmd, g_input_buf, 255);
+                        size_t clen = strlen(g_input_buf);
+                        if (clen > 255) clen = 255;
+                        memcpy(cpkt.cmd, g_input_buf, clen);
+                        cpkt.cmd[clen] = '\0';
                         send(sock, &cpkt, sizeof(cpkt), 0);
                     }
                     

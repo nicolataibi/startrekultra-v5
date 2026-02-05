@@ -315,23 +315,27 @@ int load_galaxy() {
         fclose(f);
         return 0;
     }
-    fread(&galaxy_master, sizeof(StarTrekGame), 1, f);
-    fread(npcs, sizeof(NPCShip), MAX_NPC, f);
-    fread(stars_data, sizeof(NPCStar), MAX_STARS, f);
-    fread(black_holes, sizeof(NPCBlackHole), MAX_BH, f);
-    fread(planets, sizeof(NPCPlanet), MAX_PLANETS, f);
-    fread(bases, sizeof(NPCBase), MAX_BASES, f);
-    fread(nebulas, sizeof(NPCNebula), MAX_NEBULAS, f);
-    fread(pulsars, sizeof(NPCPulsar), MAX_PULSARS, f);
-    fread(comets, sizeof(NPCComet), MAX_COMETS, f);
-    fread(asteroids, sizeof(NPCAsteroid), MAX_ASTEROIDS, f);
-    fread(derelicts, sizeof(NPCDerelict), MAX_DERELICTS, f);
-    fread(mines, sizeof(NPCMine), MAX_MINES, f);
-    fread(buoys, sizeof(NPCBuoy), MAX_BUOYS, f);
-    fread(platforms, sizeof(NPCPlatform), MAX_PLATFORMS, f);
-    fread(rifts, sizeof(NPCRift), MAX_RIFTS, f);
-    fread(monsters, sizeof(NPCMonster), MAX_MONSTERS, f);
-    fread(players, sizeof(ConnectedPlayer), MAX_CLIENTS, f);
+
+#define CHECK_READ(ptr, sz, count, stream) \
+    if (fread(ptr, sz, count, stream) != (size_t)(count)) { perror("fread data"); fclose(stream); return 0; }
+
+    CHECK_READ(&galaxy_master, sizeof(StarTrekGame), 1, f);
+    CHECK_READ(npcs, sizeof(NPCShip), MAX_NPC, f);
+    CHECK_READ(stars_data, sizeof(NPCStar), MAX_STARS, f);
+    CHECK_READ(black_holes, sizeof(NPCBlackHole), MAX_BH, f);
+    CHECK_READ(planets, sizeof(NPCPlanet), MAX_PLANETS, f);
+    CHECK_READ(bases, sizeof(NPCBase), MAX_BASES, f);
+    CHECK_READ(nebulas, sizeof(NPCNebula), MAX_NEBULAS, f);
+    CHECK_READ(pulsars, sizeof(NPCPulsar), MAX_PULSARS, f);
+    CHECK_READ(comets, sizeof(NPCComet), MAX_COMETS, f);
+    CHECK_READ(asteroids, sizeof(NPCAsteroid), MAX_ASTEROIDS, f);
+    CHECK_READ(derelicts, sizeof(NPCDerelict), MAX_DERELICTS, f);
+    CHECK_READ(mines, sizeof(NPCMine), MAX_MINES, f);
+    CHECK_READ(buoys, sizeof(NPCBuoy), MAX_BUOYS, f);
+    CHECK_READ(platforms, sizeof(NPCPlatform), MAX_PLATFORMS, f);
+    CHECK_READ(rifts, sizeof(NPCRift), MAX_RIFTS, f);
+    CHECK_READ(monsters, sizeof(NPCMonster), MAX_MONSTERS, f);
+    CHECK_READ(players, sizeof(ConnectedPlayer), MAX_CLIENTS, f);
     fclose(f);
     
     for(int i=0; i<MAX_CLIENTS; i++) {

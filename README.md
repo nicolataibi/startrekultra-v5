@@ -44,7 +44,16 @@ make
 Il ponte di comando di Star Trek Ultra opera tramite un'interfaccia a riga di comando (CLI) ad alta precisione. Oltre ai comandi di navigazione e combattimento, il simulatore implementa un sofisticato sistema di **Guerra Elettronica** basato su crittografia reale.
 
 #### 🛰️ Comandi di Navigazione Avanzata e Utility
-*   `cal <Q1> <Q2> <Q3>`: **Warp Calculator**. Calcola istantaneamente il vettore (Heading/Mark), la distanza e fornisce una **Tabella del Profilo Warp** con i tempi di arrivo stimati.
+*   `nav <H> <M> <W> [F]`: **Warp Navigation**. Rotta di curvatura verso coordinate relative. `H`: Heading (0-359), `M`: Mark (-90/+90), `W`: Distanza in quadranti, `F`: Fattore Warp opzionale (1.0 - 9.9).
+*   `imp <H> <M> <S>`: **Impulse Drive**. Navigazione sub-luce nel settore attuale. `S`: Velocità in percentuale (1-100%). Usare `imp <S>` per cambiare solo velocità.
+*   `jum <Q1> <Q2> <Q3>`: **Wormhole Jump**. Genera un tunnel spaziale verso un quadrante lontano. Richiede **5000 energia e 1 Cristallo di Dilithium**.
+*   `apr <ID> [DIST]`: **Automatic Approach**. Il pilota automatico intercetta l'oggetto specificato alla distanza desiderata (default 2.0). Funziona in tutta la galassia per navi e comete.
+*   `cha`: **Chase Target**. Insegue attivamente il bersaglio attualmente agganciato (`lock`).
+*   `rep <ID>`: **Repair System**. Avvia le riparazioni su un sottosistema (1: Warp, 2: Impulso, 3: Sensori, 4: Faser, 5: Siluri, ecc.).
+*   `inv`: **Inventory Report**. Elenco dettagliato delle risorse in stiva (Dilithio, Tritanio, Gas, ecc.).
+*   `dam`: **Damage Report**. Stato dettagliato dell'integrità dello scafo e dei sistemi.
+*   `cal <Q1> <Q2> <Q3>`: **Warp Calculator**. Calcola il vettore verso il centro di un quadrante distante.
+*   `cal <Q1> <Q2> <Q3> <X> <Y> <Z>`: **Pinpoint Calculator**. Calcola il vettore verso coordinate di settore precise `[X, Y, Z]` in un quadrante distante. Fornisce tempi di arrivo e suggerisce il comando `nav` esatto da copiare.
 *   `ical <X> <Y> <Z>`: **Impulse Calculator**. Fornisce la soluzione di navigazione completa per coordinate di settore precise [0.0 - 10.0], incluso il tempo di percorrenza in base all'attuale potenza dei motori.
 *   `who`: **Captains Registry**. Elenca tutti i comandanti attualmente attivi nella galassia, i loro ID di tracciamento e la posizione attuale. Fondamentale per identificare alleati o potenziali predatori prima di entrare in un settore.
 *   `sta`: **Status Report**. Diagnostica completa dei sistemi, inclusi i livelli di energia, integrità hardware e ripartizione della potenza.
@@ -485,7 +494,7 @@ Il comando `apr <ID> <DISTANZA>` permette di avvicinarsi automaticamente a quals
 | **Mostri Spaziali** | 18000 - 18029 | `pha`, `tor`, `scan` | **< 1.5** | **Tracciamento Galattico** |
 
 *   `she <F> <R> <T> <B> <L> <RI>`: **Shield Configuration**. Distribuisce energia ai 6 scudi.
-*   `clo`: **Cloaking Device**. Attiva/Disattiva occultamento (consuma energia).
+*   `clo`: **Cloaking Device**. Attiva/Disattiva occultamento. Consuma 15 unità di energia/tick. Rende invisibili a NPC e altre fazioni, ma è instabile nelle nebulose.
 *   `pow <E> <S> <W>`: **Power Distribution**. Ripartisce energia reattore (Motori, Scudi, Armi %). I valori sono relativi (es. `pow 1 1 1` equivale a `pow 33 33 33`).
 *   `aux jettison`: **Eject Warp Core**. Espelle il nucleo di curvatura (Manovra suicida).
 *   `xxx`: **Self-Destruct**. Autodistruzione sequenziale.
@@ -507,6 +516,17 @@ La nave è protetta da 6 quadranti indipendenti: **Frontale (F), Posteriore (R),
 *   **Condizione di Distruzione**: Se la **Hull Integrity raggiunge lo 0%**, la nave esplode istantaneamente, indipendentemente dai livelli di energia o scudi rimanenti.
 *   **Rigenerazione Continua**: A differenza dei vecchi sistemi, la rigenerazione degli scudi è continua ma scala con la salute dell'hardware.
 *   **Collasso degli Scudi**: Se un quadrante raggiunge lo 0% di integrità, i colpi successivi provenienti da quella direzione infliggeranno danni diretti allo scafo e al reattore energetico principale.
+
+#### 🛸 Dispositivo di Occultamento (Cloaking Device)
+Il comando `clo` attiva una tecnologia di occultamento avanzata che manipola la luce e i sensori per rendere il vascello invisibile.
+
+*   **Invisibilità Tattica**: Una volta attivo, non sarai rilevabile dai sensori (`srs`/`lrs`) degli altri giocatori (a meno che non appartengano alla tua stessa fazione). Le navi NPC ti ignoreranno completamente e non inizieranno manovre di attacco.
+*   **Costi Energetici**: Il mantenimento del campo di occultamento è estremamente energivoro, consumando **15 unità di energia per tick** logico. Monitora attentamente le riserve del reattore.
+*   **Limitazioni Sensori**: Durante l'occultamento, i sensori di bordo subiscono interferenze ("Sensors limited"), rendendo più difficile l'acquisizione di dati ambientali precisi.
+*   **Instabilità nelle Nebulose**: All'interno delle nebulose, il campo di occultamento diventa instabile a causa dei gas ionizzati. Questo può causare fluttuazioni nel drenaggio energetico e inibire la rigenerazione degli scudi.
+*   **Feedback Visivo**: Quando occultato, la nave originale scompare e viene sostituita da un modello a reticolo (wireframe) con un **effetto "Blue Glowing"** pulsante. L'HUD mostrerà lo stato `[ CLOAKED ]` in magenta.
+*   **Restrizioni di Combattimento**: Non è possibile fare fuoco con i **Faser** (`pha`) o lanciare **Siluri** (`tor`) mentre il dispositivo di occultamento è attivo. È necessario disattivarlo per ingaggiare il nemico.
+*   **Strategia NPC (Romulani)**: L'Impero Stellare Romulano utilizza tattiche di occultamento avanzate; le loro navi rimarranno occultate durante il pattugliamento o la fuga, rivelandosi solo per sferrare un attacco.
 
 *   **Armi (W)**: Scala direttamente l'**Intensità dei Faser** e il **Tasso di Ricarica**. Un'allocazione elevata convoglia più energia nei banchi faser, permettendo di infliggere danni esponenzialmente maggiori e ricaricare il condensatore molto più velocemente.
 

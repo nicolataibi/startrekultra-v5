@@ -85,23 +85,29 @@ int main(int argc, char *argv[]) {
         printf("Warning: Version mismatch. File: %d, Expected: %d\n", version, GALAXY_VERSION);
     }
 
-    fread(&galaxy_master, sizeof(StarTrekGame), 1, f);
-    fread(npcs, sizeof(NPCShip), MAX_NPC, f);
-    fread(stars_data, sizeof(NPCStar), MAX_STARS, f);
-    fread(black_holes, sizeof(NPCBlackHole), MAX_BH, f);
-    fread(planets, sizeof(NPCPlanet), MAX_PLANETS, f);
-    fread(bases, sizeof(NPCBase), MAX_BASES, f);
-    fread(nebulas, sizeof(NPCNebula), MAX_NEBULAS, f);
-    fread(pulsars, sizeof(NPCPulsar), MAX_PULSARS, f);
-    fread(comets, sizeof(NPCComet), MAX_COMETS, f);
-    fread(asteroids, sizeof(NPCAsteroid), MAX_ASTEROIDS, f);
-    fread(derelicts, sizeof(NPCDerelict), MAX_DERELICTS, f);
-    fread(mines, sizeof(NPCMine), MAX_MINES, f);
-    fread(buoys, sizeof(NPCBuoy), MAX_BUOYS, f);
-    fread(platforms, sizeof(NPCPlatform), MAX_PLATFORMS, f);
-    fread(rifts, sizeof(NPCRift), MAX_RIFTS, f);
-    fread(monsters, sizeof(NPCMonster), MAX_MONSTERS, f);
-    fread(players, sizeof(ConnectedPlayer), MAX_CLIENTS, f);
+#define CHECK_READ(ptr, size, count, stream) \
+    if (fread(ptr, size, count, stream) != (size_t)(count)) { \
+        fprintf(stderr, "Error reading from galaxy.dat\n"); \
+        fclose(stream); return 1; \
+    }
+
+    CHECK_READ(&galaxy_master, sizeof(StarTrekGame), 1, f);
+    CHECK_READ(npcs, sizeof(NPCShip), MAX_NPC, f);
+    CHECK_READ(stars_data, sizeof(NPCStar), MAX_STARS, f);
+    CHECK_READ(black_holes, sizeof(NPCBlackHole), MAX_BH, f);
+    CHECK_READ(planets, sizeof(NPCPlanet), MAX_PLANETS, f);
+    CHECK_READ(bases, sizeof(NPCBase), MAX_BASES, f);
+    CHECK_READ(nebulas, sizeof(NPCNebula), MAX_NEBULAS, f);
+    CHECK_READ(pulsars, sizeof(NPCPulsar), MAX_PULSARS, f);
+    CHECK_READ(comets, sizeof(NPCComet), MAX_COMETS, f);
+    CHECK_READ(asteroids, sizeof(NPCAsteroid), MAX_ASTEROIDS, f);
+    CHECK_READ(derelicts, sizeof(NPCDerelict), MAX_DERELICTS, f);
+    CHECK_READ(mines, sizeof(NPCMine), MAX_MINES, f);
+    CHECK_READ(buoys, sizeof(NPCBuoy), MAX_BUOYS, f);
+    CHECK_READ(platforms, sizeof(NPCPlatform), MAX_PLATFORMS, f);
+    CHECK_READ(rifts, sizeof(NPCRift), MAX_RIFTS, f);
+    CHECK_READ(monsters, sizeof(NPCMonster), MAX_MONSTERS, f);
+    CHECK_READ(players, sizeof(ConnectedPlayer), MAX_CLIENTS, f);
     fclose(f);
 
     if (argc < 2) {
@@ -208,7 +214,7 @@ int main(int argc, char *argv[]) {
         printf("BPNBS Encoding: %017lld\n", bpnbs);
 
         for(int i=0; i<MAX_NPC; i++) if(npcs[i].active && npcs[i].q1 == q1 && npcs[i].q2 == q2 && npcs[i].q3 == q3)
-            printf("[NPC] ID:%d Faction:%s Coord:%.1f,%.1f,%.1f Energy:%d AI:%d\n", npcs[i].id+1000, get_faction_name(npcs[i].faction), npcs[i].x, npcs[i].y, npcs[i].z, npcs[i].energy, npcs[i].ai_state);
+            printf("[NPC] ID:%d Faction:%s Coord:%.1f,%.1f,%.1f Energy:%d AI:%d %s\n", npcs[i].id+1000, get_faction_name(npcs[i].faction), npcs[i].x, npcs[i].y, npcs[i].z, npcs[i].energy, npcs[i].ai_state, npcs[i].is_cloaked ? "[CLOAKED]" : "");
 
         for(int i=0; i<MAX_MONSTERS; i++) if(monsters[i].active && monsters[i].q1 == q1 && monsters[i].q2 == q2 && monsters[i].q3 == q3)
             printf("[MONSTER] ID:%d Type:%s Coord:%.1f,%.1f,%.1f Health:%d\n", monsters[i].id+18000, get_faction_name(monsters[i].type), monsters[i].x, monsters[i].y, monsters[i].z, monsters[i].health);
@@ -256,10 +262,11 @@ int main(int argc, char *argv[]) {
         printf("--- Persistent Players ---\n");
         for(int i=0; i<MAX_CLIENTS; i++) {
             if (players[i].name[0] != '\0') {
-                printf("Name: %-15s Faction: %-12s Pos: [%d,%d,%d] (%.1f,%.1f,%.1f)\n", 
+                printf("Name: %-15s Faction: %-12s Pos: [%d,%d,%d] (%.1f,%.1f,%.1f) %s\n", 
                        players[i].name, get_faction_name(players[i].faction),
                        players[i].state.q1, players[i].state.q2, players[i].state.q3,
-                       players[i].state.s1, players[i].state.s2, players[i].state.s3);
+                       players[i].state.s1, players[i].state.s2, players[i].state.s3,
+                       players[i].state.is_cloaked ? "[CLOAKED]" : "");
             }
         }
     }
@@ -268,7 +275,8 @@ int main(int argc, char *argv[]) {
         printf("Searching for '%s'..\n", name);
         for(int i=0; i<MAX_CLIENTS; i++) {
             if (players[i].name[0] != '\0' && strcasestr(players[i].name, name)) {
-                printf("[PLAYER] Found: %s in Quadrant [%d,%d,%d]\n", players[i].name, players[i].state.q1, players[i].state.q2, players[i].state.q3);
+                printf("[PLAYER] Found: %s in Quadrant [%d,%d,%d] %s\n", players[i].name, players[i].state.q1, players[i].state.q2, players[i].state.q3,
+                       players[i].state.is_cloaked ? "[CLOAKED]" : "");
             }
         }
     }

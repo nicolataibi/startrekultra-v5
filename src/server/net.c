@@ -92,7 +92,9 @@ int write_all(int fd, const void *buf, size_t len) {
 
 void broadcast_message(PacketMessage *msg) {
     char plaintext[65536];
-    strncpy(plaintext, msg->text, 65535);
+    size_t plen = (msg->length < 65536) ? msg->length : 65535;
+    memcpy(plaintext, msg->text, plen);
+    plaintext[plen] = '\0';
 
     pthread_mutex_lock(&game_mutex);
     
@@ -122,8 +124,11 @@ void broadcast_message(PacketMessage *msg) {
                 encrypt_payload(&individual_msg, plaintext, all_zero ? MASTER_SESSION_KEY : k);
             } else {
                 individual_msg.is_encrypted = 0;
-                strncpy(individual_msg.text, plaintext, 65535);
-                individual_msg.length = strlen(individual_msg.text);
+                size_t tlen = strlen(plaintext);
+                if (tlen > 65535) tlen = 65535;
+                memcpy(individual_msg.text, plaintext, tlen);
+                individual_msg.text[tlen] = '\0';
+                individual_msg.length = tlen;
             }
             
             size_t pkt_size = offsetof(PacketMessage, text) + individual_msg.length;

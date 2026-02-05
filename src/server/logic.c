@@ -48,6 +48,15 @@ void update_npc_ai(int n) {
         npcs[n].ai_state = AI_STATE_PATROL;
     }
 
+    /* Romulan Cloak Logic */
+    if (npcs[n].faction == FACTION_ROMULAN) {
+        if (closest_p == -1) npcs[n].is_cloaked = 1; /* Stalking/Patrolling */
+        else if (npcs[n].ai_state == AI_STATE_FLEE) npcs[n].is_cloaked = 1;
+        else npcs[n].is_cloaked = 0; /* Reveal to attack */
+    } else {
+        npcs[n].is_cloaked = 0;
+    }
+
     double d_dx = 0, d_dy = 0, d_dz = 0, speed = 0.03;
     if (npcs[n].engine_health < 10.0f) speed = 0; else speed *= (npcs[n].engine_health/100.0f);
 
@@ -1196,7 +1205,7 @@ void update_game_logic() {
         upd.is_cloaked = players[i].state.is_cloaked;
         upd.encryption_enabled = players[i].crypto_algo;
         int o_idx = 0;
-        upd.objects[o_idx] = (NetObject){(float)players[i].state.s1,(float)players[i].state.s2,(float)players[i].state.s3,(float)players[i].state.ent_h,(float)players[i].state.ent_m,1,players[i].ship_class,1,(int)players[i].state.hull_integrity,players[i].state.energy,players[i].state.duranium_plating,(int)players[i].state.hull_integrity,players[i].faction,i+1,""};
+        upd.objects[o_idx] = (NetObject){(float)players[i].state.s1,(float)players[i].state.s2,(float)players[i].state.s3,(float)players[i].state.ent_h,(float)players[i].state.ent_m,1,players[i].ship_class,1,(int)players[i].state.hull_integrity,players[i].state.energy,players[i].state.duranium_plating,(int)players[i].state.hull_integrity,players[i].faction,i+1,players[i].state.is_cloaked,""};
         strncpy(upd.objects[o_idx++].name, players[i].name, 63);
         
         /* 1. Prioritize Current Quadrant Objects (Critical for SRS/HUD) */
@@ -1208,28 +1217,32 @@ void update_game_logic() {
                 if (p == &players[i] || !p->active || o_idx >= MAX_NET_OBJECTS) continue;
                 if (p->state.is_cloaked && p->faction != players[i].faction) continue;
                 NetObject *no = &upd.objects[o_idx];
-                *no = (NetObject){(float)p->state.s1, (float)p->state.s2, (float)p->state.s3, (float)p->state.ent_h, (float)p->state.ent_m, 1, p->ship_class, 1, (int)p->state.hull_integrity, p->state.energy, p->state.duranium_plating, (int)p->state.hull_integrity, p->faction, (int)(p-players)+1, ""};
-                strncpy(no->name, p->name, 63); o_idx++;
+                *no = (NetObject){(float)p->state.s1, (float)p->state.s2, (float)p->state.s3, (float)p->state.ent_h, (float)p->state.ent_m, 1, p->ship_class, 1, (int)p->state.hull_integrity, p->state.energy, p->state.duranium_plating, (int)p->state.hull_integrity, p->faction, (int)(p-players)+1, p->state.is_cloaked, ""};
+                size_t nlen = strlen(p->name);
+                if (nlen > 63) nlen = 63;
+                memcpy(no->name, p->name, nlen);
+                no->name[nlen] = '\0';
+                o_idx++;
             }
             /* NPCs in current quadrant */
             for(int n=0; n<lq->npc_count && o_idx < MAX_NET_OBJECTS; n++) {
                 NPCShip *npc = lq->npcs[n]; if (!npc->active) continue;
                 NetObject *no = &upd.objects[o_idx];
-                *no = (NetObject){(float)npc->x, (float)npc->y, (float)npc->z, (float)npc->h, (float)npc->m, npc->faction, 0, 1, (int)npc->engine_health, npc->energy, 0, (int)npc->engine_health, npc->faction, npc->id+1000, ""};
+                *no = (NetObject){(float)npc->x, (float)npc->y, (float)npc->z, (float)npc->h, (float)npc->m, npc->faction, 0, 1, (int)npc->engine_health, npc->energy, 0, (int)npc->engine_health, npc->faction, npc->id+1000, npc->is_cloaked, ""};
                 strncpy(no->name, get_species_name(npc->faction), 63); o_idx++;
             }
             /* Static objects in current quadrant */
-                for(int p=0; p<lq->planet_count && o_idx < MAX_NET_OBJECTS; p++) if(lq->planets[p]->active) upd.objects[o_idx++] = (NetObject){(float)lq->planets[p]->x, (float)lq->planets[p]->y, (float)lq->planets[p]->z, 0, 0, 5, lq->planets[p]->resource_type, 1, 100, 0, 0, 100, 0, lq->planets[p]->id+3000, "Planet"};
-                for(int s=0; s<lq->star_count && o_idx < MAX_NET_OBJECTS; s++) if(lq->stars[s]->active) upd.objects[o_idx++] = (NetObject){(float)lq->stars[s]->x, (float)lq->stars[s]->y, (float)lq->stars[s]->z, 0, 0, 4, lq->stars[s]->id % 7, 1, 100, 0, 0, 100, 0, lq->stars[s]->id+4000, "Star"};
-                for(int h=0; h<lq->bh_count && o_idx < MAX_NET_OBJECTS; h++) if(lq->black_holes[h]->active) upd.objects[o_idx++] = (NetObject){(float)lq->black_holes[h]->x, (float)lq->black_holes[h]->y, (float)lq->black_holes[h]->z, 0, 0, 6, 0, 1, 100, 0, 0, 100, 0, lq->black_holes[h]->id+7000, "Black Hole"};
-                for(int b=0; b<lq->base_count && o_idx < MAX_NET_OBJECTS; b++) if(lq->bases[b]->active) upd.objects[o_idx++] = (NetObject){(float)lq->bases[b]->x, (float)lq->bases[b]->y, (float)lq->bases[b]->z, 0, 0, 3, 0, 1, 100, 0, 0, 100, 0, lq->bases[b]->id+2000, "Starbase"};
-                for(int n=0; n<lq->nebula_count && o_idx < MAX_NET_OBJECTS; n++) upd.objects[o_idx++] = (NetObject){(float)lq->nebulas[n]->x, (float)lq->nebulas[n]->y, (float)lq->nebulas[n]->z, 0, 0, 7, lq->nebulas[n]->id % 5, 1, 100, 0, 0, 100, 0, lq->nebulas[n]->id+8000, "Nebula"};
-                for(int p=0; p<lq->pulsar_count && o_idx < MAX_NET_OBJECTS; p++) upd.objects[o_idx++] = (NetObject){(float)lq->pulsars[p]->x, (float)lq->pulsars[p]->y, (float)lq->pulsars[p]->z, 0, 0, 8, 0, 1, 100, 0, 0, 100, 0, lq->pulsars[p]->id+9000, "Pulsar"};
-                for(int c=0; c<lq->comet_count && o_idx < MAX_NET_OBJECTS; c++) upd.objects[o_idx++] = (NetObject){(float)lq->comets[c]->x, (float)lq->comets[c]->y, (float)lq->comets[c]->z, (float)lq->comets[c]->h, (float)lq->comets[c]->m, 9, 0, 1, 100, 0, 0, 100, 0, lq->comets[c]->id+10000, "Comet"};
-                for(int a=0; a<lq->asteroid_count && o_idx < MAX_NET_OBJECTS; a++) upd.objects[o_idx++] = (NetObject){(float)lq->asteroids[a]->x, (float)lq->asteroids[a]->y, (float)lq->asteroids[a]->z, 0, 0, 21, 0, 1, 100, 0, 0, 100, 0, lq->asteroids[a]->id+12000, "Asteroid"};
-                for(int d=0; d<lq->derelict_count && o_idx < MAX_NET_OBJECTS; d++) upd.objects[o_idx++] = (NetObject){(float)lq->derelicts[d]->x, (float)lq->derelicts[d]->y, (float)lq->derelicts[d]->z, 0, 0, 22, lq->derelicts[d]->ship_class, 1, 30, 0, 0, 100, 0, lq->derelicts[d]->id+11000, "Derelict"};
-                for(int pt=0; pt<lq->platform_count && o_idx < MAX_NET_OBJECTS; pt++) upd.objects[o_idx++] = (NetObject){(float)lq->platforms[pt]->x, (float)lq->platforms[pt]->y, (float)lq->platforms[pt]->z, 0, 0, 25, 0, 1, (int)((lq->platforms[pt]->energy/10000.0)*100), (int)lq->platforms[pt]->energy, 0, 100, lq->platforms[pt]->faction, lq->platforms[pt]->id+16000, "Defense Platform"};
-                for(int mo=0; mo<lq->monster_count && o_idx < MAX_NET_OBJECTS; mo++) { NetObject *no = &upd.objects[o_idx++]; *no = (NetObject){(float)lq->monsters[mo]->x, (float)lq->monsters[mo]->y, (float)lq->monsters[mo]->z, 0, 0, lq->monsters[mo]->type, 0, 1, 100, (int)lq->monsters[mo]->energy, 0, 100, 0, lq->monsters[mo]->id+18000, ""}; strncpy(no->name, (lq->monsters[mo]->type==30)?"Crystalline Entity":"Space Amoeba", 63); }
+                for(int p=0; p<lq->planet_count && o_idx < MAX_NET_OBJECTS; p++) if(lq->planets[p]->active) upd.objects[o_idx++] = (NetObject){(float)lq->planets[p]->x, (float)lq->planets[p]->y, (float)lq->planets[p]->z, 0, 0, 5, lq->planets[p]->resource_type, 1, 100, 0, 0, 100, 0, lq->planets[p]->id+3000, 0, "Planet"};
+                for(int s=0; s<lq->star_count && o_idx < MAX_NET_OBJECTS; s++) if(lq->stars[s]->active) upd.objects[o_idx++] = (NetObject){(float)lq->stars[s]->x, (float)lq->stars[s]->y, (float)lq->stars[s]->z, 0, 0, 4, lq->stars[s]->id % 7, 1, 100, 0, 0, 100, 0, lq->stars[s]->id+4000, 0, "Star"};
+                for(int h=0; h<lq->bh_count && o_idx < MAX_NET_OBJECTS; h++) if(lq->black_holes[h]->active) upd.objects[o_idx++] = (NetObject){(float)lq->black_holes[h]->x, (float)lq->black_holes[h]->y, (float)lq->black_holes[h]->z, 0, 0, 6, 0, 1, 100, 0, 0, 100, 0, lq->black_holes[h]->id+7000, 0, "Black Hole"};
+                for(int b=0; b<lq->base_count && o_idx < MAX_NET_OBJECTS; b++) if(lq->bases[b]->active) upd.objects[o_idx++] = (NetObject){(float)lq->bases[b]->x, (float)lq->bases[b]->y, (float)lq->bases[b]->z, 0, 0, 3, 0, 1, 100, 0, 0, 100, 0, lq->bases[b]->id+2000, 0, "Starbase"};
+                for(int n=0; n<lq->nebula_count && o_idx < MAX_NET_OBJECTS; n++) upd.objects[o_idx++] = (NetObject){(float)lq->nebulas[n]->x, (float)lq->nebulas[n]->y, (float)lq->nebulas[n]->z, 0, 0, 7, lq->nebulas[n]->id % 5, 1, 100, 0, 0, 100, 0, lq->nebulas[n]->id+8000, 0, "Nebula"};
+                for(int p=0; p<lq->pulsar_count && o_idx < MAX_NET_OBJECTS; p++) upd.objects[o_idx++] = (NetObject){(float)lq->pulsars[p]->x, (float)lq->pulsars[p]->y, (float)lq->pulsars[p]->z, 0, 0, 8, 0, 1, 100, 0, 0, 100, 0, lq->pulsars[p]->id+9000, 0, "Pulsar"};
+                for(int c=0; c<lq->comet_count && o_idx < MAX_NET_OBJECTS; c++) upd.objects[o_idx++] = (NetObject){(float)lq->comets[c]->x, (float)lq->comets[c]->y, (float)lq->comets[c]->z, (float)lq->comets[c]->h, (float)lq->comets[c]->m, 9, 0, 1, 100, 0, 0, 100, 0, lq->comets[c]->id+10000, 0, "Comet"};
+                for(int a=0; a<lq->asteroid_count && o_idx < MAX_NET_OBJECTS; a++) upd.objects[o_idx++] = (NetObject){(float)lq->asteroids[a]->x, (float)lq->asteroids[a]->y, (float)lq->asteroids[a]->z, 0, 0, 21, 0, 1, 100, 0, 0, 100, 0, lq->asteroids[a]->id+12000, 0, "Asteroid"};
+                for(int d=0; d<lq->derelict_count && o_idx < MAX_NET_OBJECTS; d++) upd.objects[o_idx++] = (NetObject){(float)lq->derelicts[d]->x, (float)lq->derelicts[d]->y, (float)lq->derelicts[d]->z, 0, 0, 22, lq->derelict_count, 1, 30, 0, 0, 100, 0, lq->derelicts[d]->id+11000, 0, "Derelict"};
+                for(int pt=0; pt<lq->platform_count && o_idx < MAX_NET_OBJECTS; pt++) upd.objects[o_idx++] = (NetObject){(float)lq->platforms[pt]->x, (float)lq->platforms[pt]->y, (float)lq->platforms[pt]->z, 0, 0, 25, 0, 1, (int)((lq->platforms[pt]->energy/10000.0)*100), (int)lq->platforms[pt]->energy, 0, 100, lq->platforms[pt]->faction, lq->platforms[pt]->id+16000, 0, "Defense Platform"};
+                for(int mo=0; mo<lq->monster_count && o_idx < MAX_NET_OBJECTS; mo++) { NetObject *no = &upd.objects[o_idx++]; *no = (NetObject){(float)lq->monsters[mo]->x, (float)lq->monsters[mo]->y, (float)lq->monsters[mo]->z, 0, 0, lq->monsters[mo]->type, 0, 1, 100, (int)lq->monsters[mo]->energy, 0, 100, 0, lq->monsters[mo]->id+18000, 0, ""}; strncpy(no->name, (lq->monsters[mo]->type==30)?"Crystalline Entity":"Space Amoeba", 63); }
             /* Global Probes: Check ALL probes from ALL players */
             for (int p_j = 0; p_j < MAX_CLIENTS; p_j++) {
                 if (!players[p_j].socket) continue;
@@ -1248,7 +1261,8 @@ void update_game_logic() {
                             no->type = 27; /* TYPE_PROBE */
                             no->id = 19000 + (p_j * 3) + pr; /* Unique ID range for probes */
                             no->ship_class = players[p_j].state.probes[pr].status; /* Pass status here */
-                            snprintf(no->name, 64, "PROBE %s", players[p_j].name);
+                            no->is_cloaked = 0;
+                            snprintf(no->name, 64, "P:%.58s", players[p_j].name);
                             no->active = 1;
                         }
                     }

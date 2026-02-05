@@ -1,0 +1,79 @@
+Per creare il tarball sorgente (.tar.gz) nel formato richiesto dal file .spec, devi seguire una convenzione precisa: i file devono trovarsi all'interno di una cartella che abbia lo stesso
+  nome e versione definiti nello spec.
+
+
+  Ecco i comandi da eseguire nel tuo terminale:
+
+
+    1 # 1. Definisci il nome della cartella (deve corrispondere a Name e Version nello spec)
+    2 export PROJECT_DIR="startrek-ultra-2026.02.05"
+    3
+    4 # 2. Crea la cartella temporanea
+    5 mkdir $PROJECT_DIR
+    6
+    7 # 3. Copia i sorgenti e i file necessari nella cartella
+    8 # Escludiamo i binari compilati e il file spec stesso
+    9 cp -r src include Makefile README.md README_en.md galaxy.dat *.jpg run_server.sh run_client.sh $PROJECT_DIR/
+   10
+   11 # 4. Crea l'archivio compresso
+   12 tar -czvf ${PROJECT_DIR}.tar.gz $PROJECT_DIR/
+   13
+   14 # 5. (Opzionale) Rimuovi la cartella temporanea
+   15 rm -rf $PROJECT_DIR
+
+  Dove posizionare il file per rpmbuild:
+  Perché rpmbuild possa trovare il tarball, devi spostarlo nella cartella dei sorgenti di RPM (solitamente sotto la tua home):
+
+
+   1 mv startrek-ultra-2026.02.05.tar.gz ~/rpmbuild/SOURCES/
+
+
+  A quel punto potrai lanciare la creazione del pacchetto con:
+   1 rpmbuild -ba startrek-ultra.spec
+
+
+Ora che ho aggiornato il Makefile per generare i simboli di debug e lo .spec per gestire correttamente la creazione del pacchetto, devi ricreare il tarball prima di lanciare nuovamente
+  rpmbuild, altrimenti il sistema userà ancora i vecchi file.
+
+  Ecco i passaggi da ripetere:
+
+
+   1. Ricrea il tarball:
+
+
+   1    export PROJECT_DIR="startrek-ultra-2026.02.05"
+   2    mkdir -p $PROJECT_DIR
+   3    cp -r src include Makefile README.md README_en.md LICENSE.txt *.jpg run_server.sh run_client.sh $PROJECT_DIR/
+   4    tar -czvf ${PROJECT_DIR}.tar.gz $PROJECT_DIR/
+   5    mv ${PROJECT_DIR}.tar.gz ~/rpmbuild/SOURCES/
+   6    rm -rf $PROJECT_DIR
+
+
+   2. Lancia di nuovo il build:
+   1    rpmbuild -ba startrek-ultra.spec
+
+
+  Con queste modifiche, l'errore debugsourcefiles.list vuoto sparirà e il pacchetto RPM verrà generato correttamente.
+
+ssh-keygen -t ed25519
+Generating public/private ed25519 key pair.
+Enter file in which to save the key (/home/nick/.ssh/id_ed25519): 
+Enter passphrase for "/home/nick/.ssh/id_ed25519" (empty for no passphrase):  nicola taibi per fedora
+Enter same passphrase again: 
+Your identification has been saved in /home/nick/.ssh/id_ed25519
+Your public key has been saved in /home/nick/.ssh/id_ed25519.pub
+The key fingerprint is:
+SHA256:JkIKqrygL32SLqeYD8orFepDLKlsDoZP+yVKuKfBXc0 nick@glauke
+The key's randomart image is:
++--[ED25519 256]--+
+|                 |
+|                 |
+|.   .            |
+|...o  o          |
+|oo.....ES        |
+|O+o .. o         |
+|#*oo. .          |
+|&&Bo.o           |
+|%/X+.            |
++----[SHA256]-----+
+~/dev/StarTrek - Trek73 game

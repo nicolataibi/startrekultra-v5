@@ -689,6 +689,7 @@ void handle_pha(int i, const char *params) {
 
     if (players[i].state.energy < e) { send_server_msg(i, "COMPUTER", "Insufficient energy for phaser burst."); return; }
     if (players[i].state.phaser_charge < 10.0f) { send_server_msg(i, "TACTICAL", "Phasers banks recharging. Wait for capacitor."); return; }
+    if (players[i].state.is_cloaked) { send_server_msg(i, "TACTICAL", "Cannot fire phasers while cloaked. Decloak first."); return; }
     
     players[i].state.energy -= e;
     float charge_consumed = (e / 5000.0f) * 100.0f;
@@ -787,6 +788,7 @@ void handle_tor(int i, const char *params) {
     if (players[i].state.system_health[5] <= 50.0f) { send_server_msg(i, "TACTICAL", "Torpedo tubes OFFLINE."); return; }
     if (players[i].torp_active) { send_server_msg(i, "TACTICAL", "Tubes currently FIRING. Wait for impact."); return; }
     if (players[i].torp_load_timer > 0) { send_server_msg(i, "TACTICAL", "Tubes are LOADING..."); return; }
+    if (players[i].state.is_cloaked) { send_server_msg(i, "TACTICAL", "Cannot fire torpedoes while cloaked."); return; }
 
     if(players[i].state.torpedoes > 0) {
         players[i].state.torpedoes--; players[i].torp_active=true;

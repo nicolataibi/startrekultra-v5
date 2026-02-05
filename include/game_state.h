@@ -33,6 +33,7 @@ typedef struct {
     int32_t hull_integrity; /* Physical Hull % */
     int32_t faction;    /* Faction ID */
     int32_t id;         /* Universal Target ID */
+    uint8_t is_cloaked; /* Whether the ship is cloaked */
     char name[64];  /* Captain name or ship name */
 } NetObject;
 

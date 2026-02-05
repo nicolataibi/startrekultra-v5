@@ -62,28 +62,28 @@ void display_system_telemetry() {
     long shared_ram = (info.sharedram * mem_unit) / 1024 / 1024;
     int nprocs = sysconf(_SC_NPROCESSORS_ONLN);
 
-    printf("\n%s .--- LCARS (Library Computer Access and Retrieval System) ----------.%s\n", B_MAGENTA, RESET);
-    printf("%s | %s HOST IDENTIFIER:   %s%-48s %s|%s\n", B_MAGENTA, B_WHITE, B_GREEN, uts.nodename, B_MAGENTA, RESET);
-    printf("%s | %s OS KERNEL:         %s%-20s %sVERSION: %s%-19s %s|%s\n", B_MAGENTA, B_WHITE, B_GREEN, uts.sysname, B_WHITE, B_GREEN, uts.release, B_MAGENTA, RESET);
-    printf("%s | %s CORE LIBRARIES:    %sGNU libc %-39s %s|%s\n", B_MAGENTA, B_WHITE, B_GREEN, gnu_get_libc_version(), B_MAGENTA, RESET);
-    printf("%s | %s LOGICAL CORES:     %s%-2d Isolinear Units (Active)                  %s|%s\n", B_MAGENTA, B_WHITE, B_GREEN, nprocs, B_MAGENTA, RESET);
+    printf("\n%s .-------------------- LCARS (Library Computer Access and Retrieval System) --------------------.%s\n", B_MAGENTA, RESET);
+    printf("%s | %s HOST IDENTIFIER:   %s%-48s %s %s\n", B_MAGENTA, B_WHITE, B_GREEN, uts.nodename, B_MAGENTA, RESET);
+    printf("%s | %s OS KERNEL:         %s%-20s %sVERSION: %s%-19s %s %s\n", B_MAGENTA, B_WHITE, B_GREEN, uts.sysname, B_WHITE, B_GREEN, uts.release, B_MAGENTA, RESET);
+    printf("%s | %s CORE LIBRARIES:    %sGNU libc %-39s %s %s\n", B_MAGENTA, B_WHITE, B_GREEN, gnu_get_libc_version(), B_MAGENTA, RESET);
+    printf("%s | %s LOGICAL CORES:     %s%-2d Isolinear Units (Active)                  %s %s\n", B_MAGENTA, B_WHITE, B_GREEN, nprocs, B_MAGENTA, RESET);
     
-    printf("%s |                                                                     |%s\n", B_MAGENTA, RESET);
-    printf("%s | %s MEMORY ALLOCATION (LOGICAL LAYER)                                  %s|%s\n", B_MAGENTA, B_WHITE, B_MAGENTA, RESET);
-    printf("%s | %s PHYSICAL RAM:      %s%ld MB Total / %ld MB Free                    %s|%s\n", B_MAGENTA, B_WHITE, B_GREEN, total_ram, free_ram, B_MAGENTA, RESET);
-    printf("%s | %s SHARED SEGMENTS:   %s%ld MB (IPC/SHM Active)                       %s|%s\n", B_MAGENTA, B_WHITE, B_GREEN, shared_ram, B_MAGENTA, RESET);
+    printf("%s |                                                                      %s\n", B_MAGENTA, RESET);
+    printf("%s | %s MEMORY ALLOCATION (LOGICAL LAYER)                                  %s %s\n", B_MAGENTA, B_WHITE, B_MAGENTA, RESET);
+    printf("%s | %s PHYSICAL RAM:      %s%ld MB Total / %ld MB Free                    %s %s\n", B_MAGENTA, B_WHITE, B_GREEN, total_ram, free_ram, B_MAGENTA, RESET);
+    printf("%s | %s SHARED SEGMENTS:   %s%ld MB (IPC/SHM Active)                       %s %s\n", B_MAGENTA, B_WHITE, B_GREEN, shared_ram, B_MAGENTA, RESET);
     
-    printf("%s |                                                                     |%s\n", B_MAGENTA, RESET);
-    printf("%s | %s SUBSPACE NETWORK TOPOLOGY                                          %s|%s\n", B_MAGENTA, B_WHITE, B_MAGENTA, RESET);
+    printf("%s |                                                                      %s\n", B_MAGENTA, RESET);
+    printf("%s | %s SUBSPACE NETWORK TOPOLOGY                                          %s %s\n", B_MAGENTA, B_WHITE, B_MAGENTA, RESET);
     if (getifaddrs(&ifaddr) == -1) {
-        printf("%s | %s NETWORK ERROR:     %sUnable to scan subspace frequencies           %s|%s\n", B_MAGENTA, B_WHITE, B_RED, B_MAGENTA, RESET);
+        printf("%s | %s NETWORK ERROR:     %sUnable to scan subspace frequencies           %s %s\n", B_MAGENTA, B_WHITE, B_RED, B_MAGENTA, RESET);
     } else {
         for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
             if (ifa->ifa_addr == NULL || ifa->ifa_addr->sa_family != AF_INET) continue;
             char addr[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr, addr, sizeof(addr));
             if (strcmp(ifa->ifa_name, "lo") == 0) continue;
-            printf("%s | %s INTERFACE: %-7s %sIP ADDR: %-15s (ACTIVE)         %s|%s\n", B_MAGENTA, B_WHITE, ifa->ifa_name, B_GREEN, addr, B_MAGENTA, RESET);
+            printf("%s | %s INTERFACE: %-7s %sIP ADDR: %-15s (ACTIVE)         %s %s\n", B_MAGENTA, B_WHITE, ifa->ifa_name, B_GREEN, addr, B_MAGENTA, RESET);
         }
         freeifaddrs(ifaddr);
     }
@@ -93,36 +93,38 @@ void display_system_telemetry() {
     if (f) {
         char line[256];
         /* Skip 2 lines header */
-        fgets(line, 256, f); fgets(line, 256, f);
+        if (fgets(line, 256, f) && fgets(line, 256, f)) {
+            /* Successfully skipped */
+        }
         while (fgets(line, 256, f)) {
             char ifname[32]; long rx, tx, tmp;
             if (sscanf(line, " %[^:]: %ld %ld %ld %ld %ld %ld %ld %ld %ld", ifname, &rx, &tmp, &tmp, &tmp, &tmp, &tmp, &tmp, &tmp, &tx) >= 2) {
                 if (strcmp(ifname, "lo") == 0 || rx == 0) continue;
-                printf("%s | %s TRAFFIC (%-5s):   %sRX: %-8ld KB  TX: %-8ld KB             %s|%s\n", 
+                printf("%s | %s TRAFFIC (%-5s):   %sRX: %-8ld KB  TX: %-8ld KB             %s %s\n", 
                        B_MAGENTA, B_WHITE, ifname, B_GREEN, rx/1024, tx/1024, B_MAGENTA, RESET);
             }
         }
         fclose(f);
     }
     
-    printf("%s |                                                                     |%s\n", B_MAGENTA, RESET);
-    printf("%s | %s SUBSPACE DYNAMICS                                                  %s|%s\n", B_MAGENTA, B_WHITE, B_MAGENTA, RESET);
+    printf("%s |                                                                      %s\n", B_MAGENTA, RESET);
+    printf("%s | %s SUBSPACE DYNAMICS                                                  %s %s\n", B_MAGENTA, B_WHITE, B_MAGENTA, RESET);
     double load = 1.0 / (1 << SI_LOAD_SHIFT);
-    printf("%s | %s LOAD INTERFERENCE: %s%.2f (1m)  %.2f (5m)  %.2f (15m)                  %s|%s\n", 
+    printf("%s | %s LOAD INTERFERENCE: %s%.2f (1m)  %.2f (5m)  %.2f (15m)                  %s %s\n", 
            B_MAGENTA, B_WHITE, B_GREEN, info.loads[0] * load, info.loads[1] * load, info.loads[2] * load, B_MAGENTA, RESET);
     
     long days = info.uptime / 86400;
     long hours = (info.uptime % 86400) / 3600;
     long mins = (info.uptime % 3600) / 60;
-    printf("%s | %s UPTIME METRICS:    %s%ldd %02ldh %02ldm                                  %s|%s\n", B_MAGENTA, B_WHITE, B_GREEN, days, hours, mins, B_MAGENTA, RESET);
+    printf("%s | %s UPTIME METRICS:    %s%ldd %02ldh %02ldm                                  %s %s\n", B_MAGENTA, B_WHITE, B_GREEN, days, hours, mins, B_MAGENTA, RESET);
     
-    printf("%s |                                                                     |%s\n", B_MAGENTA, RESET);
-    printf("%s | %s CRYPTOGRAPHIC SUBSYSTEM (SECURE LAYER)                               %s|%s\n", B_MAGENTA, B_WHITE, B_MAGENTA, RESET);
-    printf("%s | %s SIGNATURE ALGO:    %sHMAC-SHA256 (EdDSA Surrogate)                 %s|%s\n", B_MAGENTA, B_WHITE, B_GREEN, B_MAGENTA, RESET);
-    printf("%s | %s ENCRYPTION FLAGS:  %s0x%08X (AES-GCM/PQC/INT)                      %s|%s\n", B_MAGENTA, B_WHITE, B_GREEN, 0x07, B_MAGENTA, RESET);
-    printf("%s | %s MASTER KEY:        %s%-43.43s %s|%s\n", B_MAGENTA, B_WHITE, B_YELLOW, getenv("TREK_SUB_KEY") ? getenv("TREK_SUB_KEY") : "NOT SET", B_MAGENTA, RESET);
+    printf("%s |                                                                      %s\n", B_MAGENTA, RESET);
+    printf("%s | %s CRYPTOGRAPHIC SUBSYSTEM (SECURE LAYER)                               %s %s\n", B_MAGENTA, B_WHITE, B_MAGENTA, RESET);
+    printf("%s | %s SIGNATURE ALGO:    %sHMAC-SHA256 (EdDSA Surrogate)                 %s %s\n", B_MAGENTA, B_WHITE, B_GREEN, B_MAGENTA, RESET);
+    printf("%s | %s ENCRYPTION FLAGS:  %s0x%08X (AES-GCM/PQC/INT)                      %s %s\n", B_MAGENTA, B_WHITE, B_GREEN, 0x07, B_MAGENTA, RESET);
+    printf("%s | %s MASTER KEY:        %s%-43.43s %s %s\n", B_MAGENTA, B_WHITE, B_YELLOW, getenv("TREK_SUB_KEY") ? getenv("TREK_SUB_KEY") : "NOT SET", B_MAGENTA, RESET);
     
-    printf("%s '---------------------------------------------------------------------'%s\n\n", B_MAGENTA, RESET);
+    printf("%s '-----------------------------------------------------------------------------------------'%s\n\n", B_MAGENTA, RESET);
 }
 
 void sign_galaxy_data() {
@@ -160,7 +162,9 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "The server requires a shared secret key to secure communications.\n");
         exit(1);
     }
-    strncpy((char*)MASTER_SESSION_KEY, env_key, 32);
+    memset(MASTER_SESSION_KEY, 0, 32);
+    size_t env_len = strlen(env_key);
+    memcpy(MASTER_SESSION_KEY, env_key, (env_len > 32) ? 32 : env_len);
     
     memset(players, 0, sizeof(players)); srand(time(NULL)); 
     for(int i=0; i<MAX_CLIENTS; i++) pthread_mutex_init(&players[i].socket_mutex, NULL);

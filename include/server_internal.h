@@ -99,6 +99,7 @@ typedef struct {
     int nav_timer; 
     double dx, dy, dz;
     double tx, ty, tz; 
+    uint8_t is_cloaked;
 } NPCShip;
 
 typedef struct { int id, q1, q2, q3; double x, y, z; int resource_type, amount, active; } NPCPlanet;

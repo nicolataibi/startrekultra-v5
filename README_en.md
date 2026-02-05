@@ -440,7 +440,7 @@ The `apr <ID> <DIST>` command allows you to automatically approach any object de
 | **Space Monsters** | 18000 - 18029 | `pha`, `tor`, `scan` | **< 1.5** | **Galactic Tracking** |
 
 *   `she <F> <R> <T> <B> <L> <RI>`: **Shield Configuration**. Distributes energy to the 6 shields.
-*   `clo`: **Cloaking Device**. Activates/Deactivates cloak (consumes energy).
+*   `clo`: **Cloaking Device**. Activates/Deactivates cloak. Consumes 15 energy units/tick. Provides invisibility to NPCs and other factions; unstable in nebulas.
 *   `pow <E> <S> <W>`: **Power Allocation**. Allocates reactor energy (Engines, Shields, Weapons %).
 *   `aux jettison`: **Eject Warp Core**. Ejects the core (Suicide maneuver / Last resort).
 *   `xxx`: **Self-Destruct**. Sequential self-destruction.
@@ -462,6 +462,17 @@ The ship is protected by 6 independent quadrants: **Front (F), Rear (R), Top (T)
 *   **Destruction Condition**: If **Hull Integrity reaches 0%**, the ship instantly explodes, regardless of remaining energy or shield levels.
 *   **Continuous Regeneration**: Unlike older systems, shield regeneration is continuous but scales with hardware health.
 *   **Shield Failure**: If a quadrant reaches 0% integrity, subsequent hits from that direction will deal direct damage to the hull and the main energy reactor.
+
+#### 🛸 Cloaking Device
+The `clo` command activates an advanced cloaking technology that manipulates light and sensors to make the vessel invisible.
+
+*   **Tactical Invisibility**: Once active, you will not be detectable by the sensors (`srs`/`lrs`) of other players (unless they belong to your own faction). NPC ships will ignore you completely and will not initiate attack maneuvers.
+*   **Energy Costs**: Maintaining the cloak field is extremely energy-intensive, consuming **15 energy units per logic tick**. Carefully monitor your reactor reserves.
+*   **Sensor Limitations**: While cloaked, onboard sensors experience interference ("Sensors limited"), making it harder to acquire precise environmental data.
+*   **Instability in Nebulas**: Inside nebulas, the cloak field becomes unstable due to ionized gases. This can cause fluctuations in energy drain and inhibit shield regeneration.
+*   **Visual Feedback**: When cloaked, the original ship model disappears and is replaced by a wireframe mesh with a pulsing **"Blue Glowing" effect**. The HUD will display the status `[ CLOAKED ]` in magenta.
+*   **Combat Restrictions**: You cannot fire **Phasers** (`pha`) or launch **Torpedoes** (`tor`) while the cloaking device is active. You must decloak to engage the enemy.
+*   **NPC Strategy (Romulans)**: The Romulan Star Empire uses advanced cloaking tactics; their ships will remain cloaked while patrolling or fleeing, only revealing themselves to launch an attack.
 
 *   **Weapons (W)**: Directly scales the **Phaser Beam Intensity** and **Recharge Rate**. A higher allocation results in more energy being focused into the phaser banks, dealing exponentially more damage and allowing the phaser capacitor to refill much faster.
 
@@ -543,7 +554,16 @@ Star Trek Ultra distinguishes between **Active Systems** and **Cargo Storage**. 
 The Star Trek Ultra bridge operates via a high-precision Command Line Interface (CLI). Beyond navigation and combat, the simulator implements a sophisticated **Electronic Warfare** system based on real-world cryptography.
 
 #### 🛰️ Advanced Navigation & Utility Commands
-*   `cal <Q1> <Q2> <Q3>`: **Navigational Computer (High Precision)**. Instantly calculates the exact vector (Heading/Mark), distance, and provides a **Warp Velocity Table** with synchronized travel times.
+*   `nav <H> <M> <W> [F]`: **Warp Navigation**. Plots a warp course towards relative coordinates. `H`: Heading (0-359), `M`: Mark (-90/+90), `W`: Distance in quadrants, `F`: Optional Warp Factor (1.0 - 9.9).
+*   `imp <H> <M> <S>`: **Impulse Drive**. Sub-light navigation within the current sector. `S`: Speed in percentage (1-100%). Use `imp <S>` to only adjust speed.
+*   `jum <Q1> <Q2> <Q3>`: **Wormhole Jump**. Generates a spatial tunnel to a distant quadrant. Requires **5000 Energy and 1 Dilithium Crystal**.
+*   `apr <ID> [DIST]`: **Automatic Approach**. Autopilot intercepts the specified object at the desired distance (default 2.0). Works galaxy-wide for ships and comets.
+*   `cha`: **Chase Target**. Actively pursues the currently locked (`lock`) target.
+*   `rep <ID>`: **Repair System**. Initiates repairs on a subsystem (1: Warp, 2: Impulse, 3: Sensors, 4: Phasers, 5: Torpedoes, etc.).
+*   `inv`: **Inventory Report**. Detailed list of resources in cargo (Dilithium, Tritanium, Gases, etc.).
+*   `dam`: **Damage Report**. Detailed status of hull integrity and systems.
+*   `cal <Q1> <Q2> <Q3>`: **Warp Calculator**. Calculates the vector towards the center of a distant quadrant.
+*   `cal <Q1> <Q2> <Q3> <X> <Y> <Z>`: **Pinpoint Calculator**. Calculates the vector towards precise sector coordinates `[X, Y, Z]` in a distant quadrant. Provides arrival times and suggests the exact `nav` command to copy.
 *   `ical <X> <Y> <Z>`: **Impulse Calculator (ETA)**. Provides a full navigational computation for precise sector coordinates [0.0 - 10.0], including real-time travel time at current power levels.
 *   `who`: **Captains Registry**. Lists all commanders currently active in the galaxy, their tracking IDs, and current position. Crucial for identifying allies or potential predators before entering a sector.
 *   `sta`: **Status Report**. Complete systems diagnostic, including energy levels, hardware integrity, and power distribution.

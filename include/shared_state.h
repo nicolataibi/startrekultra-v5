@@ -35,6 +35,7 @@ typedef struct {
     int hull_integrity;
     int faction;
     int id;
+    int is_cloaked;
     char shm_name[64];
 } SharedObject;
 
