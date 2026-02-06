@@ -341,6 +341,15 @@ Below is the complete list of available commands, grouped by function.
 *   `scan <ID>`: **Deep Scan Analysis**. Performs a deep scan of the target or anomaly.
     *   **Vessels**: Reveals hull integrity, shield levels per quadrant, residual energy, crew count, and subsystem damage.
     *   **Anomalies**: Provides scientific data on Nebulas and Pulsars.
+
+#### 📡 Sensor Integrity and Data Accuracy
+The effectiveness of your sensors depends directly on the health of the **Sensors system (ID 2)**:
+*   **100% Health**: Accurate and reliable data.
+*   **Health < 100%**: Introduction of telemetry "noise". Sector coordinates `[X,Y,Z]` shown in `srs` become imprecise (error increases exponentially as health drops).
+*   **Health < 50%**: The `lrs` command starts displaying corrupted or incomplete data about surrounding quadrants.
+*   **Health < 30%**: Risk of "Target Ghosting" or failing to detect real objects.
+*   **Repair**: Use `rep 2` to restore nominal sensor precision.
+
 *   `srs`: **Short Range Sensors**. Detailed scan of the current quadrant.
     *   **Neighborhood Scan**: If the ship is near sector boundaries (< 2.5 units), sensors automatically detect objects in adjacent quadrants, listing them in a dedicated section to prevent ambushes.
 *   `lrs`: **Long Range Sensors**. 3x3x3 scan of surrounding quadrants displayed via **LCARS Tactical Console** (Zones: Top, Center, Down).
@@ -470,6 +479,9 @@ The ship is protected by 6 independent quadrants: **Front (F), Rear (R), Top (T)
 
 *   **Localized Damage**: Attacks (Phasers/Torpedoes) now hit specific quadrants based on the relative angle of impact.
 *   **Hull Integrity**: Represents the physical health of the ship (0-100%). If a shield quadrant reaches 0% or the impact is excessively powerful, residual damage directly hits the structural integrity.
+*   **Internal System Damage**: When the hull is struck directly (shields at zero), there is a high probability of sustaining damage to subsystems (engines, weapons, sensors, etc.).
+    *   **Phasers**: Moderate chance of random system damage.
+    *   **Torpedoes**: Very high chance (>50%) of critical system failure upon impact.
 *   **Hull Plating (Duranium)**: Additional plating (command `hull`) acts as a buffer: it absorbs physical damage *before* it affects Hull Integrity.
 *   **Destruction Condition**: If **Hull Integrity reaches 0%**, the ship instantly explodes, regardless of remaining energy or shield levels.
 *   **Continuous Regeneration**: Unlike older systems, shield regeneration is continuous but scales with hardware health.
@@ -541,20 +553,21 @@ The HUD displays "LIFE SUPPORT: XX.X%", which is directly linked to the integrit
 Star Trek Ultra distinguishes between **Active Systems** and **Cargo Storage**. This is reflected in the HUD as `ENERGY: X (CARGO: Y)`.
 
 *   **Active Energy/Torps**: These are resources currently available for immediate use.
-*   **Cargo Reserves**: Resources stored in the Cargo Bay.
+*   **Cargo Reserves (Cargo Bay)**: Resources stored for long-range replenishment.
     *   **Resource Table**:
         1. **Dilithium**: Warp Jump and energy conversion.
         2. **Tritanium**: Hull repairs and energy conversion.
-        3. **Verterium**: Photon torpedo production.
+        3. **Verterium**: Material for photon torpedo warheads (`[WARHEADS]`).
         4. **Monotanium**: Advanced structural alloy.
         5. **Isolinear**: Chips for complex system repairs.
         6. **Gases**: Collected from comets, energy conversion.
         7. **Duranium**: Armored hull plating.
         8. **Prisoners**: Captured enemy personnel.
-*   **Resource Conversion**: Raw materials must be converted (`con`) into usable Energy or Torpedoes before loading.
+*   **Resource Conversion**: Raw materials must be converted (`con`) into **CARGO Antimatter** or **CARGO Torpedoes** before loading into active systems.
 
-*   `rep [ID]`: **Repair**. Repairs a damaged system using **50 Tritanium** and **10 Isolinear**.
-    *   If no ID is provided, lists all 10 ship systems.
+*   `rep [ID]`: **Repair**. Repairs a damaged system (health < 100%) restoring it to full efficiency. Essential for fixing sensor noise or reactivating offline weapons.
+    *   **Cost**: Each repair consumes **50 Tritanium** and **10 Isolinear Chips**.
+    *   **Usage**: If no ID is provided, lists all 10 ship systems with their current integrity status.
     *   **System IDs**: `0`: Warp, `1`: Impulse, `2`: Sensors, `3`: Transp, `4`: Phasers, `5`: Torps, `6`: Computer, `7`: Life Support, `8`: Shields, `9`: Aux.
 *   **Crew Management**: 
     *   Initial personnel number depends on ship class (e.g., 1012 for Galaxy, 50 for Defiant).    *   **Vital Integrity**: If **Life Support** drops below 75%, the crew will start suffering periodic losses.
@@ -746,6 +759,8 @@ The quadrant is scattered with natural phenomena detectable by both sensors and 
 *   **Ion Storms**:
     *   **Effect**: Random global events synchronized in real-time on the map.
     *   **Frequency**: High (statistical average of one event every 5-6 minutes).
+    *   **Technical Impact**: Hitting a storm **instantly halves** sensor health (ID 2).
+    *   **Functional Degradation**: Damaged sensors (< 100%) produce "noise" in SRS/LRS reports (ghost objects, missing data, or imprecise coordinates). Below 25%, sensors become nearly unusable.
     *   **Technical Details**: Checked every 1000 ticks (33s), 20% event probability, with a 50% specific weight for ion storms.
     *   **Hazard**: Can blind sensors or violently push the ship off course.
 

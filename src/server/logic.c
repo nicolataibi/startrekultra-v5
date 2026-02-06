@@ -171,6 +171,19 @@ void update_npc_ai(int n) {
                 target->state.hull_integrity -= hull_dmg;
                 if (target->state.hull_integrity < 0) target->state.hull_integrity = 0;
                 
+                /* Internal System Damage Logic: Chance to hit a subsystem when shields are down */
+                if (rand() % 100 < (15 + (int)(dmg_rem / 500))) {
+                    int sys_idx = rand() % 10;
+                    float sys_dmg = 5.0f + (rand() % 20);
+                    target->state.system_health[sys_idx] -= sys_dmg;
+                    if (target->state.system_health[sys_idx] < 0) target->state.system_health[sys_idx] = 0;
+                    
+                    const char* sys_names[] = {"WARP", "IMPULSE", "SENSORS", "TRANSPORTERS", "PHASERS", "TORPEDOES", "COMPUTER", "LIFE SUPPORT", "SHIELDS", "AUXILIARY"};
+                    char alert[128];
+                    sprintf(alert, "CRITICAL: Impact on bare hull! %s system damaged!", sys_names[sys_idx]);
+                    send_server_msg(closest_p, "DAMAGE", alert);
+                }
+
                 /* Energy also takes some impact damage */
                 target->state.energy -= dmg_rem / 2;
             }
@@ -1148,6 +1161,21 @@ void update_game_logic() {
                     p->state.energy -= dmg; 
                     p->shield_regen_delay = 150; /* 5 seconds for torpedoes */
                     
+                    /* Torpedo System Damage: High chance to damage internal systems if shields are bypassed */
+                    if (dmg > 0) {
+                        if (rand() % 100 < (50 + (int)(dmg / 1000))) {
+                            int sys_idx = rand() % 10;
+                            float sys_dmg = 15.0f + (rand() % 35);
+                            p->state.system_health[sys_idx] -= sys_dmg;
+                            if (p->state.system_health[sys_idx] < 0) p->state.system_health[sys_idx] = 0;
+                            
+                            const char* sys_names[] = {"WARP", "IMPULSE", "SENSORS", "TRANSPORTERS", "PHASERS", "TORPEDOES", "COMPUTER", "LIFE SUPPORT", "SHIELDS", "AUXILIARY"};
+                            char alert[128];
+                            sprintf(alert, "SYSTEM ALERT: Torpedo impact caused critical failure in %s!", sys_names[sys_idx]);
+                            send_server_msg((int)(p-players), "DAMAGE", alert);
+                        }
+                    }
+
                     /* Renegade Status: If you hit a friendly player, you are a traitor */
                     if (p->faction == players[i].faction) {
                         players[i].renegade_timer = 18000; /* 10 minutes renegade status */

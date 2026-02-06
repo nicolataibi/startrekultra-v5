@@ -395,6 +395,15 @@ Line 353: *   `cal <QX> <QY> <QZ>`: **Warp Calculator**. Calcola H, M e tempo di
 *   `scan <ID>`: **Deep Scan Analysis**. Esegue una scansione profonda del bersaglio o dell'anomalia.
     *   **Navi**: Rivela integrità scafo, livelli scudi per quadrante, energia residua, equipaggio e danni ai sottosistemi.
     *   **Anomalie**: Fornisce dati scientifici su Nebulose e Pulsar.
+
+#### 📡 Integrità dei Sensori e Precisione Dati
+L'efficacia dei sensori dipende direttamente dalla salute del sistema **Sensori (ID 2)**:
+*   **Salute 100%**: Dati precisi e affidabili.
+*   **Salute < 100%**: Introduzione di "rumore" telemetrico. Le coordinate di settore `[X,Y,Z]` mostrate in `srs` diventano imprecise (l'errore aumenta esponenzialmente al calare della salute).
+*   **Salute < 50%**: Il comando `lrs` inizia a mostrare dati corrotti o incompleti sui quadranti circostanti.
+*   **Salute < 30%**: Rischio di "Target Ghosting" o mancata rilevazione di oggetti reali.
+*   **Riparazione**: Usare `rep 2` per ripristinare la precisione nominale.
+
 *   `srs`: **Short Range Sensors**. Scansione dettagliata del quadrante attuale.
     *   **Neighborhood Scan**: Se la nave è vicino ai confini del settore (< 2.5 unità), i sensori rilevano automaticamente oggetti nei quadranti adiacenti, elencandoli in una sezione dedicata per prevenire imboscate.
 *   `lrs`: **Long Range Sensors**. Scansione 3x3x3 dei quadranti circostanti visualizzata tramite **Console Tattica LCARS** (Zone: Top, Center, Down).
@@ -523,7 +532,10 @@ Il comando `pow` è fondamentale per la sopravvivenza e la superiorità tattica.
 La nave è protetta da 6 quadranti indipendenti: **Frontale (F), Posteriore (R), Superiore (T), Inferiore (B), Sinistro (L) e Destro (RI)**.
 
 *   **Danno Localizzato**: Gli attacchi (Faser/Siluri) colpiscono ora quadranti specifici in base all'angolo relativo di impatto.
-*   **Hull Integrity (Integrità Scafo)**: Rappresenta la salute fisica della nave (0-100%). Se un quadrante di scudi raggiunge lo 0% o il colpo è eccessivamente potente, il danno residuo colpisce direttamente l'integrità strutturale.
+*   **Danno Strutturale (Hull Integrity)**: Rappresenta la salute fisica della nave (0-100%). Se un quadrante di scudi raggiunge lo 0% o il colpo è eccessivamente potente, il danno residuo colpisce direttamente l'integrità strutturale.
+*   **Danno ai Sistemi Interni**: Quando lo scafo viene colpito direttamente (scudi a zero), c'è un'alta probabilità di subire danni ai sottosistemi (motori, armi, sensori, ecc.).
+    *   **Faser**: Probabilità moderata di danno casuale.
+    *   **Siluri**: Probabilità molto alta (>50%) di guasti critici ai sistemi interni.
 *   **Hull Plating (Duranio)**: La placcatura aggiuntiva (comando `hull`) funge da buffer: assorbe il danno fisico *prima* che questo intacchi la Hull Integrity.
 *   **Condizione di Distruzione**: Se la **Hull Integrity raggiunge lo 0%**, la nave esplode istantaneamente, indipendentemente dai livelli di energia o scudi rimanenti.
 *   **Rigenerazione Continua**: A differenza dei vecchi sistemi, la rigenerazione degli scudi è continua ma scala con la salute dell'hardware.
@@ -596,20 +608,21 @@ L'HUD mostra "LIFE SUPPORT: XX.X%", valore direttamente collegato all'integrità
 Star Trek Ultra distingue tra **Sistemi Attivi** e **Stoccaggio Stiva**. Questa distinzione è visibile nell'HUD come `ENERGY: X (CARGO: Y)`.
 
 *   **Energia/Siluri Attivi**: Sono le risorse immediatamente utilizzabili dai sistemi della nave.
-*   **Riserve in Stiva**: Risorse conservate nella Cargo Bay.
+*   **Riserve in Stiva (Cargo Bay)**: Risorse conservate per il rifornimento a lungo raggio.
     *   **Tabella Risorse**:
-        1. **Dilithium**: Salto Warp e conversione energia.
+        1. **Dilithium**: Salto Warp e conversione energetica.
         2. **Tritanium**: Riparazione scafi e conversione energia.
-        3. **Verterium**: Produzione siluri fotonici.
+        3. **Verterium**: Materiale per testate siluri fotonici (`[WARHEADS]`).
         4. **Monotanium**: Lega strutturale avanzata.
         5. **Isolinear**: Chip per riparazioni sistemi complessi.
         6. **Gases**: Raccolti dalle comete, conversione energia.
         7. **Duranium**: Placcatura corazzata scafo.
         8. **Prisoners**: Personale nemico catturato.
-*   **Conversione Risorse**: Materie prime devono essere convertite (`con`) in Energia o Siluri prima dell'uso.
+*   **Conversione Risorse**: Materie prime devono essere convertite (`con`) in **CARGO Antimatter** o **CARGO Torpedoes** prima di essere caricate nei sistemi attivi.
 
-*   `rep [ID]`: **Repair**. Ripara un sistema danneggiato consumando **50 Tritanio** e **10 Isolineare**.
-    *   Se usato senza ID, elenca tutti i 10 sistemi della nave.
+*   `rep [ID]`: **Repair**. Ripara un sistema danneggiato (salute < 100%) riportandolo alla piena efficienza. Fondamentale per eliminare il rumore telemetrico dei sensori o riattivare armi offline.
+    *   **Costo**: Ogni riparazione consuma **50 Tritanio** e **10 Isolineare**.
+    *   **Funzionamento**: Se usato senza ID, elenca tutti i 10 sistemi con il loro stato di integrità.
     *   **ID Sistemi**: `0`: Warp, `1`: Impulse, `2`: Sensori, `3`: Trasportatori, `4`: Faser, `5`: Siluri, `6`: Computer, `7`: Supporto Vitale, `8`: Scudi, `9`: Ausiliari.
 *   **Gestione Equipaggio**: 
     *   Il numero iniziale di personale dipende dalla classe della nave (es. 1012 per la Galaxy, 50 per la Defiant).
@@ -779,6 +792,8 @@ Il quadrante è disseminato di fenomeni naturali rilevabili sia dai sensori che 
 *   **Tempeste Ioniche**:
     *   **Effetto**: Eventi casuali globali sincronizzati in tempo reale sulla mappa.
     *   **Frequenza**: Elevata (media statistica di un evento ogni 5-6 minuti).
+    *   **Impatto Tecnico**: Colpire una tempesta **dimezza istantaneamente** la salute dei sensori (ID 2).
+    *   **Degrado Funzionale**: Sensori danneggiati (< 100%) producono "rumore" nei rapporti SRS/LRS (oggetti fantasma, dati mancanti o coordinate imprecise). Sotto il 25%, i sensori diventano quasi inutilizzabili.
     *   **Dettagli Tecnici**: Controllo ogni 1000 tick (33s), probabilità evento 20%, di cui il 50% sono tempeste ioniche.
     *   **Pericolo**: Possono accecare i sensori o spostare violentemente la nave fuori dalla rotta stabilita.
 
