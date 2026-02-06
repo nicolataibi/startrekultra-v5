@@ -2447,7 +2447,7 @@ void display() {
 
         /* 2. Vital Resources */
         glColor3f(1.0f, 1.0f, 1.0f);
-        sprintf(buf, "ENERGY: %-7d (CARGO: %-7d) | TORPS: %-4d (CARGO: %-4d)", g_energy, g_cargo_energy, g_torpedoes_launcher, g_cargo_torps);
+        sprintf(buf, "ENERGY: %-7d (CARGO ANTIMATTER: %-7d) | TORPS: %-4d (CARGO TORPEDOES: %-4d)", g_energy, g_cargo_energy, g_torpedoes_launcher, g_cargo_torps);
         drawText3D(x_off, y_pos, 0, buf); y_pos -= 18;
         
         /* Hull Integrity Main Display */
@@ -2501,7 +2501,7 @@ void display() {
         /* 4. Cargo Inventory (2 columns) */
         glColor3f(0.8f, 0.5f, 0.0f);
         drawText3D(x_off, y_pos, 0, "--- CARGO INVENTORY ---"); y_pos -= 18;
-        const char* res_names[] = {"-", "Dilithium", "Tritanium", "Verterium", "Monotanium", "Isolinear", "Gases", "Duranium", "Prisoners"};
+        const char* res_names[] = {"-", "Dilithium", "Tritanium", "Verterium (Torp)", "Monotanium", "Isolinear", "Gases", "Duranium", "Prisoners"};
         for(int i=1; i<5; i++) {
             for(int col=0; col<2; col++) {
                 int idx = i + col*4;
@@ -2603,7 +2603,7 @@ void display() {
                     float dist = sqrt(dx*dx + dy*dy + dz*dz);
                     
                     glColor3f(1.0f, 1.0f, 1.0f);
-                    sprintf(buf, "ENERGY: %d (%d%%) | DIST: %.2f", objects[i].energy, objects[i].health_pct, dist);
+                    sprintf(buf, "ANTIMATTER: %d (%d%%) | DIST: %.2f", objects[i].energy, objects[i].health_pct, dist);
                     drawText3D(tx_pos, ty_pos, 0, buf); ty_pos -= 15;
 
                     sprintf(buf, "HEADING: %.0f | MARK: %+.0f", objects[i].h, objects[i].m);

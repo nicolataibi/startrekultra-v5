@@ -678,9 +678,10 @@ Upon launching `trek_server`, the system performs a complete diagnostic of the h
 This diagnostic ensures the server operates in a nominal environment before opening subspace communication channels on port `3073`.
 
 
-#### 📟 Telemetry and HUD Monitoring
+#### 📟 HUD Telemetry and Monitoring
 The on-screen interface (Overlay) provides constant monitoring of vital parameters:
 *   **Reactor & Shield Status**: Real-time display of available energy and average defensive grid power.
+*   **Cargo Monitoring**: Explicit monitoring of **CARGO ANTIMATTER** and **CARGO TORPEDOES** reserves for rapid resupply.
 *   **Hull Integrity**: Physical state of the hull (0-100%). If it drops to zero, the vessel is lost.
 *   **Hull Plating**: Golden indicator of Duranium-reinforced hull integrity (visible only if present).
 *   **Sector Coordinates**: Instant conversion of spatial data into relative coordinates `[S1, S2, S3]` (0.0 - 10.0), mirroring those used in `nav` and `imp` commands.

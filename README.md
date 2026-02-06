@@ -713,7 +713,8 @@ Questa diagnostica assicura che il server operi in un ambiente nominale prima di
 
 #### 📟 Telemetria e Monitoraggio HUD
 L'interfaccia a schermo (Overlay) fornisce un monitoraggio costante dei parametri vitali:
-*   **Reactor & Shield Status**: Real-time display of available energy and average defensive grid power.
+*   **Reactor & Shield Status**: Visualizzazione in tempo reale dell'energia disponibile e della potenza media della griglia difensiva.
+*   **Cargo Monitoring**: Monitoraggio esplicito delle riserve di **CARGO ANTIMATTER** e **CARGO TORPEDOES** per il rifornimento rapido.
 *   **Hull Integrity**: Stato fisico dello scafo (0-100%). Se scende a zero, il vascello è perduto.
 *   **Hull Plating**: Indicatore in oro dell'integrità dello scafo rinforzato con Duranio (visibile solo se presente).
 *   **Coordinate di Settore**: Conversione istantanea dei dati spaziali in coordinate relative `[S1, S2, S3]` (0.0 - 10.0), speculari a quelle utilizzate nei comandi `nav` e `imp`.
