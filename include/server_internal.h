@@ -56,6 +56,7 @@ typedef struct {
     /* Jump Visuals */
     double wx, wy, wz;      /* Wormhole entrance coords */
     int shield_regen_delay;
+    int renegade_timer;     /* Ticks until faction forgives friendly fire */
     
     /* Boarding Interaction State */
     int pending_bor_target; /* ID of target player */

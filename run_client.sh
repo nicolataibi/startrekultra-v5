@@ -2,9 +2,6 @@
 # STAR TREK ULTRA - TACTICAL BRIDGE INTERFACE
 # Professional Startup Script
 
-# TREK_SUB_KEY="ciao" ./run_client.sh
-
-
 # Colori
 RED='\033[1;31m'
 GREEN='\033[1;32m'
@@ -33,9 +30,13 @@ echo -e ' \_____________________________________________________________________
 echo ""
 
 # Verifica eseguibile
-if [ ! -f "./trek_client" ]; then
+if [ -f "./trek_client" ]; then
+    TREK_BIN="./trek_client"
+elif command -v trek_client > /dev/null; then
+    TREK_BIN="trek_client"
+else
     echo -e "${RED}[ERROR]${NC} Interfaccia tattica non trovata."
-    echo -e "${YELLOW}[HINT]${NC} Esegui 'make' prima di tentare l'accesso."
+    echo -e "${YELLOW}[HINT]${NC} Esegui 'make' o installa il pacchetto RPM."
     exit 1
 fi
 
@@ -52,5 +53,4 @@ echo -e "${GREEN}[LINK]${NC} Master Key caricata. Inizializzazione link neurale.
 echo ""
 
 # Esecuzione del client
-# Passiamo tutti gli argomenti (es. -d per debug) all\'eseguibile
-./trek_client "$@"
+$TREK_BIN "$@"

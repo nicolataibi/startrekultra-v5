@@ -32,6 +32,13 @@ void update_npc_ai(int n) {
     int closest_p = -1; double min_d2 = 100.0;
     for (int j = 0; j < local_q->player_count; j++) {
         ConnectedPlayer *p = local_q->players[j]; if (p->state.is_cloaked) continue;
+        
+        /* Faction/Reputation Logic: NPCs only attack if:
+         * 1. Player is from a different faction
+         * 2. Player is from SAME faction but is currently marked as RENEGADE/TRAITOR
+         */
+        if (p->faction == npcs[n].faction && p->renegade_timer <= 0) continue;
+
         double d2 = pow(npcs[n].gx - p->gx, 2) + pow(npcs[n].gy - p->gy, 2) + pow(npcs[n].gz - p->gz, 2);
         if (d2 < min_d2) { min_d2 = d2; closest_p = (int)(p - players); }
     }
@@ -249,6 +256,9 @@ void update_game_logic() {
                 ConnectedPlayer *p = local_q->players[j];
                 if (p->state.is_cloaked) continue;
                 
+                /* Faction Check for Platforms */
+                if (p->faction == platforms[pt].faction && p->renegade_timer <= 0) continue;
+
                 double dx = p->state.s1 - platforms[pt].x;
                 double dy = p->state.s2 - platforms[pt].y;
                 double dz = p->state.s3 - platforms[pt].z;
@@ -649,6 +659,14 @@ void update_game_logic() {
 
         /* 1.2 Torpedo Loading Timer */
         if (players[i].torp_load_timer > 0) players[i].torp_load_timer--;
+        
+        /* 1.2.1 Renegade Timer Decrement */
+        if (players[i].renegade_timer > 0) {
+            players[i].renegade_timer--;
+            if (players[i].renegade_timer == 0) {
+                send_server_msg(i, "COMMAND", "Amnesty granted. Your status has been restored to active duty.");
+            }
+        }
 
         /* 1.3 Update Tube State for HUD */
         if (players[i].state.system_health[5] <= 50.0f) players[i].state.tube_state = 3; /* OFFLINE */
@@ -1129,6 +1147,13 @@ void update_game_logic() {
 
                     p->state.energy -= dmg; 
                     p->shield_regen_delay = 150; /* 5 seconds for torpedoes */
+                    
+                    /* Renegade Status: If you hit a friendly player, you are a traitor */
+                    if (p->faction == players[i].faction) {
+                        players[i].renegade_timer = 18000; /* 10 minutes renegade status */
+                        send_server_msg(i, "CRITICAL", "FRIENDLY FIRE DETECTED! You have been marked as a TRAITOR by the fleet!");
+                    }
+
                     send_server_msg((int)(p-players), "WARNING", "HIT BY PHOTON TORPEDO!");
                     if(p->state.energy <= 0) { 
                         p->state.energy = 0; p->state.crew_count = 0;
@@ -1142,7 +1167,17 @@ void update_game_logic() {
             if (!hit) for (int n=0; n<lq->npc_count; n++) {
                 NPCShip *npc = lq->npcs[n];
                 double d = sqrt(pow(players[i].tx - npc->x, 2) + pow(players[i].ty - npc->y, 2) + pow(players[i].tz - npc->z, 2));
-                if (d < 0.8) { npc->energy -= 75000; if(npc->energy <= 0) { npc->active = 0; players[i].state.boom = (NetPoint){(float)npc->x, (float)npc->y, (float)npc->z, 1}; } hit = true; break; }
+                if (d < 0.8) { 
+                    npc->energy -= 75000; 
+                    
+                    /* Renegade Status: If you hit a friendly NPC */
+                    if (npc->faction == players[i].faction) {
+                        players[i].renegade_timer = 18000;
+                        send_server_msg(i, "CRITICAL", "ATTACKING FRIENDLY VESSEL! Sector command has revoked your status!");
+                    }
+
+                    if(npc->energy <= 0) { npc->active = 0; players[i].state.boom = (NetPoint){(float)npc->x, (float)npc->y, (float)npc->z, 1}; } hit = true; break; 
+                }
             }
             /* 3. Planets/Stars/Bases (Solid obstacles) */
             if (!hit) for (int p=0; p<lq->planet_count; p++) {

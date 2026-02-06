@@ -354,6 +354,7 @@ int main(int argc, char *argv[]) {
                                 }
 
                                 /* SESSION INITIALIZATION: Reset transient event flags */
+                                players[slot].renegade_timer = 0;
                                 players[slot].state.boom.active = 0;
                                 players[slot].state.torp.active = 0;
                                 players[slot].state.dismantle.active = 0;

@@ -765,6 +765,13 @@ void handle_pha(int i, const char *params) {
             }
 
             target->shield_regen_delay = 90; /* 3 seconds at 30Hz */
+            
+            /* Renegade Status: Phaser friendly fire */
+            if (target->faction == players[i].faction) {
+                players[i].renegade_timer = 18000;
+                send_server_msg(i, "CRITICAL", "UNAUTHORIZED PHASER FIRE ON ALLY! YOU ARE NOW A RENEGADE!");
+            }
+
             if (target->state.hull_integrity <= 0 || target->state.energy <= 0) { 
                 target->state.energy = 0; target->state.hull_integrity = 0; target->state.crew_count = 0; target->active = 0; 
                 target->state.boom = (NetPoint){(float)tx,(float)ty,(float)tz,1}; 
@@ -772,9 +779,23 @@ void handle_pha(int i, const char *params) {
             send_server_msg(tid-1, "WARNING", "UNDER PHASER ATTACK!");
         } else if (tid >= 1000 && tid < 1000+MAX_NPC) {
             npcs[tid-1000].energy -= hit; float engine_dmg = (hit / 1000.0f) * 10.0f; npcs[tid-1000].engine_health -= engine_dmg; if (npcs[tid-1000].engine_health < 0) npcs[tid-1000].engine_health = 0;
+            
+            /* Renegade Status: Phaser friendly fire (NPC) */
+            if (npcs[tid-1000].faction == players[i].faction) {
+                players[i].renegade_timer = 18000;
+                send_server_msg(i, "CRITICAL", "TRAITOROUS ATTACK! Friendly phaser lock detected!");
+            }
+
             if (npcs[tid-1000].energy <= 0) { npcs[tid-1000].active = 0; players[i].state.boom = (NetPoint){(float)npcs[tid-1000].x, (float)npcs[tid-1000].y, (float)npcs[tid-1000].z, 1}; }
         } else if (tid >= 16000 && tid < 16000+MAX_PLATFORMS) {
             platforms[tid-16000].energy -= hit;
+            
+            /* Renegade Status: Platforms */
+            if (platforms[tid-16000].faction == players[i].faction) {
+                players[i].renegade_timer = 18000;
+                send_server_msg(i, "CRITICAL", "ACT OF SABOTAGE! Federation/Faction property attacked!");
+            }
+
             if (platforms[tid-16000].energy <= 0) { platforms[tid-16000].active = 0; players[i].state.boom = (NetPoint){(float)platforms[tid-16000].x, (float)platforms[tid-16000].y, (float)platforms[tid-16000].z, 1}; }
         } else if (tid >= 18000 && tid < 18000+MAX_MONSTERS) {
             monsters[tid-18000].energy -= hit;

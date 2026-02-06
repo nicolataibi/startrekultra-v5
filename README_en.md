@@ -281,6 +281,18 @@ The Star Trek Ultra universe is a dynamic ecosystem populated by 17 classes of e
 *   **Borg Collective**: The greatest threat. Their Cubes have massive firepower and superior regenerative capabilities.
 *   **NPC Factions**: Cardassians, Dominion (Jem'Hadar), Tholians, Gorn, Ferengi, Species 8472, Breen, and Hirogen. Each with varying levels of hostility and power.
 
+#### ⚖️ Faction System and "Renegade" Protocol
+Star Trek Ultra implements a dynamic reputation system that manages relationships between the player and the various galactic powers.
+
+*   **Allied IFF Recognition**: Upon character creation, the captain chooses a faction. NPC ships and defense platforms of the same faction will recognize the vessel as an ally and **will not open fire on sight**.
+*   **Friendly Fire and Betrayal**: If a player deliberately attacks a unit of their own faction (ship, base, or platform):
+    *   **Renegade Status**: The captain is immediately marked as a **TRAITOR (Renegade)**.
+    *   **Immediate Retaliation**: All units of their own faction in the sector will become hostile and begin heavy attack maneuvers.
+    *   **Alert Message**: The onboard computer will receive a critical warning: `FRIENDLY FIRE DETECTED! You have been marked as a TRAITOR by the fleet!`.
+*   **Duration and Amnesty**: The traitor status is severe but temporary. It lasts for **10 minutes (real time)**.
+    *   During this period, any further attack against allies will reset the timer.
+    *   When the timer expires, if no further hostilities have been committed, Sector Command will grant amnesty: `Amnesty granted. Your status has been restored to active duty.` and faction units will return to being neutral/allied.
+
 ### ⚠️ Tactical Hazards and Resources
 *   **Asteroid Fields**: Rocky debris posing a physical risk. Collision damage increases with ship speed.
 *   **Space Mines**: Hidden explosive devices placed by hostile factions. Detectable only via close-range scanning.
@@ -620,7 +632,10 @@ The 3D viewer is not a simple graphic window but an extension of the command bri
 
 #### 🎯 Integrated Tactical Projection
 The system uses spatial projection algorithms to anchor information directly above detected entities:
-*   **Targeting Tags**: Each vessel is identified with a dynamic label. For players, it shows `Class (Captain Name)`, for NPCs `Faction [ID]`.
+*   **Targeting Tags**: Each vessel is identified with an advanced dynamic label.
+    *   **Federation Players**: Displays `Federation - [Class] ([Captain Name])`.
+    *   **Alien Players**: Displays `[Faction] ([Captain Name])`.
+    *   **NPC Units**: Displays `[Faction] [ID]`.
 *   **Health Bars**: Chromatic health indicators (Green/Yellow/Red) displayed above each ship and station, allowing instant evaluation of enemy status without consulting text logs.
 *   **Visual Latching**: Combat effects (phasers, explosions) are temporally synchronized with server logic, providing immediate visual feedback on hit impact.
 

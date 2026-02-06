@@ -1,0 +1,2 @@
+TREK_SUB_KEY="thisisasecretkeyforencryption" ./run_server.sh
+TREK_SUB_KEY="thisisasecretkeyforencryption" ./run_client.sh

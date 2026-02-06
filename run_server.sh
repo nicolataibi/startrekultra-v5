@@ -2,8 +2,6 @@
 # STAR TREK ULTRA - GALAXY SERVER BOOTLOADER
 # Professional Startup Script
 
-# TREK_SUB_KEY="ciao" ./run_server.sh 
-
 # Colori
 RED='\033[1;31m'
 GREEN='\033[1;32m'
@@ -27,9 +25,13 @@ echo -e ' \_____________________________________________________________________
 echo ""
 
 # Verifica eseguibile
-if [ ! -f "./trek_server" ]; then
+if [ -f "./trek_server" ]; then
+    TREK_BIN="./trek_server"
+elif command -v trek_server > /dev/null; then
+    TREK_BIN="trek_server"
+else
     echo -e "${RED}[ERROR]${NC} Eseguibile 'trek_server' non trovato."
-    echo -e "${YELLOW}[HINT]${NC} Esegui 'make' per compilare il progetto."
+    echo -e "${YELLOW}[HINT]${NC} Esegui 'make' o installa il pacchetto RPM."
     exit 1
 fi
 
@@ -47,4 +49,4 @@ echo -e "${BLUE}[INFO]${NC} Server in ascolto sulla porta 5000 (TCP/Binary)"
 echo ""
 
 # Esecuzione del server
-./trek_server "$@"
+$TREK_BIN "$@"

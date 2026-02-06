@@ -1,13 +1,15 @@
+%global rel 1
 Name:           startrek-ultra
 Version:        2026.02.05
-Release:        1%{?dist}
+Release:        %{rel}%{?dist}
 Summary:        Star Trek Ultra: 3D Multi-User Client-Server Edition
 
+# Disable debuginfo to keep the package simple for this project
 %define debug_package %{nil}
 
 License:        GPLv3
 URL:            https://github.com/nicolataibi/startrekultra-v5
-Source0:        %{name}-%{version}.tar.gz
+Source0:        %{name}-%{version}-%{rel}.tar.gz
 
 BuildRequires:  gcc
 BuildRequires:  make
@@ -31,7 +33,8 @@ and a technical 3D visualizer based on OpenGL and FreeGLUT.
 %setup -q
 
 %build
-make %{?_smp_mflags}
+# Use the provided Makefile but ensure we pass optimization flags
+make %{?_smp_mflags} CFLAGS="%{optflags} -Iinclude -std=c2x -D_XOPEN_SOURCE=700"
 
 %install
 rm -rf %{buildroot}
@@ -39,27 +42,29 @@ mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_datadir}/%{name}
 
 # Install binaries
-install -m 0755 trek_server %{buildroot}%{_bindir}/
-install -m 0755 trek_client %{buildroot}%{_bindir}/
-install -m 0755 trek_3dview %{buildroot}%{_bindir}/
-install -m 0755 trek_galaxy_viewer %{buildroot}%{_bindir}/
+install -p -m 0755 trek_server %{buildroot}%{_bindir}/
+install -p -m 0755 trek_client %{buildroot}%{_bindir}/
+install -p -m 0755 trek_3dview %{buildroot}%{_bindir}/
+install -p -m 0755 trek_galaxy_viewer %{buildroot}%{_bindir}/
 
-# Install data files
-install -m 0644 LICENSE.txt %{buildroot}%{_datadir}/%{name}/
-install -m 0644 *.jpg %{buildroot}%{_datadir}/%{name}/
+# Install helper scripts as user commands
+install -p -m 0755 run_server.sh %{buildroot}%{_bindir}/%{name}-server
+install -p -m 0755 run_client.sh %{buildroot}%{_bindir}/%{name}-client
+
+# Install data and templates
+install -p -m 0644 LICENSE.txt %{buildroot}%{_datadir}/%{name}/
 
 %files
 %license LICENSE.txt
-%doc README.md README_en.md
+%doc README.md README_en.md *.jpg
 %{_bindir}/trek_server
 %{_bindir}/trek_client
 %{_bindir}/trek_3dview
 %{_bindir}/trek_galaxy_viewer
+%{_bindir}/%{name}-server
+%{_bindir}/%{name}-client
 %{_datadir}/%{name}/
 
 %changelog
-* Thu Feb 05 2026 Nicola Taibi <nicola.taibi@example.com> - 2026.02.05-1
-- Initial RPM release
-- Added technical cloaking effect with blue glowing shader
-- Integrated PQC (Post-Quantum Cryptography) for subspace telemetry
-- Added multi-user tactical viewer support
+* Fri Feb 06 2026 Nicola Taibi <nicola.taibi.1967@gmail.com> - 2026.02.05-2
+- Improved helper scripts and build flags

@@ -334,6 +334,18 @@ L'universo di Star Trek Ultra è un ecosistema dinamico popolato da 17 classi di
 *   **Collettivo Borg**: La minaccia più grande. I loro Cubi hanno una potenza di fuoco massiccia e capacità rigenerative superiori.
 *   **Fazioni NPC**: Cardassiani, Dominion (Jem'Hadar), Tholiani, Gorn, Ferengi, Specie 8472, Breen e Hirogen. Ognuna con diversi livelli di ostilità e potenza.
 
+#### ⚖️ Sistema di Fazioni e Protocollo "Traditore" (Renegade)
+Star Trek Ultra implementa un sistema di reputazione dinamico che gestisce le relazioni tra il giocatore e le diverse potenze galattiche.
+
+*   **Riconoscimento IFF Alleato**: Al momento della creazione del personaggio, il capitano sceglie una fazione di appartenenza. Le navi NPC e le piattaforme di difesa della stessa fazione riconosceranno il vascello come alleato e **non apriranno il fuoco a vista**.
+*   **Fuoco Amico e Tradimento**: Se un giocatore attacca deliberatamente un'unità della propria fazione (nave, base o piattaforma):
+    *   **Stato Renegade**: Il capitano viene immediatamente marcato come **TRADITORE (Renegade)**.
+    *   **Ritorsione Immediata**: Tutte le unità della propria fazione nel settore diventeranno ostili e inizieranno manovre di attacco pesanti.
+    *   **Messaggio di Allerta**: Il computer di bordo riceverà un avviso critico dal Comando di Settore: `FRIENDLY FIRE DETECTED! You have been marked as a TRAITOR by the fleet!`.
+*   **Durata e Amnistia**: Lo status di traditore è temporaneo ma severo. Ha una durata di **10 minuti (tempo reale)**.
+    *   Durante questo periodo, ogni ulteriore attacco contro alleati resetterà il timer.
+    *   Allo scadere del tempo, se non sono state commesse altre ostilità, il Comando di Settore concederà l'amnistia: `Amnesty granted. Your status has been restored to active duty.` e le unità della fazione torneranno ad essere neutrali/alleate.
+
 ### ⚠️ Pericoli e Risorse Tattiche
 *   **Campi di Asteroidi**: Detriti rocciosi che rappresentano un rischio fisico. Il danno da collisione aumenta con la velocità della nave.
 *   **Mine Spaziali**: Ordigni esplosivi occulti piazzati da fazioni ostili. Rilevabili solo tramite scansione ravvicinata.
@@ -653,7 +665,10 @@ Il visualizzatore 3D non è una semplice finestra grafica, ma un'estensione del 
 
 #### 🎯 Proiezione Tattica Integrata
 Il sistema utilizza algoritmi di proiezione spaziale per ancorare le informazioni direttamente sopra le entità rilevate:
-*   **Targeting Tags**: Ogni vascello viene identificato con un'etichetta dinamica. Per i giocatori mostra `Classe (Nome Capitano)`, per gli NPC `Fazione [ID]`.
+*   **Targeting Tags**: Ogni vascello viene identificato con un'etichetta dinamica avanzata.
+    *   **Giocatori Federazione**: Mostra `Federation - [Classe] ([Nome Capitano])`.
+    *   **Giocatori Alieni**: Mostra `[Fazione] ([Nome Capitano])`.
+    *   **Unità NPC**: Mostra `[Fazione] [ID]`.
 *   **Health Bars**: Indicatori cromatici della salute (Verde/Giallo/Rosso) visualizzati sopra ogni nave e stazione, permettendo di valutare istantaneamente lo stato del nemico senza consultare i log testuali.
 *   **Visual Latching**: Gli effetti di combattimento (phaser, esplosioni) sono sincronizzati temporalmente con la logica del server, fornendo un feedback visivo immediato all'impatto dei colpi.
 

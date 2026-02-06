@@ -724,12 +724,30 @@ int main(int argc, char *argv[]) {
         printf("\n" B_WHITE "--- NEW RECRUIT IDENTIFIED ---" RESET "\n");
         printf("--- SELECT YOUR FACTION ---\n");
         printf(" 0: Federation\n 1: Klingon\n 2: Romulan\n 3: Borg\n 4: Cardassian\n 5: Jem'Hadar\n 6: Tholian\n 7: Gorn\n 8: Ferengi\n 9: Species 8472\n 10: Breen\n 11: Hirogen\nSelection: ");
-        if (scanf("%d", &my_faction) != 1) { my_faction = 0; }
+        int selection;
+        if (scanf("%d", &selection) != 1) { selection = 0; }
+        switch(selection) {
+            case 0: my_faction = FACTION_FEDERATION; break;
+            case 1: my_faction = FACTION_KLINGON; break;
+            case 2: my_faction = FACTION_ROMULAN; break;
+            case 3: my_faction = FACTION_BORG; break;
+            case 4: my_faction = FACTION_CARDASSIAN; break;
+            case 5: my_faction = FACTION_JEM_HADAR; break;
+            case 6: my_faction = FACTION_THOLIAN; break;
+            case 7: my_faction = FACTION_GORN; break;
+            case 8: my_faction = FACTION_FERENGI; break;
+            case 9: my_faction = FACTION_SPECIES_8472; break;
+            case 10: my_faction = FACTION_BREEN; break;
+            case 11: my_faction = FACTION_HIROGEN; break;
+            default: my_faction = FACTION_FEDERATION; break;
+        }
         
         if (my_faction == FACTION_FEDERATION) {
             printf("\n" B_WHITE "--- SELECT YOUR CLASS ---" RESET "\n");
             printf(" 0: Constitution\n 1: Miranda\n 2: Excelsior\n 3: Constellation\n 4: Defiant\n 5: Galaxy\n 6: Sovereign\n 7: Intrepid\n 8: Akira\n 9: Nebula\n 10: Ambassador\n 11: Oberth\n 12: Steamrunner\nSelection: ");
             if (scanf("%d", &my_ship_class) != 1) { my_ship_class = 0; }
+        } else {
+            my_ship_class = SHIP_CLASS_GENERIC_ALIEN;
         }
         clear_stdin();
     } else {

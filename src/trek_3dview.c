@@ -622,6 +622,24 @@ const char* getSpeciesName(int s) {
     }
 }
 
+const char* getFactionHUDName(int f) {
+    switch(f) {
+        case 0:  return "Federation";
+        case 10: return "Klingon Empire";
+        case 11: return "Romulan Star Empire";
+        case 12: return "Borg Collective";
+        case 13: return "Cardassian Union";
+        case 14: return "Jem'Hadar / Dominion";
+        case 15: return "Tholian Assembly";
+        case 16: return "Gorn Hegemony";
+        case 17: return "Ferengi Alliance";
+        case 18: return "Species 8472";
+        case 19: return "Breen Confederacy";
+        case 20: return "Hirogen Hunters";
+        default: return "Unknown Faction";
+    }
+}
+
 const char* getClassName(int c) {
     switch(c) {
         case SHIP_CLASS_CONSTITUTION: return "Constitution";
@@ -637,6 +655,7 @@ const char* getClassName(int c) {
         case SHIP_CLASS_AMBASSADOR:   return "Ambassador";
         case SHIP_CLASS_OBERTH:       return "Oberth";
         case SHIP_CLASS_STEAMRUNNER:  return "Steamrunner";
+        case SHIP_CLASS_GENERIC_ALIEN: return "Vessel";
         default:                      return "Vessel";
     }
 }
@@ -674,8 +693,12 @@ void drawHUD(int obj_idx) {
         /* Draw Name/ID - Use a fixed offset from winY to keep it above health bar */
         char buf[128];
         if (type == 1) {
-            /* Player: Class (Captain) */
-            sprintf(buf, "%s (%s)", getClassName(obj->ship_class), obj->name);
+            /* Player: Faction - Class (Captain) */
+            if (obj->faction == 0) { // FACTION_FEDERATION
+                sprintf(buf, "Federation - %s (%s)", getClassName(obj->ship_class), obj->name);
+            } else {
+                sprintf(buf, "%s (%s)", getFactionHUDName(obj->faction), obj->name);
+            }
             glColor3f(0.0f, 1.0f, 1.0f); /* Cyan for player */
         } else if (type >= 10 && type < 21) {
             /* NPC: Species [ID] */
@@ -2278,7 +2301,26 @@ void display() {
             }
 
             if (objects[i].type == 1) { 
-                drawFederationShip(objects[i].ship_class, objects[i].h, objects[i].m);
+                if (objects[i].faction == 0) { // FACTION_FEDERATION
+                    drawFederationShip(objects[i].ship_class, objects[i].h, objects[i].m);
+                } else {
+                    /* Non-Federation Player: Use Faction model */
+                    glRotatef(objects[i].h - 90.0f, 0, 1, 0); glRotatef(objects[i].m, 0, 0, 1);
+                    switch(objects[i].faction) {
+                        case 10: drawKlingon(0,0,0); break;
+                        case 11: drawRomulan(0,0,0); break;
+                        case 12: drawBorg(0,0,0); break;
+                        case 13: drawCardassian(0,0,0); break;
+                        case 14: drawJemHadar(0,0,0); break;
+                        case 15: drawTholian(0,0,0); break;
+                        case 16: drawGorn(0,0,0); break;
+                        case 17: drawFerengi(0,0,0); break;
+                        case 18: drawSpecies8472(0,0,0); break;
+                        case 19: drawBreen(0,0,0); break;
+                        case 20: drawHirogen(0,0,0); break;
+                        default: drawFederationShip(0, 0, 0); break;
+                    }
+                }
             } else {
                 glRotatef(objects[i].h - 90.0f, 0, 1, 0); glRotatef(objects[i].m, 0, 0, 1);
                 switch(objects[i].type) {
@@ -2388,7 +2430,11 @@ void display() {
         /* 1. Command & Location */
         glColor3f(1.0f, 1.0f, 0.0f); /* Yellow */
         /* Use captain name and class from local variables copied under mutex */
-        sprintf(buf, "%s - CAPTAIN: %s", getClassName(g_player_class), g_player_name);
+        if (g_shared_state->objects[0].faction == 0) { // FACTION_FEDERATION
+            sprintf(buf, "Federation - %s - CAPTAIN: %s", getClassName(g_player_class), g_player_name);
+        } else {
+            sprintf(buf, "%s - CAPTAIN: %s", getFactionHUDName(g_shared_state->objects[0].faction), g_player_name);
+        }
         drawText3D(x_off, y_pos, 0, buf); y_pos -= 20;
 
         glColor3f(0.0f, 1.0f, 1.0f); /* Cyan */
