@@ -22,10 +22,10 @@
 #define SHIELD_REGEN_DELAY      150     /* Ticks before regen after hit */
 
 /* --- Distances (Sector Units) --- */
-#define DIST_INTERACTION_MAX    2.0f
-#define DIST_MINING_MAX         2.0f
-#define DIST_DOCKING_MAX        2.0f
-#define DIST_SCOOPING_MAX       2.0f
+#define DIST_INTERACTION_MAX    3.1f
+#define DIST_MINING_MAX         3.1f
+#define DIST_DOCKING_MAX        3.1f
+#define DIST_SCOOPING_MAX       3.1f
 #define DIST_DISMANTLE_MAX      1.5f
 #define DIST_BOARDING_MAX       1.0f
 #define DIST_COLLISION_SHIP     0.8f

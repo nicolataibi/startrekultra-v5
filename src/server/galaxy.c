@@ -439,7 +439,7 @@ void generate_galaxy() {
                     bases[b_count] = (NPCBase){.id=b_count, .faction=FACTION_FEDERATION, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .health=5000, .active=1}; b_count++; actual_b++;
                 }
                 for(int p=0; p<planets_cnt && p_count < MAX_PLANETS; p++) {
-                    planets[p_count] = (NPCPlanet){.id=p_count, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .resource_type=(rand()%7)+1, .amount=1000, .active=1}; p_count++; actual_p++;
+                    planets[p_count] = (NPCPlanet){.id=p_count, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .resource_type=(rand()%8)+1, .amount=1000, .active=1}; p_count++; actual_p++;
                 }
                 for(int s=0; s<star && s_count < MAX_STARS; s++) {
                     stars_data[s_count] = (NPCStar){.id=s_count, .faction=4, .q1=i, .q2=j, .q3=l, .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, .active=1}; s_count++; actual_s++;
@@ -474,7 +474,7 @@ void generate_galaxy() {
                         .id=ast_count, .q1=i, .q2=j, .q3=l, 
                         .x=(rand()%100)/10.0, .y=(rand()%100)/10.0, .z=(rand()%100)/10.0, 
                         .size=0.1f+(rand()%20)/100.0f, 
-                        .resource_type=(rand()%10 < 7) ? 2 : 4, /* 70% Tritanium, 30% Monotanium */
+                        .resource_type=(rand()%8)+1, /* Random type 1-8 */
                         .amount=100 + rand()%401,
                         .active=1
                     }; 

@@ -40,7 +40,8 @@ typedef struct {
 } SharedObject;
 
 typedef struct {
-    float shm_tx, shm_ty, shm_tz;
+    float shm_sx, shm_sy, shm_sz; /* Source coordinates */
+    float shm_tx, shm_ty, shm_tz; /* Target coordinates */
     int active;
 } SharedBeam;
 
@@ -72,6 +73,7 @@ typedef struct {
     /* UI Info */
     int shm_energy;
     int shm_crew;
+    int shm_prison_unit;
     int shm_torpedoes;
     int shm_duranium_plating;
     float shm_hull_integrity;

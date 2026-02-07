@@ -433,6 +433,7 @@ void *network_listener(void *arg) {
                 g_shared_state->shm_duranium_plating = upd.duranium_plating;
                 g_shared_state->shm_hull_integrity = upd.hull_integrity;
                 g_shared_state->shm_crew = upd.crew_count;
+                g_shared_state->shm_prison_unit = upd.prison_unit;
                 g_shared_state->shm_torpedoes = upd.torpedoes;
                 g_shared_state->shm_cargo_energy = upd.cargo_energy;
                 g_shared_state->shm_cargo_torpedoes = upd.cargo_torpedoes;
@@ -498,6 +499,9 @@ void *network_listener(void *arg) {
                     for (int b=0; b < upd.beam_count; b++) {
                         if (g_shared_state->beam_count < MAX_BEAMS) {
                             int idx = g_shared_state->beam_count;
+                            g_shared_state->beams[idx].shm_sx = upd.beams[b].net_sx;
+                            g_shared_state->beams[idx].shm_sy = upd.beams[b].net_sy;
+                            g_shared_state->beams[idx].shm_sz = upd.beams[b].net_sz;
                             g_shared_state->beams[idx].shm_tx = upd.beams[b].net_tx;
                             g_shared_state->beams[idx].shm_ty = upd.beams[b].net_ty;
                             g_shared_state->beams[idx].shm_tz = upd.beams[b].net_tz;

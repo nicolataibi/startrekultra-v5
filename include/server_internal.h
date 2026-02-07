@@ -126,20 +126,20 @@ typedef struct { int id, faction, q1, q2, q3; double x, y, z; int health, active
 
 /* Local Quadrant Limits for Spatial Index (Optimization) */
 #define MAX_Q_NPC 32
-#define MAX_Q_PLANETS 16
-#define MAX_Q_BASES 8
-#define MAX_Q_STARS 32
-#define MAX_Q_BH 4
-#define MAX_Q_NEBULAS 8
-#define MAX_Q_PULSARS 4
-#define MAX_Q_COMETS 4
-#define MAX_Q_ASTEROIDS 20
-#define MAX_Q_DERELICTS 2
-#define MAX_Q_MINES 16
-#define MAX_Q_BUOYS 2
-#define MAX_Q_PLATFORMS 4
-#define MAX_Q_RIFTS 1
-#define MAX_Q_MONSTERS 1
+#define MAX_Q_PLANETS 32
+#define MAX_Q_BASES 16
+#define MAX_Q_STARS 64
+#define MAX_Q_BH 8
+#define MAX_Q_NEBULAS 16
+#define MAX_Q_PULSARS 8
+#define MAX_Q_COMETS 8
+#define MAX_Q_ASTEROIDS 40
+#define MAX_Q_DERELICTS 8
+#define MAX_Q_MINES 32
+#define MAX_Q_BUOYS 8
+#define MAX_Q_PLATFORMS 16
+#define MAX_Q_RIFTS 4
+#define MAX_Q_MONSTERS 4
 #define MAX_Q_PLAYERS 32
 
 /* Global Data accessed by modules */
@@ -171,6 +171,7 @@ typedef struct {
     int supernova_q1, supernova_q2, supernova_q3;
     double x, y, z; /* Epicenter of the explosion (The star) */
     int supernova_timer; /* Ticks remaining, 0 = inactive */
+    int star_id; /* ID of the star exploding */
 } SupernovaState;
 extern SupernovaState supernova_event;
 

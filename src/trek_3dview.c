@@ -7,6 +7,7 @@
 
 #define _DEFAULT_SOURCE
 #define GL_GLEXT_PROTOTYPES
+#include <GL/glew.h>
 #include <GL/freeglut.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,12 +26,36 @@
 
 #include "network.h"
 
+typedef struct {
+    float x, y, z;
+    float vx, vy, vz;
+    float r, g, b, a;
+    float size;
+    float life;
+    int active;
+} FXParticle;
+
+void spawnParticle(float x, float y, float z, float vx, float vy, float vz, float r, float g, float b, float size, float life);
+
 /* VBO Globals */
 GLuint vbo_stars = 0;
 GLuint vbo_grid = 0;
 int grid_vertex_count = 0;
 
+/* Bloom FBO Globals */
+GLuint fbo_scene = 0, tex_scene = 0, rbo_depth = 0;
+GLuint fbo_msaa = 0, rbo_color_msaa = 0, rbo_depth_msaa = 0;
+GLuint fbo_pingpong[2] = {0, 0}, tex_pingpong[2] = {0, 0};
+GLuint blurShaderProgram = 0, finalShaderProgram = 0;
+GLuint quadVAO = 0, quadVBO = 0;
+
+#define MAX_PARTICLES 2000
+FXParticle fx_particles[MAX_PARTICLES];
+GLuint particleShaderProgram = 0;
+
 /* Shader Globals */
+GLuint skyboxShaderProgram = 0;
+GLuint hullShaderProgram = 0;
 GLuint starShaderProgram = 0;
 GLuint bhShaderProgram = 0;
 GLuint whShaderProgram = 0;
@@ -66,6 +91,118 @@ GLuint linkProgram(GLuint vert, GLuint frag) {
 }
 
 void initShaders() {
+    /* SKYBOX: Procedural Nebula Shader */
+    const char* skyboxVert = "#version 120\n"
+        "varying vec3 vPos;\n"
+        "void main() {\n"
+        "    vPos = gl_Vertex.xyz;\n"
+        "    gl_Position = gl_ModelViewProjectionMatrix * vec4(gl_Vertex.xyz, 1.0);\n"
+        "}";
+
+    const char* skyboxFrag = "#version 120\n"
+        "varying vec3 vPos;\n"
+        "uniform float time;\n"
+        "/* Pseudo-random noise function */\n"
+        "float hash(float n) { return fract(sin(n) * 43758.5453123); }\n"
+        "float noise(vec3 x) {\n"
+        "    vec3 p = floor(x);\n"
+        "    vec3 f = fract(x);\n"
+        "    f = f*f*(3.0-2.0*f);\n"
+        "    float n = p.x + p.y*57.0 + 113.0*p.z;\n"
+        "    return mix(mix(mix(hash(n+0.0), hash(n+1.0),f.x),\n"
+        "                   mix(hash(n+57.0), hash(n+58.0),f.x),f.y),\n"
+        "               mix(mix(hash(n+113.0), hash(n+114.0),f.x),\n"
+        "                   mix(hash(n+170.0), hash(n+171.0),f.x),f.y),f.z);\n"
+        "}\n"
+        "void main() {\n"
+        "    vec3 dir = normalize(vPos);\n"
+        "    float n = noise(dir * 2.0 + time * 0.01);\n"
+        "    n += 0.5 * noise(dir * 4.0 - time * 0.02);\n"
+        "    /* Color palette: Deep purple and blue */\n"
+        "    vec3 col1 = vec3(0.05, 0.0, 0.15);\n"
+        "    vec3 col2 = vec3(0.0, 0.05, 0.1);\n"
+        "    vec3 finalCol = mix(col1, col2, n);\n"
+        "    /* Add some brighter gas patches */\n"
+        "    finalCol += vec3(0.1, 0.0, 0.2) * pow(n, 4.0);\n"
+        "    gl_FragColor = vec4(finalCol, 1.0);\n"
+        "}";
+
+    skyboxShaderProgram = linkProgram(compileShader(skyboxVert, GL_VERTEX_SHADER), compileShader(skyboxFrag, GL_FRAGMENT_SHADER));
+
+    /* HULL: Procedural Plating with Triplanar Mapping */
+    const char* hullVert = "#version 120\n"
+        "varying vec3 vPos;\n"
+        "varying vec3 vNorm;\n"
+        "void main() {\n"
+        "    vPos = gl_Vertex.xyz;\n"
+        "    vNorm = gl_NormalMatrix * gl_Normal;\n"
+        "    gl_Position = gl_ModelViewProjectionMatrix * vec4(gl_Vertex.xyz, 1.0);\n"
+        "    gl_FrontColor = gl_Color;\n"
+        "}";
+
+    const char* hullFrag = "#version 120\n"
+        "varying vec3 vPos;\n"
+        "varying vec3 vNorm;\n"
+        "uniform vec3 lightPos;\n"
+        "uniform float hitPulse;\n"
+        "float hash(float n) { return fract(sin(n) * 43758.5453123); }\n"
+        "float noise(vec3 x) {\n"
+        "    vec3 p = floor(x);\n"
+        "    vec3 f = fract(x);\n"
+        "    f = f*f*(3.0-2.0*f);\n"
+        "    float n = p.x + p.y*57.0 + 113.0*p.z;\n"
+        "    return mix(mix(mix(hash(n+0.0), hash(n+1.0),f.x),\n"
+        "                   mix(hash(n+57.0), hash(n+58.0),f.x),f.y),\n"
+        "               mix(mix(hash(n+113.0), hash(n+114.0),f.x),\n"
+        "                   mix(hash(n+170.0), hash(n+171.0),f.x),f.y),f.z);\n"
+        "}\n"
+        "void main() {\n"
+        "    vec3 normal = normalize(vNorm);\n"
+        "    vec3 lightDir = normalize(lightPos - vPos);\n"
+        "    /* Triplanar blending weights */\n"
+        "    vec3 blending = abs(normal);\n"
+        "    blending /= (blending.x + blending.y + blending.z);\n"
+        "    \n"
+        "    /* Generate hull panels */\n"
+        "    float scale = 15.0;\n"
+        "    float hx = noise(vec3(vPos.yz * scale, 0.0));\n"
+        "    float hy = noise(vec3(vPos.xz * scale, 1.0));\n"
+        "    float hz = noise(vec3(vPos.xy * scale, 2.0));\n"
+        "    float hull = hx * blending.x + hy * blending.y + hz * blending.z;\n"
+        "    hull = step(0.4, hull) * 0.2 + 0.8;\n"
+        "    \n"
+        "    /* Dynamic Lighting */\n"
+        "    float diff = max(dot(normal, lightDir), 0.1);\n"
+        "    vec3 baseCol = gl_Color.rgb * hull * diff;\n"
+        "    \n"
+        "    /* Apply Red Hit Pulse */\n"
+        "    baseCol = mix(baseCol, vec3(1.0, 0.0, 0.0), hitPulse * 0.6);\n"
+        "    \n"
+        "    /* Specular highlight */\n"
+        "    vec3 viewDir = normalize(-vPos);\n"
+        "    vec3 reflectDir = reflect(-lightDir, normal);\n"
+        "    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);\n"
+        "    \n"
+        "    gl_FragColor = vec4(baseCol + vec3(0.4) * spec, 1.0);\n"
+        "}";
+    hullShaderProgram = linkProgram(compileShader(hullVert, GL_VERTEX_SHADER), compileShader(hullFrag, GL_FRAGMENT_SHADER));
+
+    /* PARTICLES: Glowing Sprites */
+    const char* partVert = "#version 120\n"
+        "void main() {\n"
+        "    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;\n"
+        "    gl_FrontColor = gl_Color;\n"
+        "    gl_PointSize = 20.0 * (1.0 / length(gl_ModelViewMatrix * gl_Vertex));\n"
+        "}";
+    const char* partFrag = "#version 120\n"
+        "void main() {\n"
+        "    float d = length(gl_PointCoord - vec2(0.5));\n"
+        "    if (d > 0.5) discard;\n"
+        "    float glow = pow(1.0 - d*2.0, 2.0);\n"
+        "    gl_FragColor = vec4(gl_Color.rgb, gl_Color.a * glow);\n"
+        "}";
+    particleShaderProgram = linkProgram(compileShader(partVert, GL_VERTEX_SHADER), compileShader(partFrag, GL_FRAGMENT_SHADER));
+
     const char* starVert = "#version 120\n"
         "void main() { gl_Position = ftransform(); gl_FrontColor = gl_Color; }";
     const char* starFrag = "#version 120\n"
@@ -79,19 +216,54 @@ void initShaders() {
 
     const char* bhFrag = "#version 120\n"
         "uniform float time;\n"
-        "varying vec3 pos;\n"
+        "uniform sampler2D sceneTex;\n"
+        "varying vec2 vTexCoord;\n"
+        "varying vec4 vScreenPos;\n"
         "void main() {\n"
-        "  float d = length(pos);\n"
-        "  float ripple = sin(d * 20.0 - time * 10.0) * 0.5 + 0.5;\n"
-        "  vec3 col = vec3(0.4, 0.0, 0.8) * (1.0 - d) + vec3(0.1, 0.0, 0.2);\n"
-        "  gl_FragColor = vec4(col * ripple, 0.7);\n"
+        "    vec2 rel = vTexCoord - vec2(0.5);\n"
+        "    float d = length(rel) * 2.0;\n"
+        "    \n"
+        "    /* DISCARD outside the effect area to eliminate the square edges */\n"
+        "    if (d > 1.0) discard;\n"
+        "    \n"
+        "    vec2 uv = (vScreenPos.xy / vScreenPos.w) * 0.5 + 0.5;\n"
+        "    \n"
+        "    /* 1. GRAVITATIONAL LENSING */\n"
+        "    float lens_strength = 0.08;\n"
+        "    float dist_inv = 1.0 / (d + 0.01);\n"
+        "    vec2 distortedUV = uv + normalize(rel) * dist_inv * lens_strength * 0.02;\n"
+        "    \n"
+        "    /* 2. EVENT HORIZON */\n"
+        "    if (d < 0.25) {\n"
+        "        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);\n"
+        "        return;\n"
+        "    }\n"
+        "    \n"
+        "    /* 3. ACCRETION DISK Logic */\n"
+        "    vec3 sceneCol = texture2D(sceneTex, (d > 0.8) ? uv : distortedUV).rgb;\n"
+        "    \n"
+        "    float ripple = sin(d * 30.0 - time * 10.0) * 0.5 + 0.5;\n"
+        "    float disk_mask = smoothstep(0.8, 0.3, d);\n"
+        "    vec3 diskCol = vec3(1.0, 0.4, 0.0) * ripple + vec3(1.0, 0.8, 0.2) * pow(ripple, 4.0);\n"
+        "    \n"
+        "    /* Final composition */\n"
+        "    vec3 finalCol = mix(sceneCol, diskCol, disk_mask * 0.8);\n"
+        "    \n"
+        "    /* Bright Photon Ring */\n"
+        "    if (d < 0.28) finalCol += vec3(1.0, 0.9, 0.6) * (1.0 - (d-0.25)*33.0);\n"
+        "    \n"
+        "    gl_FragColor = vec4(finalCol, 1.0);\n"
         "}";
     
     const char* bhVert = "#version 120\n"
+        "varying vec2 vTexCoord;\n"
+        "varying vec4 vScreenPos;\n"
         "varying vec3 pos;\n"
         "void main() {\n"
-        "  pos = gl_Vertex.xyz;\n"
-        "  gl_Position = ftransform();\n"
+        "    vTexCoord = gl_MultiTexCoord0.xy;\n"
+        "    vScreenPos = gl_ModelViewProjectionMatrix * gl_Vertex;\n"
+        "    pos = gl_Vertex.xyz;\n"
+        "    gl_Position = vScreenPos;\n"
         "}";
     bhShaderProgram = linkProgram(compileShader(bhVert, GL_VERTEX_SHADER), compileShader(bhFrag, GL_FRAGMENT_SHADER));
 
@@ -128,7 +300,126 @@ void initShaders() {
         "}";
     cloakShaderProgram = linkProgram(compileShader(cloakVert, GL_VERTEX_SHADER), compileShader(cloakFrag, GL_FRAGMENT_SHADER));
     
-    /* Advanced Ship Shader */
+    /* BLOOM: Simple Quad Vertex Shader */
+    const char* quadVert = "#version 120\n"
+        "attribute vec2 position;\n"
+        "varying vec2 TexCoords;\n"
+        "void main() {\n"
+        "    gl_Position = vec4(position.x, position.y, 0.0, 1.0);\n"
+        "    TexCoords = (position + 1.0) / 2.0;\n"
+        "}";
+
+    /* BLOOM: Blur Fragment Shader (Two-Pass Gaussian) */
+    const char* blurFrag = "#version 120\n"
+        "uniform sampler2D image;\n"
+        "uniform bool horizontal;\n"
+        "varying vec2 TexCoords;\n"
+        "void main() {\n"
+        "    float weight[5] = float[] (0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);\n"
+        "    vec2 tex_offset = 1.0 / vec2(1024.0, 768.0);\n" // Hardcoded resolution for simplicity
+        "    vec3 result = texture2D(image, TexCoords).rgb * weight[0];\n"
+        "    if(horizontal) {\n"
+        "        for(int i = 1; i < 5; ++i) {\n"
+        "            result += texture2D(image, TexCoords + vec2(tex_offset.x * i, 0.0)).rgb * weight[i];\n"
+        "            result += texture2D(image, TexCoords - vec2(tex_offset.x * i, 0.0)).rgb * weight[i];\n"
+        "        }\n"
+        "    } else {\n"
+        "        for(int i = 1; i < 5; ++i) {\n"
+        "            result += texture2D(image, TexCoords + vec2(0.0, tex_offset.y * i)).rgb * weight[i];\n"
+        "            result += texture2D(image, TexCoords - vec2(0.0, tex_offset.y * i)).rgb * weight[i];\n"
+        "        }\n"
+        "    }\n"
+        "    gl_FragColor = vec4(result, 1.0);\n"
+        "}";
+
+    /* BLOOM: Final Combination Shader */
+    const char* finalFrag = "#version 120\n"
+        "uniform sampler2D scene;\n"
+        "uniform sampler2D bloomBlur;\n"
+        "varying vec2 TexCoords;\n"
+        "void main() {\n"
+        "    vec3 hdrColor = texture2D(scene, TexCoords).rgb;\n"
+        "    vec3 bloomColor = texture2D(bloomBlur, TexCoords).rgb;\n"
+        "    /* Additive mixing with slight tone mapping */\n"
+        "    vec3 result = hdrColor + bloomColor;\n" 
+        "    gl_FragColor = vec4(result, 1.0);\n"
+        "}";
+
+    blurShaderProgram = linkProgram(compileShader(quadVert, GL_VERTEX_SHADER), compileShader(blurFrag, GL_FRAGMENT_SHADER));
+    finalShaderProgram = linkProgram(compileShader(quadVert, GL_VERTEX_SHADER), compileShader(finalFrag, GL_FRAGMENT_SHADER));
+}
+
+void renderQuad() {
+    if (quadVAO == 0) {
+        float quadVertices[] = {
+            /* pos (2) */
+            -1.0f,  1.0f,
+            -1.0f, -1.0f,
+             1.0f,  1.0f,
+             1.0f, -1.0f,
+        };
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    }
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+}
+
+void initBloomFBO() {
+    /* 1. MSAA Framebuffer (Initial Render Target) */
+    glGenFramebuffers(1, &fbo_msaa);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo_msaa);
+
+    glGenRenderbuffers(1, &rbo_color_msaa);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo_color_msaa);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_RGB16F, 1024, 768);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, rbo_color_msaa);
+
+    glGenRenderbuffers(1, &rbo_depth_msaa);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo_depth_msaa);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_DEPTH_COMPONENT, 1024, 768);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo_depth_msaa);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        printf("[BLOOM] ERROR: MSAA Framebuffer not complete!\n");
+
+    /* 2. Scene FBO (Resolve Target for MSAA) */
+    glGenFramebuffers(1, &fbo_scene);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo_scene);
+
+    glGenTextures(1, &tex_scene);
+    glBindTexture(GL_TEXTURE_2D, tex_scene);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 1024, 768, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex_scene, 0);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        printf("[BLOOM] ERROR: Scene Framebuffer not complete!\n");
+
+    /* 3. Ping-Pong FBOs for Blur */
+    glGenFramebuffers(2, fbo_pingpong);
+    glGenTextures(2, tex_pingpong);
+    for (unsigned int i = 0; i < 2; i++) {
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo_pingpong[i]);
+        glBindTexture(GL_TEXTURE_2D, tex_pingpong[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 1024, 768, 0, GL_RGB, GL_FLOAT, NULL);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); 
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex_pingpong[i], 0);
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+            printf("[BLOOM] ERROR: PingPong Framebuffer %d not complete!\n", i);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    printf("[BLOOM] FBOs initialized successfully.\n");
 }
 
 int shm_fd = -1;
@@ -153,8 +444,14 @@ float zoom = -14.0f;
 float autoRotate = 0.075f;
 float pulse = 0.0f;
 float map_anim = 0.0f;
+GLdouble hud_model[16], hud_proj[16];
+GLint hud_view[4];
+int g_shield_hit_timers[6] = {0,0,0,0,0,0};
+int g_hull_hit_timer = 0;
+float g_last_hull = 100.0f;
+int g_last_shields_val_hit[6] = {0,0,0,0,0,0};
 
-int g_energy = 0, g_crew = 0, g_shields = 0, g_klingons = 0;
+int g_energy = 0, g_crew = 0, g_prison_unit = 0, g_shields = 0, g_klingons = 0;
 int g_duranium_plating = 0;
 float g_hull_integrity = 100.0f;
 int g_shields_val[6] = {0};
@@ -237,7 +534,7 @@ ArrivalEffect g_arrival_fx = {0, 0, 0, 0};
 RecoveryFX g_recovery_fx = {0, 0, 0, 0};
 
 /* Rimosse variabili globali scia singola per scia universale */
-typedef struct { float x, y, z, alpha; } PhaserBeam;
+typedef struct { float sx, sy, sz, tx, ty, tz, alpha; } PhaserBeam;
 PhaserBeam beams[10];
 int beamCount = 0;
 
@@ -250,7 +547,6 @@ ViewPoint g_sn_pos = {0,0,0,0,0};
 int g_sn_q[3] = {0,0,0};
 
 float enterpriseX = 0, enterpriseY = 0, enterpriseZ = 0;
-
 float stars[1000][3];
 
 /* Prototypes */
@@ -344,6 +640,7 @@ void loadGameState() {
     g_duranium_plating = g_shared_state->shm_duranium_plating;
     g_hull_integrity = g_shared_state->shm_hull_integrity;
     g_crew = g_shared_state->shm_crew;
+    g_prison_unit = g_shared_state->shm_prison_unit;
     g_torpedoes_launcher = g_shared_state->shm_torpedoes;
     g_cargo_energy = g_shared_state->shm_cargo_energy;
     g_cargo_torps = g_shared_state->shm_cargo_torpedoes;
@@ -351,7 +648,27 @@ void loadGameState() {
     for(int inv=0; inv<10; inv++) g_inventory[inv] = g_shared_state->inventory[inv];
     g_lock_target = g_shared_state->shm_lock_target;
     int total_s = 0;
-    for(int s=0; s<6; s++) total_s += g_shared_state->shm_shields[s];
+    for(int s=0; s<6; s++) {
+        if (g_shared_state->shm_shields[s] < g_last_shields_val_hit[s]) {
+            g_shield_hit_timers[s] = 40; /* Increased from 25 to match phasers */
+        }
+        g_last_shields_val_hit[s] = g_shared_state->shm_shields[s];
+        total_s += g_shared_state->shm_shields[s];
+    }
+    
+    /* Detect Direct Hull Hit: if hull decreased */
+    if (g_hull_integrity < g_last_hull) {
+        g_hull_hit_timer = 20; /* Red pulse duration */
+        /* Spawn metallic sparks on the ship */
+        for(int k=0; k<15; k++) {
+            float vx = ((float)rand()/RAND_MAX - 0.5f) * 0.15f;
+            float vy = ((float)rand()/RAND_MAX - 0.5f) * 0.15f;
+            float vz = ((float)rand()/RAND_MAX - 0.5f) * 0.15f;
+            spawnParticle(enterpriseX, enterpriseY, enterpriseZ, vx, vy, vz, 1.0f, 0.4f, 0.0f, 0.8f, 0.8f);
+        }
+    }
+    g_last_hull = g_hull_integrity;
+
     g_shields = total_s / 6;
     for(int s=0; s<6; s++) g_shields_val[s] = g_shared_state->shm_shields[s];
     g_klingons = g_shared_state->klingons;
@@ -487,9 +804,14 @@ void loadGameState() {
             int slot = -1;
             for(int j=0; j<10; j++) if(beams[j].alpha <= 0) { slot = j; break; }
             if (slot == -1) slot = rand()%10;
-            beams[slot].x = g_shared_state->beams[i].shm_tx - 5.0f;
-            beams[slot].y = g_shared_state->beams[i].shm_tz - 5.0f;
-            beams[slot].z = 5.0f - g_shared_state->beams[i].shm_ty;
+            /* Source */
+            beams[slot].sx = g_shared_state->beams[i].shm_sx - 5.0f;
+            beams[slot].sy = g_shared_state->beams[i].shm_sz - 5.0f;
+            beams[slot].sz = 5.0f - g_shared_state->beams[i].shm_sy;
+            /* Target */
+            beams[slot].tx = g_shared_state->beams[i].shm_tx - 5.0f;
+            beams[slot].ty = g_shared_state->beams[i].shm_tz - 5.0f;
+            beams[slot].tz = 5.0f - g_shared_state->beams[i].shm_ty;
             beams[slot].alpha = 1.5f;
         }
         /* Consume events */
@@ -671,27 +993,23 @@ void drawHUD(int obj_idx) {
     int id = obj->id;
     int hp = obj->health_pct;
 
-    GLdouble model[16], proj[16];
-    GLint view[4];
     GLdouble winX, winY, winZ;
 
-    glGetDoublev(GL_MODELVIEW_MATRIX, model);
-    glGetDoublev(GL_PROJECTION_MATRIX, proj);
-    glGetIntegerv(GL_VIEWPORT, view);
-
-    /* Project slightly above the ship (1.5 units instead of 0.8) to clear the hull */
-    if (gluProject(x, y, z + 1.5f, model, proj, view, &winX, &winY, &winZ) == GL_TRUE) {
+    /* Project slightly above the ship (Y is height in viewer) */
+    float v_off = (type == 21) ? 0.4f : 0.8f;
+    if (gluProject(x, y + v_off, z, hud_model, hud_proj, hud_view, &winX, &winY, &winZ) == GL_TRUE) {
         /* Check if behind camera or too close to clip plane */
         if (winZ < 0.0 || winZ > 1.0) return;
 
         glMatrixMode(GL_PROJECTION);
         glPushMatrix(); glLoadIdentity();
-        gluOrtho2D(0, view[2], 0, view[3]);
+        gluOrtho2D(0, hud_view[2], 0, hud_view[3]);
         glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity();
         glDisable(GL_LIGHTING); glDisable(GL_DEPTH_TEST);
 
         /* Draw Name/ID - Use a fixed offset from winY to keep it above health bar */
         char buf[128];
+        bool handled_custom = false;
         if (type == 1) {
             /* Player: Faction - Class (Captain) */
             if (obj->faction == 0) { // FACTION_FEDERATION
@@ -719,12 +1037,14 @@ void drawHUD(int obj_idx) {
                     const char* classes[] = {"O (Blue)", "B (Light Blue)", "A (White)", "F (Yellow-White)", "G (Yellow)", "K (Orange)", "M (Red)"};
                     int c_idx = obj->ship_class; if(c_idx<0) c_idx=0; if(c_idx>6) c_idx=6;
                     sprintf(buf, "STAR: %s [%d]", classes[c_idx], id);
+                    handled_custom = true;
                 } break;
                 case 5: {
                     type_name = "PLANET"; glColor3f(0.0f, 1.0f, 0.5f);
                     const char* res[] = {"-", "Dilithium", "Tritanium", "Verterium", "Monotanium", "Isolinear", "Gases", "Duranium"};
                     int r_idx = obj->ship_class; if(r_idx<0) r_idx=0; if(r_idx>7) r_idx=7;
                     sprintf(buf, "PLANET: %s [%d]", res[r_idx], id);
+                    handled_custom = true;
                 } break;
                 case 6: type_name = "BLACK HOLE"; glColor3f(0.5f, 0.0f, 1.0f); break;
                 case 7: {
@@ -732,10 +1052,17 @@ void drawHUD(int obj_idx) {
                     const char* neb_classes[] = {"Mutara Class", "Paulson Class", "Mar Oscura Class", "McAllister Class", "Arachnia Class"};
                     int n_idx = obj->ship_class; if(n_idx<0) n_idx=0; if(n_idx>4) n_idx=4;
                     sprintf(buf, "NEBULA: %s [%d]", neb_classes[n_idx], id);
+                    handled_custom = true;
                 } break;
                 case 8: type_name = "PULSAR"; glColor3f(1.0f, 0.5f, 0.0f); break;
-                case 9: type_name = "COMET"; glColor3f(0.5f, 0.8f, 1.0f); break;
-                case 21: type_name = "ASTEROID"; glColor3f(0.6f, 0.4f, 0.2f); break;
+                case 9: type_name = "COMET"; glColor3f(0.5, 0.8, 1.0); break;
+                case 21: {
+                    type_name = "ASTEROID"; glColor3f(0.6f, 0.4f, 0.2f); 
+                    const char* res_names[] = {"-", "Dilithium", "Tritanium", "Verterium", "Monotanium", "Isolinear", "Gases", "Duranium", "Keronium"};
+                    int r_idx = obj->ship_class; if(r_idx<0) r_idx=0; if(r_idx>8) r_idx=8;
+                    sprintf(buf, "ASTEROID [%d]: %s (%d units)", id, res_names[r_idx], obj->energy);
+                    handled_custom = true;
+                } break;
                 case 22: type_name = "DERELICT"; glColor3f(0.4f, 0.4f, 0.4f); break;
                 case 23: type_name = "MINE"; glColor3f(1.0f, 0.0f, 0.0f); break;
                 case 24: type_name = "BUOY"; glColor3f(0.0f, 0.5f, 1.0f); break;
@@ -748,8 +1075,8 @@ void drawHUD(int obj_idx) {
                     sprintf(buf, "%s [%d]", type_name, id);
                 } break;
             }
-            if (type == 4 || type == 5) {
-                /* Already handled above with specific formatting */
+            if (handled_custom) {
+                /* Skip generic formatting */
             } else if (obj->name[0] != '\0' && strcmp(obj->name, "Unknown") != 0) {
                 sprintf(buf, "%s: %s [%d]", type_name, obj->name, id);
             } else {
@@ -1178,6 +1505,7 @@ void drawSteamrunner() {
 }
 
 void drawFederationShip(int class, float h, float m) {
+    if (!g_is_cloaked_rendering) glUseProgram(hullShaderProgram);
     glRotatef(h - 90.0f, 0, 1, 0);
     glRotatef(m, 0, 0, 1);
     switch(class) {
@@ -1196,6 +1524,7 @@ void drawFederationShip(int class, float h, float m) {
         case SHIP_CLASS_STEAMRUNNER:  drawSteamrunner(); break;
         default:                      drawConstitution(); break;
     }
+    glUseProgram(0);
 }
 
 void drawKlingon(float x, float y, float z) {
@@ -1314,7 +1643,7 @@ void drawStar(float x, float y, float z, int id) {
     }
     
     /* 3. Solar Flares (Prominences) */
-    glLineWidth(2.0f);
+    glLineWidth(1.0f);
     for(int i=0; i<8; i++) {
         glPushMatrix();
         glRotatef(i*45 + pulse*20, 0, 1, 0);
@@ -1444,63 +1773,38 @@ void drawWormhole(float x, float y, float z, float h, float m, int type) {
 void drawBlackHole(float x, float y, float z) {
     glPushAttrib(GL_ALL_ATTRIB_BITS);
     glDisable(GL_LIGHTING);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE); /* Don't write to depth buffer to avoid square artifacts */
+    
+    glPushMatrix();
     glTranslatef(x, y, z);
     
-    /* 1. RELATIVISTIC JETS - Rendered with additive blending */
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-    for(int i=-1; i<=1; i+=2) {
-        if(i==0) continue;
-        glPushMatrix();
-        float jet_pulse = (sin(pulse*10.0f)+1.0f)*0.5f;
-        glColor4f(0.5f, 0.4f, 1.0f, 0.3f + jet_pulse*0.2f);
-        glBegin(GL_TRIANGLE_FAN);
-        glVertex3f(0, 3.5f * i, 0); 
-        for(int j=0; j<=16; j++) {
-            float ang = j * (2.0f * M_PI / 16.0f);
-            float r = 0.08f + jet_pulse*0.04f;
-            glColor4f(0.2f, 0.0f, 0.6f, 0.0f);
-            glVertex3f(r*cos(ang), 0.1f * i, r*sin(ang));
-        }
-        glEnd();
-        glPopMatrix();
+    /* Billboard logic: face the camera */
+    float m[16];
+    glGetFloatv(GL_MODELVIEW_MATRIX, m);
+    for(int i=0; i<3; i++) for(int j=0; j<3; j++) {
+        if(i==j) m[i*4+j] = 1.0; else m[i*4+j] = 0.0;
     }
+    glLoadMatrixf(m);
 
-    /* 2. SOLID EVENT HORIZON - MUST BE OPAQUE BLACK */
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_TRUE);
-    glColor3f(0.0f, 0.0f, 0.0f);
-    glutSolidSphere(0.2, 32, 32); 
+    glUseProgram(bhShaderProgram);
+    glUniform1f(glGetUniformLocation(bhShaderProgram, "time"), pulse);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex_scene);
+    glUniform1i(glGetUniformLocation(bhShaderProgram, "sceneTex"), 0);
 
-    /* 3. ACCRETION DISK - Volumetric and tilted */
-    glEnable(GL_BLEND);
-    glDepthMask(GL_FALSE);
-    glPushMatrix();
-    glRotatef(75, 1, 0, 0); 
-    glRotatef(pulse*50, 0, 0, 1);
-    for(int i=0; i<10; i++) {
-        float r = 0.24f + i*0.06f;
-        float alpha = 0.7f - i*0.07f;
-        glColor4f(0.8f - i*0.05f, 0.2f + i*0.05f, 1.0f, alpha);
-        glutWireTorus(0.01, r, 10, 60);
-        
-        if(i % 2 == 0) {
-            glColor4f(0.4f, 0.1f, 0.7f, 0.1f);
-            glutSolidTorus(0.02, r, 8, 40);
-        }
-    }
+    /* Draw full-size quad for the shader to work on */
+    float s = 1.2f;
+    glBegin(GL_QUADS);
+    glTexCoord2f(0,0); glVertex3f(-s, -s, 0);
+    glTexCoord2f(1,0); glVertex3f( s, -s, 0);
+    glTexCoord2f(1,1); glVertex3f( s,  s, 0);
+    glTexCoord2f(0,1); glVertex3f(-s,  s, 0);
+    glEnd();
+
+    glUseProgram(0);
     glPopMatrix();
-    
-    /* 4. PHOTON RING - Bright edge */
-    glColor4f(1.0f, 0.8f, 1.0f, 0.8f);
-    glutWireSphere(0.21, 32, 32);
-
-    /* 5. GRAVITATIONAL GLOW */
-    glRotatef(pulse*5, 0, 1, 1);
-    glColor4f(0.3f, 0.0f, 0.6f, 0.15f);
-    glutSolidSphere(0.8, 20, 20);
-    
     glPopAttrib();
 }
 
@@ -1595,6 +1899,7 @@ void drawComet(float x, float y, float z) {
 }
 
 void drawAsteroid(float x, float y, float z) {
+    glUseProgram(hullShaderProgram);
     glPushMatrix();
     glColor3f(0.5f, 0.35f, 0.25f); /* Brownish */
     glRotatef(pulse * 10.0f, 1, 1, 0);
@@ -1615,6 +1920,7 @@ void drawAsteroid(float x, float y, float z) {
         glPopMatrix();
     }
     glPopMatrix();
+    glUseProgram(0);
 }
 
 void drawDerelict(int ship_class) {
@@ -1868,7 +2174,7 @@ void drawGalaxyMap() {
                     /* Ion Storm: Large Transparent White Wireframe Shell - Enhanced visibility */
                     glEnable(GL_BLEND);
                     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                    glLineWidth(2.0f);
+                    glLineWidth(1.0f);
                     glColor4f(1.0f, 1.0f, 1.0f, 0.4f + sin(pulse*4.0f)*0.2f);
                     glutWireCube(0.8f);
                     glLineWidth(1.0f);
@@ -1918,7 +2224,7 @@ void drawGrid() {
 void drawShipTrail(int obj_idx) {
     glPushAttrib(GL_ALL_ATTRIB_BITS);
     glDisable(GL_LIGHTING);
-    glLineWidth(2.0f);
+    glLineWidth(1.0f);
     glBegin(GL_LINE_STRIP);
     
     float r=0.4, g=0.7, b=1.0; /* Default Starfleet Blue */
@@ -1931,6 +2237,11 @@ void drawShipTrail(int obj_idx) {
         float alpha = (1.0f - (float)i / objects[obj_idx].trail_count) * 0.5f;
         glColor4f(r, g, b, alpha);
         glVertex3f(objects[obj_idx].trail[idx][0], objects[obj_idx].trail[idx][1], objects[obj_idx].trail[idx][2]);
+        
+        /* Spawn a subtle engine particle occasionally at the latest trail point */
+        if (i == 0 && (rand() % 5 == 0)) {
+            spawnParticle(objects[obj_idx].x, objects[obj_idx].y, objects[obj_idx].z, 0, 0, 0, r, g, b, 0.5f, 0.3f);
+        }
     }
     glEnd();
     glPopAttrib();
@@ -1941,8 +2252,11 @@ void drawPhaserBeams() {
     glDisable(GL_LIGHTING);
     for (int i = 0; i < 10; i++) {
         if (beams[i].alpha > 0) {
-            glLineWidth(4.0f); glColor4f(1.0f, 0.8f, 0.0f, (beams[i].alpha > 1.0f) ? 1.0f : beams[i].alpha);
-            glBegin(GL_LINES); glVertex3f(enterpriseX, enterpriseY, enterpriseZ); glVertex3f(beams[i].x, beams[i].y, beams[i].z); glEnd();
+            glLineWidth(3.0f); glColor4f(1.0f, 0.8f, 0.0f, (beams[i].alpha > 1.0f) ? 1.0f : beams[i].alpha);
+            glBegin(GL_LINES); 
+            glVertex3f(beams[i].sx, beams[i].sy, beams[i].sz); 
+            glVertex3f(beams[i].tx, beams[i].ty, beams[i].tz); 
+            glEnd();
         }
     }
     glPopAttrib();
@@ -1950,14 +2264,27 @@ void drawPhaserBeams() {
 
 void drawExplosion() {
     if (g_boom.timer <= 0) return;
+    
+    /* Spawn particles on first frame of explosion */
+    static int last_boom_id = -1;
+    if (g_boom.timer >= 38 && last_boom_id != g_shared_state->frame_id) {
+        for (int i = 0; i < 100; i++) {
+            float vx = ((float)rand() / RAND_MAX - 0.5f) * 0.3f;
+            float vy = ((float)rand() / RAND_MAX - 0.5f) * 0.3f;
+            float vz = ((float)rand() / RAND_MAX - 0.5f) * 0.3f;
+            spawnParticle(g_boom.x, g_boom.y, g_boom.z, vx, vy, vz, 1.0f, 0.7f, 0.2f, 1.5f, 1.0f);
+        }
+        last_boom_id = g_shared_state->frame_id;
+    }
+    
     glPushAttrib(GL_ALL_ATTRIB_BITS);
     glDisable(GL_LIGHTING);
     glPushMatrix(); glTranslatef(g_boom.x, g_boom.y, g_boom.z);
     /* Pulsing expansion */
-    float s = 0.5f + (40 - g_boom.timer) * 0.05f;
+    float s = 1.0f + (40 - g_boom.timer) * 0.15f; /* Doubled size */
     float alpha = g_boom.timer / 40.0f;
-    glColor4f(1.0f, 0.5f, 0.0f, alpha); 
-    glutSolidSphere(s, 16, 16);
+    glColor4f(1.0f, 0.6f, 0.1f, alpha); 
+    glutSolidSphere(s, 24, 24);
     glPopMatrix(); 
     glPopAttrib();
 }
@@ -1993,35 +2320,69 @@ void updateProbeHUD() {
 
 void drawTorpedo() {
     if (!g_torp.active) return;
+    
+    /* Radiant Multicolored Logic */
+    static float t_color = 0;
+    t_color += 0.2f;
+    float r = sin(t_color) * 0.5f + 0.5f;
+    float g = sin(t_color + 2.0f) * 0.5f + 0.5f;
+    float b = sin(t_color + 4.0f) * 0.5f + 0.5f;
+    
+    if (rand() % 1 == 0) {
+        spawnParticle(g_torp.x, g_torp.y, g_torp.z, 
+                      ((float)rand()/RAND_MAX-0.5f)*0.01f, 
+                      ((float)rand()/RAND_MAX-0.5f)*0.01f, 
+                      ((float)rand()/RAND_MAX-0.5f)*0.01f, 
+                      r, g, b, 0.05f, 0.3f);
+    }
+
     glDisable(GL_LIGHTING);
     glPushMatrix(); glTranslatef(g_torp.x, g_torp.y, g_torp.z);
     
-    /* Halved sizes and improved color contrast */
-    float wave = (sin(pulse * 20.0f) + 1.0f) * 0.5f;
-    
-    /* 1. Undulating Aura (Yellow/Orange) - Rendered FIRST to avoid obscuring the red core */
+    float wave = (sin(pulse * 30.0f) + 1.0f) * 0.5f;
     glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-    for(int i=0; i<2; i++) {
+
+    /* 1. Central Glow sparkle - Background aura */
+    drawGlow(0.08f + wave * 0.04f, r, g, b, 0.5f);
+
+    /* 2. Luminous Star Rays (Flares) - LENGTHENED and THICKER */
+    glLineWidth(2.5f);
+    for(int axis=0; axis<3; axis++) {
         glPushMatrix();
-        float s = 0.03f + (i * 0.02f) * wave;
-        float alpha = 0.4f / (i + 1);
-        glColor4f(1.0f, 0.6f, 0.0f, alpha);
-        glScalef(1.0f + wave*0.3f, 1.0f - wave*0.2f, 1.0f + wave*0.2f);
-        glutWireSphere(s, 8, 8);
+        if(axis==1) glRotatef(90, 0, 1, 0);
+        if(axis==2) glRotatef(90, 1, 0, 0);
+        glRotatef(pulse * 250.0f, 0, 0, 1);
+        glBegin(GL_LINES);
+        for(int j=0; j<4; j++) {
+            float ang = j * (M_PI / 2.0f);
+            float len = 0.35f + wave * 0.15f; /* Significantly longer rays */
+            glColor4f(r, g, b, 1.0f); glVertex3f(0, 0, 0);
+            glColor4f(r, g, b, 0.0f); glVertex3f(cos(ang)*len, sin(ang)*len, 0);
+        }
+        glEnd();
         glPopMatrix();
     }
 
-    /* 2. Micro Central Glow (Orange/Yellow tint) */
-    drawGlow(0.05f + wave*0.02f, 1.0f, 0.4f, 0.0f, 0.3f);
-    glDisable(GL_BLEND);
+    /* 3. Solid Geometric Core - WITH LIGHTING */
+    glEnable(GL_LIGHTING);
+    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+    glPushMatrix();
+    glScalef(0.04f, 0.04f, 0.04f); /* Increased size for visibility */
+    glRotatef(pulse * 400.0f, 1, 1, 1);
+    glutSolidIcosahedron(); 
+    glPopMatrix();
+    glDisable(GL_LIGHTING);
 
-    /* 3. Small Intense Red Core - Rendered LAST to be on top */
-    glColor3f(1.0f, 0.0f, 0.0f);
-    glutSolidSphere(0.02, 10, 10);
-    
+    /* 4. Tiny Black Singularity - Contrast point */
+    glColor3f(0.0f, 0.0f, 0.0f);
+    glPushMatrix();
+    glScalef(0.015f, 0.015f, 0.015f);
+    glutSolidSphere(1.0, 8, 8);
+    glPopMatrix();
+
+    glDisable(GL_BLEND);
     glPopMatrix(); glEnable(GL_LIGHTING);
 }
-
 void drawRecoveryEffect() {
     if (g_recovery_fx.timer <= 0) return;
     
@@ -2144,7 +2505,7 @@ void drawFaceLabels() {
 
 void drawTacticalCube() {
     glDisable(GL_LIGHTING);
-    glLineWidth(2.0f);
+    glLineWidth(1.0f);
     
     float min = -5.0f;
     float mid = 0.0f;
@@ -2183,7 +2544,136 @@ void drawTacticalCube() {
     glEnable(GL_LIGHTING);
 }
 
+void spawnParticle(float x, float y, float z, float vx, float vy, float vz, float r, float g, float b, float size, float life) {
+    for (int i = 0; i < MAX_PARTICLES; i++) {
+        if (!fx_particles[i].active) {
+            fx_particles[i].x = x; fx_particles[i].y = y; fx_particles[i].z = z;
+            fx_particles[i].vx = vx; fx_particles[i].vy = vy; fx_particles[i].vz = vz;
+            fx_particles[i].r = r; fx_particles[i].g = g; fx_particles[i].b = b;
+            fx_particles[i].a = 1.0f;
+            fx_particles[i].size = size;
+            fx_particles[i].life = life;
+            fx_particles[i].active = 1;
+            break;
+        }
+    }
+}
+
+void updateParticles() {
+    for (int i = 0; i < MAX_PARTICLES; i++) {
+        if (fx_particles[i].active) {
+            fx_particles[i].x += fx_particles[i].vx;
+            fx_particles[i].y += fx_particles[i].vy;
+            fx_particles[i].z += fx_particles[i].vz;
+            fx_particles[i].life -= 0.02f;
+            fx_particles[i].a = fx_particles[i].life;
+            if (fx_particles[i].life <= 0) fx_particles[i].active = 0;
+        }
+    }
+}
+
+void drawParticles() {
+    glDisable(GL_LIGHTING);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+    glUseProgram(particleShaderProgram);
+    
+    glPointSize(5.0f);
+    glBegin(GL_POINTS);
+    for (int i = 0; i < MAX_PARTICLES; i++) {
+        if (fx_particles[i].active) {
+            glColor4f(fx_particles[i].r, fx_particles[i].g, fx_particles[i].b, fx_particles[i].a);
+            glVertex3f(fx_particles[i].x, fx_particles[i].y, fx_particles[i].z);
+        }
+    }
+    glEnd();
+    
+    glUseProgram(0);
+    glDisable(GL_BLEND);
+    glEnable(GL_LIGHTING);
+}
+
+void drawSkybox() {
+    glDisable(GL_LIGHTING);
+    glDepthMask(GL_FALSE);
+    glUseProgram(skyboxShaderProgram);
+    glUniform1f(glGetUniformLocation(skyboxShaderProgram, "time"), pulse);
+    
+    glPushMatrix();
+    /* Rotate skybox slowly */
+    glRotatef(pulse * 0.5f, 0, 1, 0);
+    glutSolidSphere(400.0, 32, 32);
+    glPopMatrix();
+    
+    glUseProgram(0);
+    glDepthMask(GL_TRUE);
+    glEnable(GL_LIGHTING);
+}
+
+void drawShieldEffect() {
+    bool any_hit = false;
+    for(int s=0; s<6; s++) if (g_shield_hit_timers[s] > 0) any_hit = true;
+    if (!any_hit) return;
+    
+    glPushAttrib(GL_ALL_ATTRIB_BITS);
+    glDisable(GL_LIGHTING);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+    
+    glPushMatrix();
+    glTranslatef(enterpriseX, enterpriseY, enterpriseZ);
+    /* Rotate shield system to match ship heading/mark */
+    glRotatef(objects[0].h - 90.0f, 0, 1, 0);
+    glRotatef(objects[0].m, 0, 0, 1);
+
+    /* Shield sectors mapping: 0:F, 1:R, 2:T, 3:B, 4:L, 5:RI */
+    struct { float rx, ry, rz; } shield_rot[] = {
+        {0, 90, 0},   /* Front: point to X+ */
+        {0, -90, 0},  /* Rear: point to X- */
+        {-90, 0, 0},  /* Top: point to Y+ */
+        {90, 0, 0},   /* Bottom: point to Y- */
+        {0, 0, 0},    /* Left: point to Z- (default for torus if aligned) */
+        {0, 180, 0}   /* Right: point to Z+ */
+    };
+
+    for(int s=0; s<6; s++) {
+        if (g_shield_hit_timers[s] <= 0) continue;
+        
+        float t = (float)g_shield_hit_timers[s] / 40.0f;
+        /* Stay bright longer, then fade quickly at the end */
+        float alpha = (t > 0.5f) ? 1.0f : t * 2.0f;
+        float scale = 1.0f + (1.0f - t) * 0.15f; 
+        
+        glPushMatrix();
+        glRotatef(shield_rot[s].ry, 0, 1, 0);
+        glRotatef(shield_rot[s].rx, 1, 0, 0);
+        
+        /* Position arc slightly outside hull */
+        glTranslatef(0, 0, 1.2f);
+        glScalef(scale * 1.5f, scale * 1.2f, scale * 0.5f);
+        
+        glColor4f(0.0f, 0.7f, 1.0f, alpha * 0.7f);
+        
+        /* Use a wireframe torus or sphere segment for the "grid" look */
+        glutWireTorus(0.05, 0.8, 8, 12);
+        
+        /* Local glow at impact site */
+        drawGlow(0.6f, 0.0f, 0.5f, 1.0f, alpha * 0.4f);
+        
+        glPopMatrix();
+    }
+    
+    glPopMatrix();
+    glPopAttrib();
+}
+
 void display() {
+    /* 1. BLOOM PASS: Render Scene to Multisampled Buffer */
+    if (fbo_msaa != 0) {
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo_msaa);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    }
+    
     if (g_data_dirty) { loadGameState(); g_data_dirty = 0; }
     
     /* RESET STACKS */
@@ -2199,6 +2689,11 @@ void display() {
     glRotatef(angleX, 1, 0, 0); 
     glRotatef(angleY, 0, 1, 0);
 
+    /* Capture matrices for HUD projection later */
+    glGetDoublev(GL_MODELVIEW_MATRIX, hud_model);
+    glGetDoublev(GL_PROJECTION_MATRIX, hud_proj);
+    glGetIntegerv(GL_VIEWPORT, hud_view);
+
     /* Sky color pulse */
     float sn_intensity = 0.0f;
     if (g_shared_state->shm_galaxy[g_shared_state->shm_q[0]][g_shared_state->shm_q[1]][g_shared_state->shm_q[2]] < 0) {
@@ -2210,7 +2705,10 @@ void display() {
     /* Background fade to darker black in map mode */
     float bg_level = 0.05f * (1.0f - map_anim);
     glClearColor(bg_level + sn_intensity, bg_level, bg_level, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    /* glClear is removed here as it is handled at the start of FBO binding */
+
+    /* Render Procedural Nebula Background */
+    if (map_anim < 0.9f) drawSkybox();
 
     /* --- RENDER GALAXY MAP (Fades In) --- */
     if (map_anim > 0.01f) {
@@ -2244,6 +2742,19 @@ void display() {
         drawTacticalCube();
 
         /* 2. LOCAL OBJECTS */
+        /* Find a star for dynamic lighting */
+        float lX = 50.0f, lY = 50.0f, lZ = 50.0f; /* Default distant light */
+        for(int i=0; i<200; i++) {
+            if (objects[i].type == 4) {
+                lX = objects[i].x; lY = objects[i].y; lZ = objects[i].z;
+                break;
+            }
+        }
+        glUseProgram(hullShaderProgram);
+        glUniform3f(glGetUniformLocation(hullShaderProgram, "lightPos"), lX, lY, lZ);
+        glUniform1f(glGetUniformLocation(hullShaderProgram, "hitPulse"), (float)g_hull_hit_timer / 20.0f);
+        glUseProgram(0);
+
         if (g_show_axes) {
             glPushMatrix();
             glTranslatef(objects[0].x, objects[0].y, objects[0].z);
@@ -2252,8 +2763,10 @@ void display() {
         }
         if (g_show_grid) drawGrid();
         
+        drawShieldEffect();
         drawPhaserBeams();
         drawExplosion();
+        drawParticles();
         drawJumpArrival();
         drawTorpedo();
         updateProbeHUD();
@@ -2297,7 +2810,7 @@ void display() {
                 glUseProgram(cloakShaderProgram);
                 glUniform1f(glGetUniformLocation(cloakShaderProgram, "time"), pulse);
                 glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                glLineWidth(1.5f);
+                glLineWidth(1.0f);
             }
 
             if (objects[i].type == 1) { 
@@ -2306,6 +2819,7 @@ void display() {
                 } else {
                     /* Non-Federation Player: Use Faction model */
                     glRotatef(objects[i].h - 90.0f, 0, 1, 0); glRotatef(objects[i].m, 0, 0, 1);
+                    if (!g_is_cloaked_rendering) glUseProgram(hullShaderProgram);
                     switch(objects[i].faction) {
                         case 10: drawKlingon(0,0,0); break;
                         case 11: drawRomulan(0,0,0); break;
@@ -2320,10 +2834,16 @@ void display() {
                         case 20: drawHirogen(0,0,0); break;
                         default: drawFederationShip(0, 0, 0); break;
                     }
+                    glUseProgram(0);
                 }
             } else {
                 glRotatef(objects[i].h - 90.0f, 0, 1, 0); glRotatef(objects[i].m, 0, 0, 1);
-                switch(objects[i].type) {
+                bool use_hull = false;
+                int t = objects[i].type;
+                if (t == 3 || t == 10 || t == 21 || t == 22 || t == 23 || t == 24 || t == 25 || (t >= 11 && t <= 20)) use_hull = true;
+                
+                if (use_hull && !g_is_cloaked_rendering) glUseProgram(hullShaderProgram);
+                switch(t) {
                     case 3: drawStarbase(0,0,0); break;
                     case 4: drawStar(objects[i].x, objects[i].y, objects[i].z, objects[i].id); break;
                     case 5: drawPlanet(0,0,0); break;
@@ -2358,7 +2878,7 @@ void display() {
                             glColor3f(0.4f, 0.4f, 0.45f); glutSolidSphere(0.05, 8, 8);
                             glColor3f(1.0f, 0.0f, 0.0f);
                             glPushMatrix(); glRotatef(pulse * 20.0f, 0, 1, 0); glutWireTorus(0.01, 0.1, 4, 12); glPopMatrix();
-                            glPushMatrix(); glRotatef(90, 1, 0, 0); glRotatef(-pulse * 15.0f, 0, 1, 0); glPushAttrib(GL_LINE_BIT); glLineWidth(0.5f); glutWireTorus(0.005, 0.12, 4, 16); glPopAttrib(); glPopMatrix();
+                            glPushMatrix(); glRotatef(90, 1, 0, 0); glRotatef(-pulse * 15.0f, 0, 1, 0); glPushAttrib(GL_LINE_BIT); glLineWidth(1.0f); glutWireTorus(0.005, 0.12, 4, 16); glPopAttrib(); glPopMatrix();
                         } else {
                             /* Active Cyan with Glow */
                             glColor3f(0.0f, 0.7f, 1.0f); glutSolidSphere(0.05, 8, 8);
@@ -2368,10 +2888,11 @@ void display() {
                             glDisable(GL_BLEND);
                             glColor3f(0.0f, 1.0f, 1.0f);
                             glPushMatrix(); glRotatef(pulse * 100.0f, 0, 1, 0); glutWireTorus(0.01, 0.1, 4, 12); glPopMatrix();
-                            glPushMatrix(); glRotatef(90, 1, 0, 0); glRotatef(-pulse * 80.0f, 0, 1, 0); glPushAttrib(GL_LINE_BIT); glLineWidth(0.5f); glutWireTorus(0.005, 0.12, 4, 16); glPopAttrib(); glPopMatrix();
+                            glPushMatrix(); glRotatef(90, 1, 0, 0); glRotatef(-pulse * 80.0f, 0, 1, 0); glPushAttrib(GL_LINE_BIT); glLineWidth(1.0f); glutWireTorus(0.005, 0.12, 4, 16); glPopAttrib(); glPopMatrix();
                         }
                     } break;
                 }
+                glUseProgram(0);
             }
 
             if (objects[i].is_cloaked) { 
@@ -2384,20 +2905,62 @@ void display() {
         }
 
         drawFaceLabels();
+        glPopMatrix(); /* End of Tactical Mode scaling */
+    }
 
-        /* HUD Overlay (Tactical Mode) - Fade Alpha */
-        if (g_show_hud) {
-            if (map_anim < 0.5f) {
-                for(int i=0; i<200; i++) {
-                    if (objects[i].type != 0 && !g_is_loading) {
-                        drawHUD(i);
-                    }
+    glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
+    glEnable(GL_LIGHTING);
+
+    /* 2. BLOOM PASS: Resolve MSAA to standard texture */
+    if (fbo_msaa != 0 && fbo_scene != 0) {
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo_msaa);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo_scene);
+        glBlitFramebuffer(0, 0, 1024, 768, 0, 0, 1024, 768, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    }
+
+    /* 3. BLOOM PASS: Blur the Bright Texture (Ping-Pong) */
+    if (fbo_scene != 0) {
+        bool horizontal = true, first_iteration = true;
+        unsigned int amount = 10;
+        glUseProgram(blurShaderProgram);
+        glDisable(GL_DEPTH_TEST);
+        for (unsigned int i = 0; i < amount; i++) {
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo_pingpong[horizontal]); 
+            glUniform1i(glGetUniformLocation(blurShaderProgram, "horizontal"), horizontal);
+            glBindTexture(GL_TEXTURE_2D, first_iteration ? tex_scene : tex_pingpong[!horizontal]); 
+            renderQuad();
+            horizontal = !horizontal;
+            first_iteration = false;
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        /* 3. BLOOM PASS: Final Combine (HDR + Bloom) */
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glUseProgram(finalShaderProgram);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, tex_scene);
+        glUniform1i(glGetUniformLocation(finalShaderProgram, "scene"), 0);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, tex_pingpong[!horizontal]);
+        glUniform1i(glGetUniformLocation(finalShaderProgram, "bloomBlur"), 1);
+        renderQuad();
+        
+        glUseProgram(0);
+        glEnable(GL_DEPTH_TEST);
+    }
+
+    /* --- FINAL UI PASS (Drawn on top of everything, bypassed by Bloom for sharpness) --- */
+    /* HUD Overlay (Tactical Mode) - Fade Alpha */
+    if (g_show_hud) {
+        if (map_anim < 0.5f) {
+            for(int i=0; i<200; i++) {
+                if (objects[i].type != 0 && !g_is_loading) {
+                    drawHUD(i);
                 }
             }
         }
-        glPopMatrix(); /* End of Tactical Mode scaling */
     }
-    
+
     /* Draw HUD Overlay (Map Mode) */
     if (g_show_hud && map_anim > 0.5f) {
         /* Show Map specific text */
@@ -2464,14 +3027,14 @@ void display() {
         }
 
         glColor3f(1.0f, 1.0f, 1.0f);
-        sprintf(buf, "CREW:   %-4d   SHIELDS AVG: %-3d%%      | LOCK:  ", g_crew, g_shields);
+        sprintf(buf, "CREW: %-4d | PRISON UNIT: %-4d | SHIELDS AVG: %-3d%% | LOCK: ", g_crew, g_prison_unit, g_shields);
         drawText3D(x_off, y_pos, 0, buf);
         if (g_lock_target > 0) {
             glColor3f(1, 0, 0); sprintf(buf, "[ ID %d ]", g_lock_target);
         } else {
             glColor3f(0.5, 0.5, 0.5); sprintf(buf, "[ NONE ]");
         }
-        drawText3D(x_off + 260, y_pos, 0, buf); y_pos -= 20;
+        drawText3D(x_off + 450, y_pos, 0, buf); y_pos -= 20;
 
         /* 2.1 Individual Shields */
         glColor3f(0.0f, 0.7f, 1.0f);
@@ -2501,7 +3064,7 @@ void display() {
         /* 4. Cargo Inventory (2 columns) */
         glColor3f(0.8f, 0.5f, 0.0f);
         drawText3D(x_off, y_pos, 0, "--- CARGO INVENTORY ---"); y_pos -= 18;
-        const char* res_names[] = {"-", "Dilithium", "Tritanium", "Verterium (Torp)", "Monotanium", "Isolinear", "Gases", "Duranium", "Prisoners"};
+        const char* res_names[] = {"-", "Dilithium", "Tritanium", "Verterium (Torp)", "Monotanium", "Isolinear", "Gases", "Duranium", "Keronium"};
         for(int i=1; i<5; i++) {
             for(int col=0; col<2; col++) {
                 int idx = i + col*4;
@@ -2793,11 +3356,11 @@ void display() {
         glMatrixMode(GL_MODELVIEW); glPopMatrix();
     }
 
-    glMatrixMode(GL_PROJECTION); glPopMatrix(); glMatrixMode(GL_MODELVIEW); glPopMatrix();
-    glEnable(GL_LIGHTING); glutSwapBuffers();
+    glutSwapBuffers();
 }
 
 void timer(int v) { 
+    updateParticles();
     if (autoRotate > 5.0f) autoRotate = 0.5f; /* Cap speed */
     angleY += autoRotate; 
     if (angleY >= 360.0f) angleY -= 360.0f;
@@ -2818,8 +3381,14 @@ void timer(int v) {
     /* Update Boom Timer */
     if (g_boom.timer > 0) g_boom.timer--;
     
+    for(int s=0; s<6; s++) if (g_shield_hit_timers[s] > 0) g_shield_hit_timers[s]--;
+    if (g_hull_hit_timer > 0) g_hull_hit_timer--;
+
     /* Update Supernova timer */
-    if (g_sn_pos.active && g_sn_pos.timer > 0) g_sn_pos.timer--;
+    if (g_sn_pos.active && g_sn_pos.timer > 0) {
+        g_sn_pos.timer--;
+        if (g_sn_pos.timer <= 0) g_sn_pos.active = 0;
+    }
 
     /* Update Jump Arrival Timer */
     if (g_jump_arrival.timer > 0) {
@@ -2964,12 +3533,25 @@ int main(int argc, char** argv) {
 
     printf("[3D VIEW] Initializing GLUT (check DISPLAY: %s)...\n", getenv("DISPLAY"));
     glutInit(&argc, argv); 
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH); glutInitWindowSize(1024, 768); glutCreateWindow("Trek 3DView - Multiuser");
+    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH | GLUT_MULTISAMPLE); glutInitWindowSize(1024, 768); glutCreateWindow("Trek 3DView - Multiuser");
     
+    /* Initialize GLEW */
+    glewExperimental = GL_TRUE;
+    GLenum err = glewInit();
+    if (GLEW_OK != err) {
+        fprintf(stderr, "[3D VIEW] GLEW Error: %s\n", glewGetErrorString(err));
+        return 1;
+    }
+    printf("[3D VIEW] GLEW initialized. OpenGL Version: %s\n", glGetString(GL_VERSION));
+
+    /* Initialize Bloom FBOs */
+    initBloomFBO();
+
     /* Initialize Shader Engine */
     initShaders();
 
     glEnable(GL_DEPTH_TEST); 
+    glEnable(GL_MULTISAMPLE);
     glEnable(GL_BLEND); 
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glShadeModel(GL_SMOOTH);

@@ -17,7 +17,8 @@
 #define MAX_NET_BEAMS 8
 
 typedef struct {
-    float net_tx, net_ty, net_tz;
+    float net_sx, net_sy, net_sz; /* Source coordinates */
+    float net_tx, net_ty, net_tz; /* Target coordinates */
     int32_t active;
 } NetBeam;
 
@@ -79,6 +80,7 @@ typedef struct {
     int32_t cargo_energy;
     int32_t cargo_torpedoes;
     int32_t crew_count;
+    int32_t prison_unit;
     int32_t inventory[10];
     int32_t species_counts[11];
     int32_t shields[6];

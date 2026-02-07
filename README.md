@@ -1,5 +1,6 @@
 # Star Trek Ultra: 3D Multi-User Client-Server Edition
 ## Star Trek Day, 8 settembre 2026, 60 anni dalla prima messa in onda della serie originale nel 1966.
+### Nicola Taibi: https://github.com/nicolataibi/startrekultra-v5
 **Persistent Galaxy Tactical Navigation & Combat Simulator**
 
 <table>
@@ -14,6 +15,10 @@
   <tr>
     <td><img src="wormhole-enter.jpg" alt="Wormhole Entry" width="400"/></td>
     <td><img src="wormhole-exit.jpg" alt="Wormhole Exit" width="400"/></td>
+  </tr>
+  <tr>
+    <td><img src="shields.jpg" alt="Sector Shields" width="400"/></td>
+    <td><img src="new cinematic engine 2026.jpg" alt="New Cinematic Engine 2026" width="400"/></td>
   </tr>
 </table>
 
@@ -99,6 +104,18 @@ Parametri configurabili includono:
 *   **Limiti Risorse:** `MAX_ENERGY_CAPACITY`, `MAX_TORPEDO_CAPACITY`.
 *   **Bilanciamento Danni:** `DMG_PHASER_BASE` (potenza faser), `DMG_TORPEDO` (danno siluri).
 *   **Distanze di Interazione:** `DIST_MINING_MAX` (raggio minerario), `DIST_BOARDING_MAX` (raggio teletrasporto per arrembaggio).
+
+| Operazione | Comando | Distanza Massima (Settore) |
+| :--- | :--- | :--- |
+| **Raccolta Antimateria** | `har` | **3.1** |
+| **Estrazione Mineraria** | `min` | **3.1** |
+| **Ricarica Solare** | `sco` | **3.1** |
+| **Arrembaggio / Squadre** | `bor` | **1.0** |
+| **Attracco Base** | `doc` | **3.1** |
+| **Recupero Sonde** | `aux recover` | **3.1** |
+
+*Nota: La distanza di sicurezza operativa dai Buchi Neri è fissata a **3.0**. Oltrepassando questa soglia si entra nel pozzo gravitazionale (attrazione fisica e drenaggio scudi). Il raggio di interazione di 3.1 permette operazioni di raccolta sicure appena fuori dal limite gravitazionale. È implementata una tolleranza di **0.05 unità** per compensare le imprecisioni decimali dell'autopilota.*
+
 *   **Eventi:** `TIMER_SUPERNOVA` (durata del countdown catastrofico).
 
 Questo permette agli amministratori di creare varianti del gioco (es. *Hardcore Survival* con poche risorse o *Arcade Deathmatch* con armi potenziate).
@@ -588,13 +605,14 @@ L'HUD mostra "LIFE SUPPORT: XX.X%", valore direttamente collegato all'integrità
 *   `sco`: **Solar Scooping**. Raccoglie energia da una stella (Dist < 2.0).
 *   `har`: **Harvest Antimatter**. Raccoglie antimateria da un buco nero (Dist < 2.0).
 *   `con T A`: **Convert Resources**. Converte materie prime in energia o siluri (`T`: tipo risorsa, `A`: quantità).
-    *   `1`: Dilithium -> Energia.
-    *   `2`: Tritanium -> Energia.
-    *   `3`: Verterium -> Siluri.
-    *   `6`: Gas -> Energia.
-    *   `7`: Duranio -> Energia.
+    *   `1`: Dilithium -> Energia (x10).
+    *   `2`: Tritanium -> Energia (x2).
+    *   `3`: Verterium -> Siluri (1 ogni 20).
+    *   `6`: Gas -> Energia (x5).
+    *   `7`: Duranio -> Energia (x4).
+    *   `8`: Keronium -> Energia (x25). [Alta efficienza]
 *   `load <T> <A>`: **Load Systems**. Trasferisce energia o siluri dalla stiva ai sistemi attivi.
-    *   `1`: Energia (Reattore Principale). Capacità max: 9.999.999 unità.
+    *   `1`: Energia (Reattore Principale). Capacità max: 9.999.999 unità. Consente di convertire l'Antimateria raccolta dai Buchi Neri in energia operativa.
     *   `2`: Siluri (Tubi di Lancio). Capacità max: 1000 unità.
 
 #### 🏗️ Rinforzo Scafo (Hull Plating)
@@ -605,19 +623,34 @@ L'HUD mostra "LIFE SUPPORT: XX.X%", valore direttamente collegato all'integrità
 
 ### 📦 Gestione Carico e Risorse
 
-Star Trek Ultra distingue tra **Sistemi Attivi** e **Stoccaggio Stiva**. Questa distinzione è visibile nell'HUD come `ENERGY: X (CARGO: Y)`.
+Star Trek Ultra distingue tra **Sistemi Attivi**, **Stoccaggio Stiva** e **Unità di Detenzione (Prison Unit)**. Questa distinzione è visibile nell'HUD come `ENERGY: X (CARGO: Y)`.
+
+
 
 *   **Energia/Siluri Attivi**: Sono le risorse immediatamente utilizzabili dai sistemi della nave.
+
 *   **Riserve in Stiva (Cargo Bay)**: Risorse conservate per il rifornimento a lungo raggio.
-    *   **Tabella Risorse**:
-        1. **Dilithium**: Salto Warp e conversione energetica.
-        2. **Tritanium**: Riparazione scafi e conversione energia.
-        3. **Verterium**: Materiale per testate siluri fotonici (`[WARHEADS]`).
-        4. **Monotanium**: Lega strutturale avanzata.
-        5. **Isolinear**: Chip per riparazioni sistemi complessi.
-        6. **Gases**: Raccolti dalle comete, conversione energia.
-        7. **Duranium**: Placcatura corazzata scafo.
-        8. **Prisoners**: Personale nemico catturato.
+
+        *   **Tabella Risorse**:
+
+            1. **Dilithium**: Salto Warp e conversione energetica.
+
+            2. **Tritanium**: Riparazione scafi e conversione energia.
+
+            3. **Verterium**: Materiale per testate siluri fotonici (`[WARHEADS]`).
+
+            4. **Monotanium**: Lega strutturale avanzata.
+
+            5. **Isolinear**: Chip per riparazioni sistemi complessi.
+
+            6. **Gases**: Raccolti dalle comete, conversione energia.
+
+            7. **Duranium**: Placcatura corazzata scafo.
+
+            8. **Keronium**: Minerale raro e radioattivo trovato in asteroidi e pianeti speciali. Utilizzato per tecnologie sperimentali e potenziamento sistemi.
+
+*   **Prison Unit**: Unità dedicata alla detenzione del personale nemico catturato durante gli arrembaggi. È monitorata in tempo reale nell'HUD vitale accanto all'equipaggio.
+
 *   **Conversione Risorse**: Materie prime devono essere convertite (`con`) in **CARGO Antimatter** o **CARGO Torpedoes** prima di essere caricate nei sistemi attivi.
 
 *   `rep [ID]`: **Repair**. Ripara un sistema danneggiato (salute < 100%) riportandolo alla piena efficienza. Fondamentale per eliminare il rumore telemetrico dei sensori o riattivare armi offline.
@@ -1021,11 +1054,25 @@ Il progetto Star Trek Ultra è una dimostrazione di ingegneria del software orie
 *   **Sincronizzazione Deterministica**: Il sistema utilizza un mix di **Pthread Mutex Shared** (per l'integrità atomica dei dati) e **POSIX Semaphores** (per il wake-up guidato dagli eventi). Questo assicura che il visualizzatore renderizzi i dati esattamente quando vengono ricevuti dal server, eliminando il jitter visivo.
 *   **Timer ad alta precisione**: Il loop logico del server è temporizzato tramite `clock_nanosleep` su orologi mononotici del sistema, garantendo che il calcolo della fisica e del movimento sia costante e indipendente dal carico del sistema.
 
-### 🎨 Tactical Rendering Pipeline (3D View)
-La visualizzazione tattica è gestita da un motore OpenGL moderno che combina tecniche classiche e programmabili:
-*   **GLSL Shader Engine**: Gli effetti di bagliore delle stelle, la distorsione del Buco Nero e le scariche phaser sono processati tramite shader scritti in **OpenGL Shading Language**. Questo sposta il carico estetico sulla GPU, liberando la CPU per la logica di rete.
-*   **Vertex Buffer Objects (VBO)**: La geometria statica (stelle di fondo, griglia tattica) viene caricata nella memoria della scheda video all'avvio. Durante il rendering, viene inviato un singolo comando di disegno alla GPU, massimizzando il throughput grafico.
-*   **Projective HUD Technology**: Utilizza trasformazioni di matrice inversa e `gluProject` per mappare coordinate spaziali 3D in coordinate dello schermo 2D, permettendo all'interfaccia di ancorare dinamicamente i tag di identificazione sopra i vascelli in movimento.
+### 🎨 Tactical Rendering Pipeline (Cinematic Engine 2026)
+La visualizzazione tattica è gestita da un motore OpenGL avanzato che implementa una pipeline di rendering moderna a più stadi:
+
+*   **MSAA-aware FBO Pipeline**: Il motore utilizza un'architettura a Framebuffer multipli. La scena viene renderizzata in un **MSAA Target (4x Multisample)** a 16-bit floating point, risolto poi tramite `glBlitFramebuffer` per garantire un antialiasing perfetto anche in presenza di effetti post-processing.
+*   **Post-Processing Bloom (HDR)**: Implementa un filtro Gaussian Blur a due passaggi applicato alle sorgenti luminose. Questo permette a stelle, phaser, motori ed esplosioni di emettere un riverbero luminoso (glow) realistico che satura l'ambiente circostante.
+*   **Procedural Hull Shader (Triplanar Mapping)**: Le navi e i corpi celesti non usano texture statiche, ma uno shader procedurale che genera pannellature metalliche e dettagli strutturali in tempo reale. Il **Triplanar Mapping** garantisce una proiezione coerente dei dettagli senza distorsioni UV su modelli complessi.
+*   **Dynamic Stellar Lighting**: La luce principale del quadrante è dinamica; viene calcolata in tempo reale in base alla posizione della stella più vicina, influenzando ombreggiamento e riflessi speculari sugli scafi.
+*   **Procedural Nebula Skybox**: Lo spazio profondo è renderizzato tramite uno shader che genera nebulose volumetriche procedurali (Noise-based), eliminando il nero piatto e fornendo un senso di profondità e scala galattica.
+*   **Advanced FX Particle System**: Gestione di migliaia di particelle tramite **Point Sprites** e shader dedicati per esplosioni, scie dei motori e detriti spaziali, con blending additivo e decadimento della vita atomico.
+*   **Radiant Photon Torpedoes**: I siluri fotonici utilizzano un design multistrato avanzato: un micro-buco nero centrale circondato da un nucleo a icosaedro solido con illuminazione dinamica, sei raggi di luce cinetica (Star-Flares) ad alta visibilità e una scia di particelle, il tutto sincronizzato in un ciclo cromatico arcobaleno (Rainbow Engine).
+*   **Precision Combat Collision**: La logica del server è stata ottimizzata per calcolare l'impatto dei siluri con precisione millimetrica. Le esplosioni, incluse quelle letali che portano alla distruzione del vascello, vengono generate esattamente nel punto di impatto sulla superficie della nave e non più genericamente nel suo centro geometrico.
+*   **Localized Sector Shields**: Implementazione di scudi difensivi intelligenti a 6 settori. Invece di una bolla generica, il sistema visualizza "archi di impatto" (toremi a reticolo) localizzati esattamente sul quadrante colpito (F, R, T, B, L, RI). L'effetto è sincronizzato temporalmente con la durata dei raggi faser ed è stato calibrato per calcolare con precisione millimetrica anche le traiettorie verticali e balistiche delle piattaforme difensive orbitali.
+*   **Hull Impact Feedback (Red Pulse)**: Quando il danno penetra gli scudi colpendo direttamente lo scafo, la nave emette un lampo rosso d'allarme (Red Alert Pulse) tramite uno shader dedicato e genera scintille metalliche volumetriche, fornendo un feedback visivo immediato sulla criticità del danno ricevuto.
+*   **Dual-Coordinate Phaser Tracking**: Il sistema di tracciamento dei fasatori è stato evoluto per gestire vettori di origine e destinazione indipendenti. Questo permette al visualizzatore di renderizzare correttamente i raggi provenienti da piattaforme NPC o altri giocatori, garantendo che l'angolazione visiva del colpo corrisponda esattamente alla posizione spaziale dell'aggressore.
+*   **Gravitational Lensing**: I Buchi Neri implementano una distorsione spazio-temporale reale. Lo shader campiona la texture della scena e ne distorce i pixel in base alla curvatura gravitazionale (Lente di Einstein) calcolata matematicamente.
+*   **GLSL Shader Engine**: Tutti gli effetti core (bagliore stelle, distorsione wormhole, occultamento) sono processati sulla GPU tramite shader GLSL ottimizzati.
+*   **Vertex Buffer Objects (VBO)**: La geometria statica è caricata nella memoria video per massimizzare il throughput grafico.
+*   **Projective HUD Technology**: Utilizza trasformazioni di matrice inversa e un sistema di **Matrix-Capture** per ancorare i tag di identificazione sopra i vascelli in movimento. Il sistema cattura lo stato della camera 3D in tempo reale e proietta i dati in uno spazio 2D/3D ibrido.
+*   **Final UI Pass (Sharp Text)**: Per garantire la massima leggibilità, l'HUD e la telemetria vengono renderizzati in un passaggio finale post-MSAA e post-Bloom. Questo bypassa i filtri di sfocatura cinematici, garantendo scritte cristalline e ultra-definite su ogni risoluzione.
 *   **Overlay Tattico Intelligente**: Quando un bersaglio viene agganciato (`lock <ID>`), un display centrale in realtà aumentata fornisce telemetria a scansione profonda:
     *   **Analisi Energia Assoluta**: Mostra le unità di energia esatte rimanenti (non solo la percentuale) per calcolare la potenza letale dei faser.
     *   **Identificazione IFF**: Visualizza la fazione del bersaglio (Federazione, Klingon, Romulani, etc.) con allerta codificata per colore.

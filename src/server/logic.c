@@ -119,7 +119,7 @@ void update_npc_ai(int n) {
         if (npcs[n].fire_cooldown <= 0 && dist_to_player < 8.0) {
              /* Beam FX logic mapped to player state for transmission */
             players[closest_p].state.beam_count = 1; 
-            players[closest_p].state.beams[0] = (NetBeam){(float)npcs[n].x, (float)npcs[n].y, (float)npcs[n].z, 1};
+            players[closest_p].state.beams[0] = (NetBeam){(float)npcs[n].x, (float)npcs[n].y, (float)npcs[n].z, (float)target->state.s1, (float)target->state.s2, (float)target->state.s3, 1};
             
             /* Damage Calculation */
             float base_dmg = DMG_PHASER_BASE;
@@ -139,11 +139,20 @@ void update_npc_ai(int n) {
             while (rel_angle < 0) rel_angle += 360;
             while (rel_angle >= 360) rel_angle -= 360;
             
+            /* 3D Shield Mapping: 0:F, 1:R, 2:T, 3:B, 4:L, 5:RI */
+            double rel_dz = npcs[n].z - target->state.s3;
+            double dist_2d = sqrt(pow(npcs[n].x - target->state.s1, 2) + pow(npcs[n].y - target->state.s2, 2));
+            double vertical_angle = atan2(rel_dz, dist_2d) * 180.0 / M_PI;
+
             int s_idx = 0;
-            if (rel_angle > 315 || rel_angle <= 45) s_idx = 0;
-            else if (rel_angle > 45 && rel_angle <= 135) s_idx = 5;
-            else if (rel_angle > 135 && rel_angle <= 225) s_idx = 1;
-            else s_idx = 4;
+            if (vertical_angle > 45) s_idx = 2;      /* Top */
+            else if (vertical_angle < -45) s_idx = 3; /* Bottom */
+            else {
+                if (rel_angle > 315 || rel_angle <= 45) s_idx = 0;
+                else if (rel_angle > 45 && rel_angle <= 135) s_idx = 5;
+                else if (rel_angle > 135 && rel_angle <= 225) s_idx = 1;
+                else s_idx = 4;
+            }
 
             int dmg_to_shield = (int)(dmg * 0.7f);
             int dmg_rem = dmg_to_shield;
@@ -280,9 +289,65 @@ void update_game_logic() {
                 if (dist < 5.0) {
                     /* Fire! */
                     p->state.beam_count = 1;
-                    p->state.beams[0] = (NetBeam){(float)platforms[pt].x, (float)platforms[pt].y, (float)platforms[pt].z, 1};
-                    p->state.energy -= 100; /* Heavy damage */
+                    p->state.beams[0] = (NetBeam){(float)platforms[pt].x, (float)platforms[pt].y, (float)platforms[pt].z, (float)p->state.s1, (float)p->state.s2, (float)p->state.s3, 1};
+                    
+                    /* Tactical Damage Logic */
+                    int dmg = 2000; /* Platform phaser base damage */
+                    
+                    /* Correct relative vector: Attacker position relative to Target */
+                    double r_dx = platforms[pt].x - p->state.s1;
+                    double r_dy = platforms[pt].y - p->state.s2;
+                    double r_dz = platforms[pt].z - p->state.s3;
+                    double dist_2d = sqrt(r_dx*r_dx + r_dy*r_dy);
+
+                    double angle = atan2(r_dx, -r_dy) * 180.0 / M_PI; if (angle < 0) angle += 360;
+                    double rel_angle = angle - p->state.ent_h;
+                    while (rel_angle < 0) rel_angle += 360;
+                    while (rel_angle >= 360) rel_angle -= 360;
+
+                    double vertical_angle = atan2(r_dz, dist_2d) * 180.0 / M_PI;
+                    int s_idx = 0;
+                    if (vertical_angle > 45) s_idx = 2;      /* Top */
+                    else if (vertical_angle < -45) s_idx = 3; /* Bottom */
+                    else {
+                        if (rel_angle > 315 || rel_angle <= 45) s_idx = 0;
+                        else if (rel_angle > 45 && rel_angle <= 135) s_idx = 5;
+                        else if (rel_angle > 135 && rel_angle <= 225) s_idx = 1;
+                        else s_idx = 4;
+                    }
+
+                    int dmg_rem = dmg;
+                    if (p->state.shields[s_idx] >= dmg_rem) {
+                        p->state.shields[s_idx] -= dmg_rem;
+                        dmg_rem = 0;
+                    } else {
+                        dmg_rem -= p->state.shields[s_idx];
+                        p->state.shields[s_idx] = 0;
+                    }
+
+                    if (dmg_rem > 0) {
+                        float hull_dmg = dmg_rem / 1000.0f;
+                        p->state.hull_integrity -= hull_dmg;
+                        if (p->state.hull_integrity < 0) p->state.hull_integrity = 0;
+                        
+                        /* Internal System Damage */
+                        if (rand() % 100 < 20) {
+                            int sys_idx = rand() % 10;
+                            p->state.system_health[sys_idx] -= (5.0f + (rand() % 15));
+                            if (p->state.system_health[sys_idx] < 0) p->state.system_health[sys_idx] = 0;
+                            send_server_msg(j, "DAMAGE", "Platform hit bypassed shields! System damage detected!");
+                        }
+                        p->state.energy -= dmg_rem / 2;
+                    }
+
+                    p->shield_regen_delay = 90;
+                    if (p->state.hull_integrity <= 0 || p->state.energy <= 0) {
+                        p->state.energy = 0; p->state.hull_integrity = 0; p->state.crew_count = 0; p->active = 0;
+                        p->state.boom = (NetPoint){(float)p->state.s1, (float)p->state.s2, (float)p->state.s3, 1};
+                    }
+
                     platforms[pt].fire_cooldown = 100; /* ~3.3 seconds */
+                    send_server_msg(j, "WARNING", "UNDER ATTACK BY DEFENSE PLATFORM!");
                     break;
                 }
             }
@@ -343,8 +408,11 @@ void update_game_logic() {
             int q1 = supernova_event.supernova_q1, q2 = supernova_event.supernova_q2, q3 = supernova_event.supernova_q3;
             LOG_DEBUG("SUPERNOVA EXPLOSION in Q-%d-%d-%d\n", q1, q2, q3);
 
-            /* Destroy Stars */
-            for(int s=0; s<MAX_STARS; s++) if(stars_data[s].active && stars_data[s].q1 == q1 && stars_data[s].q2 == q2 && stars_data[s].q3 == q3) stars_data[s].active = 0;
+            /* Destroy the specific star */
+            if (supernova_event.star_id >= 0 && supernova_event.star_id < MAX_STARS) {
+                stars_data[supernova_event.star_id].active = 0;
+            }
+            
             /* Destroy Planets */
             for(int p=0; p<MAX_PLANETS; p++) if(planets[p].active && planets[p].q1 == q1 && planets[p].q2 == q2 && planets[p].q3 == q3) planets[p].active = 0;
             /* Destroy NPCs */
@@ -381,6 +449,13 @@ void update_game_logic() {
             supernova_event.supernova_timer = 0; /* EXPLICITLY CLEAR EVENT */
             rebuild_spatial_index();
             save_galaxy();
+            
+            /* Broadcaster: Force immediate map update for all players */
+            for(int i=0; i<MAX_CLIENTS; i++) {
+                if (players[i].active && players[i].socket != 0) {
+                    send_server_msg(i, "SCIENCE", "SENSOR ALERT: Gravitational waves confirmed. Singularity detected at explosion epicenter.");
+                }
+            }
         }
     } else {
         /* Small chance to trigger a new supernova if none active */
@@ -395,6 +470,7 @@ void update_game_logic() {
                 supernova_event.x = qi->stars[0]->x;
                 supernova_event.y = qi->stars[0]->y;
                 supernova_event.z = qi->stars[0]->z;
+                supernova_event.star_id = qi->stars[0]->id;
             }
         }
     }
@@ -959,20 +1035,34 @@ void update_game_logic() {
         /* Collision Detection: Celestial Bodies */
         QuadrantIndex *current_q = &spatial_index[players[i].state.q1][players[i].state.q2][players[i].state.q3];
         for (int h = 0; h < current_q->bh_count; h++) {
-            double d = sqrt(pow(players[i].state.s1 - current_q->black_holes[h]->x, 2) + pow(players[i].state.s2 - current_q->black_holes[h]->y, 2) + pow(players[i].state.s3 - current_q->black_holes[h]->z, 2));
-            if (d < 2.5) {
+            double dx = current_q->black_holes[h]->x - players[i].state.s1;
+            double dy = current_q->black_holes[h]->y - players[i].state.s2;
+            double dz = current_q->black_holes[h]->z - players[i].state.s3;
+            double d = sqrt(dx*dx + dy*dy + dz*dz);
+            
+            if (d < DIST_GRAVITY_WELL) {
                 /* Gravity Well Effect: Drain Shields and Energy */
-                int drain = (int)((2.5 - d) * 1000.0);
+                int drain = (int)((DIST_GRAVITY_WELL - d) * 1000.0);
                 for(int s=0; s<6; s++) { if(players[i].state.shields[s] > 0) players[i].state.shields[s] -= (drain/10); if(players[i].state.shields[s] < 0) players[i].state.shields[s] = 0; }
                 players[i].state.energy -= drain;
+                
+                /* Physical Pull: Displace ship towards singularity */
+                double pull_strength = (DIST_GRAVITY_WELL - d) * 0.05;
+                if (d > 0.001) {
+                    players[i].gx += (dx / d) * pull_strength;
+                    players[i].gy += (dy / d) * pull_strength;
+                    players[i].gz += (dz / d) * pull_strength;
+                }
+
                 if (global_tick % 20 == 0) send_server_msg(i, "WARNING", "Extreme gravitational shear detected! Hull integrity at risk.");
             }
-            if (d < 0.6) { 
+            if (d < DIST_EVENT_HORIZON) { 
                 send_server_msg(i, "CRITICAL", "Event Horizon crossed! Spaghettification in progress..."); 
                 players[i].state.energy = 0; players[i].state.crew_count = 0;
                 players[i].nav_state = NAV_STATE_IDLE; players[i].warp_speed = 0;
                 players[i].dx = 0; players[i].dy = 0; players[i].dz = 0;
                 players[i].state.boom = (NetPoint){(float)players[i].state.s1, (float)players[i].state.s2, (float)players[i].state.s3, 1}; 
+                players[i].active = 0; /* Ship destroyed */
                 break; 
             }
         }
@@ -1144,11 +1234,19 @@ void update_game_logic() {
                     while (rel_angle < 0) rel_angle += 360;
                     while (rel_angle >= 360) rel_angle -= 360;
                     
+                    double rel_dz = players[i].tz - p->state.s3;
+                    double dist_2d = sqrt(rel_dx*rel_dx + rel_dy*rel_dy);
+                    double vertical_angle = atan2(rel_dz, dist_2d) * 180.0 / M_PI;
+
                     int s_idx = 0;
-                    if (rel_angle > 315 || rel_angle <= 45) s_idx = 0;      /* Front */
-                    else if (rel_angle > 45 && rel_angle <= 135) s_idx = 5; /* Right */
-                    else if (rel_angle > 135 && rel_angle <= 225) s_idx = 1;/* Rear */
-                    else s_idx = 4;                                        /* Left */
+                    if (vertical_angle > 45) s_idx = 2;      /* Top */
+                    else if (vertical_angle < -45) s_idx = 3; /* Bottom */
+                    else {
+                        if (rel_angle > 315 || rel_angle <= 45) s_idx = 0;      /* Front */
+                        else if (rel_angle > 45 && rel_angle <= 135) s_idx = 5; /* Right */
+                        else if (rel_angle > 135 && rel_angle <= 225) s_idx = 1;/* Rear */
+                        else s_idx = 4;                                        /* Left */
+                    }
 
                     if (p->state.shields[s_idx] >= dmg) {
                         p->state.shields[s_idx] -= dmg;
@@ -1186,7 +1284,7 @@ void update_game_logic() {
                     if(p->state.energy <= 0) { 
                         p->state.energy = 0; p->state.crew_count = 0;
                         p->nav_state = NAV_STATE_IDLE; p->warp_speed = 0;
-                        p->state.boom = (NetPoint){(float)p->state.s1, (float)p->state.s2, (float)p->state.s3, 1}; 
+                        p->state.boom = (NetPoint){(float)players[i].tx, (float)players[i].ty, (float)players[i].tz, 1}; 
                     }
                     hit = true; break;
                 }
@@ -1204,7 +1302,7 @@ void update_game_logic() {
                         send_server_msg(i, "CRITICAL", "ATTACKING FRIENDLY VESSEL! Sector command has revoked your status!");
                     }
 
-                    if(npc->energy <= 0) { npc->active = 0; players[i].state.boom = (NetPoint){(float)npc->x, (float)npc->y, (float)npc->z, 1}; } hit = true; break; 
+                    if(npc->energy <= 0) { npc->active = 0; players[i].state.boom = (NetPoint){(float)players[i].tx, (float)players[i].ty, (float)players[i].tz, 1}; } hit = true; break; 
                 }
             }
             /* 3. Planets/Stars/Bases (Solid obstacles) */
@@ -1224,12 +1322,12 @@ void update_game_logic() {
             if (!hit) for (int pt=0; pt<lq->platform_count; pt++) {
                 NPCPlatform *plat = lq->platforms[pt];
                 double d = sqrt(pow(players[i].tx - plat->x, 2) + pow(players[i].ty - plat->y, 2) + pow(players[i].tz - plat->z, 2));
-                if (d < DIST_COLLISION_TORP) { plat->energy -= DMG_TORPEDO_PLATFORM; if(plat->energy <= 0) { plat->active = 0; players[i].state.boom = (NetPoint){(float)plat->x, (float)plat->y, (float)plat->z, 1}; } hit = true; break; }
+                if (d < DIST_COLLISION_TORP) { plat->energy -= DMG_TORPEDO_PLATFORM; if(plat->energy <= 0) { plat->active = 0; players[i].state.boom = (NetPoint){(float)players[i].tx, (float)players[i].ty, (float)players[i].tz, 1}; } hit = true; break; }
             }
             if (!hit) for (int mo=0; mo<lq->monster_count; mo++) {
                 NPCMonster *mon = lq->monsters[mo];
                 double d = sqrt(pow(players[i].tx - mon->x, 2) + pow(players[i].ty - mon->y, 2) + pow(players[i].tz - mon->z, 2));
-                if (d < 1.0) { mon->energy -= DMG_TORPEDO_MONSTER; if(mon->energy <= 0) { mon->active = 0; players[i].state.boom = (NetPoint){(float)mon->x, (float)mon->y, (float)mon->z, 1}; } hit = true; break; }
+                if (d < 1.0) { mon->energy -= DMG_TORPEDO_MONSTER; if(mon->energy <= 0) { mon->active = 0; players[i].state.boom = (NetPoint){(float)players[i].tx, (float)players[i].ty, (float)players[i].tz, 1}; } hit = true; break; }
             }
             if (players[i].torp_timeout > 0) players[i].torp_timeout--;
 
@@ -1254,6 +1352,7 @@ void update_game_logic() {
         upd.energy = players[i].state.energy; upd.torpedoes = players[i].state.torpedoes;
         upd.cargo_energy = players[i].state.cargo_energy; upd.cargo_torpedoes = players[i].state.cargo_torpedoes;
         upd.crew_count = players[i].state.crew_count;
+        upd.prison_unit = players[i].state.prison_unit;
         upd.duranium_plating = players[i].state.duranium_plating;
         upd.hull_integrity = players[i].state.hull_integrity;
         for(int s=0; s<6; s++) upd.shields[s] = players[i].state.shields[s];
@@ -1302,7 +1401,7 @@ void update_game_logic() {
                 for(int n=0; n<lq->nebula_count && o_idx < MAX_NET_OBJECTS; n++) upd.objects[o_idx++] = (NetObject){(float)lq->nebulas[n]->x, (float)lq->nebulas[n]->y, (float)lq->nebulas[n]->z, 0, 0, 7, lq->nebulas[n]->id % 5, 1, 100, 0, 0, 100, 0, lq->nebulas[n]->id+8000, 0, "Nebula"};
                 for(int p=0; p<lq->pulsar_count && o_idx < MAX_NET_OBJECTS; p++) upd.objects[o_idx++] = (NetObject){(float)lq->pulsars[p]->x, (float)lq->pulsars[p]->y, (float)lq->pulsars[p]->z, 0, 0, 8, 0, 1, 100, 0, 0, 100, 0, lq->pulsars[p]->id+9000, 0, "Pulsar"};
                 for(int c=0; c<lq->comet_count && o_idx < MAX_NET_OBJECTS; c++) upd.objects[o_idx++] = (NetObject){(float)lq->comets[c]->x, (float)lq->comets[c]->y, (float)lq->comets[c]->z, (float)lq->comets[c]->h, (float)lq->comets[c]->m, 9, 0, 1, 100, 0, 0, 100, 0, lq->comets[c]->id+10000, 0, "Comet"};
-                for(int a=0; a<lq->asteroid_count && o_idx < MAX_NET_OBJECTS; a++) upd.objects[o_idx++] = (NetObject){(float)lq->asteroids[a]->x, (float)lq->asteroids[a]->y, (float)lq->asteroids[a]->z, 0, 0, 21, 0, 1, 100, 0, 0, 100, 0, lq->asteroids[a]->id+12000, 0, "Asteroid"};
+                for(int a=0; a<lq->asteroid_count && o_idx < MAX_NET_OBJECTS; a++) upd.objects[o_idx++] = (NetObject){(float)lq->asteroids[a]->x, (float)lq->asteroids[a]->y, (float)lq->asteroids[a]->z, 0, 0, 21, lq->asteroids[a]->resource_type, 1, 100, lq->asteroids[a]->amount, 0, 100, 0, lq->asteroids[a]->id+12000, 0, "Asteroid"};
                 for(int d=0; d<lq->derelict_count && o_idx < MAX_NET_OBJECTS; d++) upd.objects[o_idx++] = (NetObject){(float)lq->derelicts[d]->x, (float)lq->derelicts[d]->y, (float)lq->derelicts[d]->z, 0, 0, 22, lq->derelict_count, 1, 30, 0, 0, 100, 0, lq->derelicts[d]->id+11000, 0, "Derelict"};
                 for(int pt=0; pt<lq->platform_count && o_idx < MAX_NET_OBJECTS; pt++) upd.objects[o_idx++] = (NetObject){(float)lq->platforms[pt]->x, (float)lq->platforms[pt]->y, (float)lq->platforms[pt]->z, 0, 0, 25, 0, 1, (int)((lq->platforms[pt]->energy/10000.0)*100), (int)lq->platforms[pt]->energy, 0, 100, lq->platforms[pt]->faction, lq->platforms[pt]->id+16000, 0, "Defense Platform"};
                 for(int mo=0; mo<lq->monster_count && o_idx < MAX_NET_OBJECTS; mo++) { NetObject *no = &upd.objects[o_idx++]; *no = (NetObject){(float)lq->monsters[mo]->x, (float)lq->monsters[mo]->y, (float)lq->monsters[mo]->z, 0, 0, lq->monsters[mo]->type, 0, 1, 100, (int)lq->monsters[mo]->energy, 0, 100, 0, lq->monsters[mo]->id+18000, 0, ""}; strncpy(no->name, (lq->monsters[mo]->type==30)?"Crystalline Entity":"Space Amoeba", 63); }

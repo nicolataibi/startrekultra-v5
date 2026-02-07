@@ -1,5 +1,6 @@
 # Star Trek Ultra: 3D Multi-User Client-Server Edition
 ## Star Trek Day, September 8, 2026, 60 years since the first airing of the original series in 1966.
+### Nicola Taibi: https://github.com/nicolataibi/startrekultra-v5
 **Persistent Galaxy Tactical Navigation & Combat Simulator**
 
 <table>
@@ -14,6 +15,10 @@
   <tr>
     <td><img src="wormhole-enter.jpg" alt="Wormhole Entry" width="400"/></td>
     <td><img src="wormhole-exit.jpg" alt="Wormhole Exit" width="400"/></td>
+  </tr>
+  <tr>
+    <td><img src="shields.jpg" alt="Sector Shields" width="400"/></td>
+    <td><img src="new cinematic engine 2026.jpg" alt="New Cinematic Engine 2026" width="400"/></td>
   </tr>
 </table>
 
@@ -67,6 +72,18 @@ Configurable parameters include:
 *   **Resource Limits:** `MAX_ENERGY_CAPACITY`, `MAX_TORPEDO_CAPACITY`.
 *   **Damage Balance:** `DMG_PHASER_BASE` (phaser power), `DMG_TORPEDO` (torpedo damage).
 *   **Interaction Ranges:** `DIST_MINING_MAX` (mining range), `DIST_BOARDING_MAX` (transporter range for boarding).
+
+| Operation | Command | Maximum Distance (Sector) |
+| :--- | :--- | :--- |
+| **Antimatter Harvest** | `har` | **3.1** |
+| **Mineral Mining** | `min` | **3.1** |
+| **Solar Scooping** | `sco` | **3.1** |
+| **Boarding / Teams** | `bor` | **1.0** |
+| **Starbase Docking** | `doc` | **3.1** |
+| **Probe Recovery** | `aux recover` | **3.1** |
+
+*Note: The operational safety distance from Black Holes is set to **3.0**. Crossing this threshold triggers gravitational pull and shield drain. The 3.1 interaction range allows for safe harvesting just outside the gravity well. A **0.05 unit tolerance** is implemented to compensate for autopilot decimal inaccuracies.*
+
 *   **Events:** `TIMER_SUPERNOVA` (catastrophic countdown duration).
 
 This allows admins to create custom game variants (e.g., *Hardcore Survival* with scarce resources or *Arcade Deathmatch* with overpowered weapons).
@@ -529,17 +546,19 @@ The HUD displays "LIFE SUPPORT: XX.X%", which is directly linked to the integrit
         *   **Hostile Vessels**: `1`: Sabotage System, `2`: Raid Cargo Hold, `3`: Capture Hostages.
     *   **Selection**: Reply with the number `1`, `2`, or `3` to execute the action.
     *   **Risks**: Resistance chance (30% for players, higher for NPCs) may cause team casualties.
-*   `dis`: **Dismantle**. Dismantles enemy wrecks for resources (Dist < 1.5).*   `min`: **Mining**. Extracts resources from an orbiting planet (Dist < 2.0).
-*   `sco`: **Solar Scooping**. Collects energy from a star (Dist < 2.0).
-*   `har`: **Harvest Antimatter**. Collects antimatter from a black hole (Dist < 2.0).
+*   `dis`: **Dismantle**. Dismantles enemy wrecks for resources (Dist < 1.5).
+*   `min`: **Mining**. Extracts resources from an orbiting planet (Dist < 3.1).
+*   `sco`: **Solar Scooping**. Collects energy from a star (Dist < 3.1).
+*   `har`: **Harvest Antimatter**. Collects antimatter from a black hole (Dist < 3.1).
 *   `con T A`: **Convert Resources**. Converts raw materials into energy or torpedoes (`T`: resource type, `A`: amount).
-    *   `1`: Dilithium -> Energy.
-    *   `2`: Tritanium -> Energy.
-    *   `3`: Verterium -> Torpedoes.
-    *   `6`: Gas -> Energy.
-    *   `7`: Duranium -> Energy.
+    *   `1`: Dilithium -> Energy (x10).
+    *   `2`: Tritanium -> Energy (x2).
+    *   `3`: Verterium -> Torpedoes (1 per 20).
+    *   `6`: Gas -> Energy (x5).
+    *   `7`: Duranium -> Energy (x4).
+    *   `8`: Keronium -> Energy (x25). [High efficiency]
 *   `load <T> <A>`: **Load Systems**. Transfers energy or torpedoes from cargo to active systems.
-    *   `1`: Energy (Main Reactor). Max capacity: 9,999,999 units.
+    *   `1`: Energy (Main Reactor). Max capacity: 9,999,999 units. Allows converting harvested Antimatter from Black Holes into operational energy.
     *   `2`: Torpedoes (Launch Tubes). Max capacity: 1000 units.
 
 #### 🏗️ Hull Reinforcement (Hull Plating)
@@ -550,19 +569,34 @@ The HUD displays "LIFE SUPPORT: XX.X%", which is directly linked to the integrit
 
 ### 📦 Cargo and Resource Management
 
-Star Trek Ultra distinguishes between **Active Systems** and **Cargo Storage**. This is reflected in the HUD as `ENERGY: X (CARGO: Y)`.
+Star Trek Ultra distinguishes between **Active Systems**, **Cargo Storage**, and the **Prison Unit**. This is reflected in the HUD as `ENERGY: X (CARGO: Y)`.
+
+
 
 *   **Active Energy/Torps**: These are resources currently available for immediate use.
+
 *   **Cargo Reserves (Cargo Bay)**: Resources stored for long-range replenishment.
+
     *   **Resource Table**:
+
         1. **Dilithium**: Warp Jump and energy conversion.
+
         2. **Tritanium**: Hull repairs and energy conversion.
+
         3. **Verterium**: Material for photon torpedo warheads (`[WARHEADS]`).
+
         4. **Monotanium**: Advanced structural alloy.
+
         5. **Isolinear**: Chips for complex system repairs.
-        6. **Gases**: Collected from comets, energy conversion.
-        7. **Duranium**: Armored hull plating.
-        8. **Prisoners**: Captured enemy personnel.
+
+                6. **Gases**: Collected from comets, energy conversion.
+
+                7. **Duranium**: Armored hull plating.
+
+                8. **Keronium**: Rare radioactive mineral found in specialized asteroids and planets. Used for experimental tech and system enhancement.
+
+*   **Prison Unit**: A dedicated unit for detaining enemy personnel captured during boarding operations. It is monitored in real-time in the vital HUD next to the crew count.
+
 *   **Resource Conversion**: Raw materials must be converted (`con`) into **CARGO Antimatter** or **CARGO Torpedoes** before loading into active systems.
 
 *   `rep [ID]`: **Repair**. Repairs a damaged system (health < 100%) restoring it to full efficiency. Essential for fixing sensor noise or reactivating offline weapons.
@@ -987,11 +1021,25 @@ The Star Trek Ultra project is a demonstration of performance-oriented software 
 *   **Deterministic Synchronization**: The system uses a mix of **Pthread Mutex Shared** (for atomic data integrity) and **POSIX Semaphores** (for event-driven wake-up). This ensures the viewer renders data exactly when received from the server, eliminating visual jitter.
 *   **High-Precision Timers**: The server logic loop is timed via `clock_nanosleep` on system monotonic clocks, ensuring physics and movement calculation is constant and independent of system load.
 
-### 🎨 Tactical Rendering Pipeline (3D View)
-Tactical visualization is managed by a modern OpenGL engine combining classic and programmable techniques:
-*   **GLSL Shader Engine**: Star glow effects, Black Hole distortion, and phaser discharges are processed via shaders written in **OpenGL Shading Language**. This shifts the aesthetic load to the GPU, freeing the CPU for network logic.
-*   **Vertex Buffer Objects (VBO)**: Static geometry (background stars, tactical grid) is loaded into video card memory at startup. During rendering, a single draw command is sent to the GPU, maximizing graphic throughput.
-*   **Projective HUD Technology**: Uses inverse matrix transformations and `gluProject` to map 3D spatial coordinates into 2D screen coordinates, allowing the interface to dynamically anchor identification tags above moving vessels.
+### 🎨 Tactical Rendering Pipeline (Cinematic Engine 2026)
+Tactical visualization is managed by an advanced OpenGL engine implementing a modern multi-stage rendering pipeline:
+
+*   **MSAA-aware FBO Pipeline**: The engine utilizes a multi-framebuffer architecture. The scene is first rendered into an **MSAA Target (4x Multisample)** at 16-bit floating point, then resolved via `glBlitFramebuffer` to ensure flawless antialiasing even with active post-processing effects.
+*   **Post-Processing Bloom (HDR)**: Implements a dual-pass Gaussian Blur filter applied to light sources. This allows stars, phasers, engines, and explosions to emit a realistic glow that saturates the surrounding environment.
+*   **Procedural Hull Shader (Triplanar Mapping)**: Ships and celestial bodies do not use static textures but a procedural shader that generates metallic plating and structural details in real-time. **Triplanar Mapping** ensures coherent detail projection without UV distortion on complex models.
+*   **Dynamic Stellar Lighting**: The quadrant's primary light is dynamic; it is calculated in real-time based on the position of the nearest star, influencing shading and specular reflections on ship hulls.
+*   **Procedural Nebula Skybox**: Deep space is rendered via a shader generating volumetric procedural nebulae (Noise-based), eliminating flat black backgrounds and providing a sense of depth and galactic scale.
+*   **Advanced FX Particle System**: Manages thousands of particles via **Point Sprites** and dedicated shaders for explosions, engine trails, and space debris, featuring additive blending and atomic life decay.
+*   **Radiant Photon Torpedoes**: Photon torpedoes feature an advanced multi-layered design: a central black singularity surrounded by a solid white geometric nucleus with dynamic lighting, six high-visibility kinetic rays (Star-Flares), and a particle trail, all synchronized in a dynamic rainbow color cycle (Rainbow Engine).
+*   **Precision Combat Collision**: The server logic has been optimized for surgical-grade torpedo impact calculation. Explosions, including lethal hits resulting in vessel destruction, are now generated at the exact point of impact on the ship's surface rather than defaulting to its geometric center.
+*   **Localized Sector Shields**: Implementation of intelligent 6-sector defensive shields. Instead of a generic bubble, the system displays localized "impact arcs" (wireframe tori) specifically on the hit quadrant (F, R, T, B, L, RI). The effect is temporally synchronized with phaser beam duration and has been calibrated for millimeter precision against vertical and ballistic trajectories from orbital defense platforms.
+*   **Hull Impact Feedback (Red Pulse)**: When damage bypasses shields and strikes the hull directly, the vessel emits a warning red flash (Red Alert Pulse) via a dedicated shader and generates volumetric metallic sparks, providing immediate visual feedback on critical damage.
+*   **Dual-Coordinate Phaser Tracking**: The phaser tracking system has been evolved to handle independent origin and destination vectors. This allows the visualizer to correctly render beams originating from NPC platforms or other players, ensuring the visual angle of the attack exactly matches the spatial position of the aggressor.
+*   **Gravitational Lensing**: Black Holes implement real space-time distortion. The shader samples the scene texture and distorts pixels based on the mathematically calculated gravitational curvature (Einstein Lens).
+*   **GLSL Shader Engine**: All core effects (star glow, wormhole distortion, cloaking) are processed on the GPU via optimized GLSL shaders.
+*   **Vertex Buffer Objects (VBO)**: Static geometry is loaded into video memory to maximize graphic throughput.
+*   **Projective HUD Technology**: Uses inverse matrix transformations and a **Matrix-Capture** system to anchor identification tags above moving vessels. The engine captures the 3D camera state in real-time and projects data into a hybrid 2D/3D space.
+*   **Final UI Pass (Sharp Text)**: To ensure maximum legibility, the HUD and telemetry are rendered in a final pass after MSAA and Bloom processing. This bypasses cinematic blur filters, ensuring crystal-clear, ultra-defined text at any resolution.
 *   **Intelligent Tactical Overlay**: When a target is locked (`lock <ID>`), a central augmented reality display provides deep-scan telemetry:
     *   **Absolute Energy Analysis**: Shows exact energy units remaining (not just percentage) to calculate lethal phaser yields.
     *   **IFF Identification**: Displays the target's faction (Federation, Klingon, Romulan, etc.) with color-coded alerts.
